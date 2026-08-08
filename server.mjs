@@ -416,6 +416,21 @@ function requestIpAddress(req) {
   return /^[a-f0-9:.]+$/i.test(candidate) ? candidate : undefined;
 }
 
+function polarErrorDiagnostic(error) {
+  const statusCode = Number(error?.statusCode || error?.rawResponse?.status || 0) || null;
+  const rawBody = typeof error?.body === 'string' ? error.body : '';
+  let detail = cleanText(error?.message || 'Polar isteği başarısız oldu.', 600);
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody);
+      detail = cleanText(parsed?.detail || parsed?.error || parsed?.message || detail, 600);
+    } catch {
+      detail = cleanText(rawBody, 600);
+    }
+  }
+  return { provider: 'polar', statusCode, type: cleanText(error?.name || 'Error', 80), detail };
+}
+
 function fulfillPolarOrder(order) {
   const metadata = order?.metadata || {};
   const purchaseId = String(metadata.purchase_id || '');
@@ -871,7 +886,9 @@ async function handleApi(req, res, url) {
     } catch (error) {
       console.error('Polar checkout error:', error?.message || error);
       db.prepare(`UPDATE purchases SET status='failed',updated_at=? WHERE id=?`).run(nowIso(), purchaseId);
-      return fail(res, 502, 'PAYMENT_PROVIDER_ERROR', 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.');
+      const paymentError = { code: 'PAYMENT_PROVIDER_ERROR', message: 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.' };
+      if (user.is_admin) paymentError.diagnostic = polarErrorDiagnostic(error);
+      return json(res, 502, { error: paymentError });
     }
   }
 
