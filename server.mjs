@@ -410,6 +410,10 @@ function polarPaymentConfigured() {
   );
 }
 
+function polarServer() {
+  return String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
+}
+
 function requestIpAddress(req) {
   const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   const candidate = forwarded || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
@@ -429,6 +433,16 @@ function polarErrorDiagnostic(error) {
     }
   }
   return { provider: 'polar', statusCode, type: cleanText(error?.name || 'Error', 80), detail };
+}
+
+function polarCheckoutErrorMessage(error) {
+  const diagnostic = polarErrorDiagnostic(error);
+  if (diagnostic.statusCode === 401) return 'Polar erişim anahtarı geçersiz veya yanlış ortama ait. Lütfen ödeme ayarlarını kontrol edin.';
+  if (diagnostic.statusCode === 403) return 'Polar anahtarında ödeme oturumu oluşturma yetkisi bulunmuyor.';
+  if (diagnostic.statusCode === 404) return 'Seçilen paket Polar ortamında bulunamadı. Ürün kimliğini kontrol edin.';
+  if (diagnostic.type === 'OrganizationNotReadyForPayments') return 'Polar hesabı henüz ödeme almaya hazır değil.';
+  if (diagnostic.statusCode === 422) return 'Polar paket ayarlarını doğrulayamadı. Ürün ve fiyat bilgilerini kontrol edin.';
+  return 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.';
 }
 
 function fulfillPolarOrder(order) {
@@ -512,7 +526,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
@@ -868,7 +882,7 @@ async function handleApi(req, res, url) {
     }
     const productId = polarProductId(pack.key);
     if (PAYMENT_MODE !== 'polar' || !process.env.POLAR_ACCESS_TOKEN || !productId) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Canlı ödeme sağlayıcısı henüz yapılandırılmadı.');
-    const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN, server: process.env.POLAR_SERVER === 'sandbox' ? 'sandbox' : 'production' });
+    const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN, server: polarServer() });
     try {
       const checkout = await polar.checkouts.create({
         products: [productId],
@@ -886,7 +900,7 @@ async function handleApi(req, res, url) {
     } catch (error) {
       console.error('Polar checkout error:', error?.message || error);
       db.prepare(`UPDATE purchases SET status='failed',updated_at=? WHERE id=?`).run(nowIso(), purchaseId);
-      const paymentError = { code: 'PAYMENT_PROVIDER_ERROR', message: 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.' };
+      const paymentError = { code: 'PAYMENT_PROVIDER_ERROR', message: polarCheckoutErrorMessage(error) };
       if (user.is_admin) paymentError.diagnostic = polarErrorDiagnostic(error);
       return json(res, 502, { error: paymentError });
     }
