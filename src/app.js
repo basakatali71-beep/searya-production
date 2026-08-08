@@ -2976,6 +2976,7 @@ function showOnboardingPage(mode = 'login') {
   const mainView = document.getElementById('main-app-view');
 
   if (obView && mainView) {
+    closeModal();
     obView.classList.remove('hidden');
     obView.classList.add('flex');
     document.body.classList.add('onboarding-open');
@@ -3056,6 +3057,7 @@ function renderAuthCard() {
         <button type="submit" id="auth-submit-btn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/25 transition-all transform active:scale-95 cursor-pointer">
           ${isEn ? 'Log In' : 'Giriş Yap'}
         </button>
+        <p id="auth-form-status" class="hidden rounded-xl px-3 py-2.5 text-xs font-bold" role="status" aria-live="polite"></p>
       </form>
     `;
   } else {
@@ -3105,6 +3107,7 @@ function renderAuthCard() {
         <button type="submit" id="auth-submit-btn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/25 transition-all transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
           <span>${isEn ? 'Sign Up & Get 2 Free Connections 🎉' : 'Kayıt Ol & 2 Ücretsiz Bağlantı Kazan 🎉'}</span>
         </button>
+        <p id="auth-form-status" class="hidden rounded-xl px-3 py-2.5 text-xs font-bold" role="status" aria-live="polite"></p>
       </form>
     `;
 
@@ -3130,9 +3133,19 @@ function renderAuthCard() {
       return;
     }
     const submitButton = document.getElementById('auth-submit-btn');
+    const status = document.getElementById('auth-form-status');
     const email = document.getElementById('auth-email')?.value || '';
     const password = document.getElementById('auth-password')?.value || '';
-    if (submitButton) submitButton.disabled = true;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.classList.add('opacity-70', 'cursor-wait');
+    }
+    if (status) {
+      status.textContent = authMode === 'register'
+        ? (isEn ? 'Creating your account…' : 'Hesabınız oluşturuluyor…')
+        : (isEn ? 'Signing you in…' : 'Giriş yapılıyor…');
+      status.className = 'rounded-xl px-3 py-2.5 text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
+    }
     try {
       const payload = authMode === 'register'
         ? await SearyaApi.register({ name: document.getElementById('auth-fullname')?.value || '', email, password, role: authRole })
@@ -3147,9 +3160,17 @@ function renderAuthCard() {
       showToast(authMode === 'login' ? (isEn ? 'Welcome back!' : 'Başarıyla giriş yapıldı!') : (isEn ? 'Your account is ready!' : 'Hesabınız başarıyla oluşturuldu!'));
       showMainAppPage();
     } catch (error) {
-      showToast(apiErrorMessage(error));
+      const message = apiErrorMessage(error);
+      if (status) {
+        status.textContent = message;
+        status.className = 'rounded-xl px-3 py-2.5 text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300';
+      }
+      showToast(message);
     } finally {
-      if (submitButton) submitButton.disabled = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.classList.remove('opacity-70', 'cursor-wait');
+      }
     }
   });
 

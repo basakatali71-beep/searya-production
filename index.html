@@ -48,7 +48,7 @@
   <!-- CENTERED AUTHENTICATION & REGISTRATION MODAL VIEW       -->
   <!-- Opens on demand without blocking marketplace discovery  -->
   <!-- ======================================================= -->
-  <div id="onboarding-fullview" class="hidden fixed inset-0 z-[120] items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto transition-all duration-300" role="dialog" aria-modal="true" aria-labelledby="t-ob-card-title">
+  <div id="onboarding-fullview" class="hidden fixed inset-0 z-[160] items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto transition-all duration-300" role="dialog" aria-modal="true" aria-labelledby="t-ob-card-title">
     
     <!-- Centered Auth Glass Card -->
     <div class="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-[#0D131F] rounded-3xl p-5 sm:p-8 border border-slate-200 dark:border-slate-800/90 shadow-2xl space-y-4 sm:space-y-6 relative animate-fade-in my-auto" id="ob-auth-card">
@@ -86,10 +86,10 @@
 
       <!-- Segmented Tab Switcher (Giriş Yap vs Kayıt Ol) -->
       <div class="grid grid-cols-2 gap-1 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        <button id="ob-tab-login" class="py-2.5 rounded-xl font-extrabold text-xs transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm cursor-pointer">
+        <button id="ob-tab-login" type="button" class="py-2.5 rounded-xl font-extrabold text-xs transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm cursor-pointer">
           Giriş Yap
         </button>
-        <button id="ob-tab-register" class="py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+        <button id="ob-tab-register" type="button" class="py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
           Kayıt Ol
         </button>
       </div>
@@ -180,7 +180,7 @@
           </button>
 
           <!-- Onboarding & Registration Trigger Button -->
-          <button id="nav-register-btn" aria-label="Kayıt Ol" class="flex p-2.5 md:px-4 md:py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-xs font-extrabold items-center gap-1.5 shadow-sm active:scale-95">
+          <button id="nav-register-btn" type="button" aria-label="Kayıt Ol" class="flex p-2.5 md:px-4 md:py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-xs font-extrabold items-center gap-1.5 shadow-sm active:scale-95">
             <i class="ph-bold ph-user-plus text-sm"></i>
             <span id="t-nav-register" class="hidden md:inline">Kayıt Ol</span>
           </button>
@@ -1101,7 +1101,7 @@
   </div>
 
   <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
   <section id="cookie-consent-banner" class="hidden fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[140] sm:max-w-md p-5 rounded-2xl bg-white/95 dark:bg-[#101725]/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 shadow-2xl" role="dialog" aria-label="Çerez tercihleri">
     <div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-shield-check text-xl"></i></div><div><h3 id="cookie-consent-title" class="font-black text-sm text-slate-900 dark:text-white">Gizlilik tercihiniz</h3><p id="cookie-consent-text" class="text-xs leading-relaxed text-slate-500 dark:text-slate-400 mt-1">Zorunlu çerezler oturum için kullanılır. İzin verirseniz yalnızca anonim ziyaret istatistikleri tutulur.</p><a id="cookie-details-link" href="./legal/cookies.html" class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 inline-block">Ayrıntıları incele</a></div></div>
@@ -1109,7 +1109,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260808-22"></script>
+  <script type="module" src="./src/app.js?v=20260808-23"></script>
 
 </body>
 </html>
