@@ -1,0 +1,6 @@
+.DS_Store
+.env
+data/*.sqlite
+data/*.sqlite-*
+data/uploads/
+npm-debug.log*

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Searya Yönetim Merkezi</title>
+  <link rel="icon" href="/public/searya-logo.png">
+  <link rel="stylesheet" href="/src/styles/admin.css?v=20260807-1">
+</head>
+<body>
+  <aside>
+    <a class="brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya"></a>
+    <p class="eyebrow">YÖNETİM MERKEZİ</p>
+    <nav>
+      <button class="active" data-section="dashboard">Genel Bakış</button>
+      <button data-section="listings">İlanlar <span id="pending-badge">0</span></button>
+      <button data-section="users">Kullanıcılar</button>
+      <button data-section="purchases">Paket Satışları</button>
+      <button data-section="reports">Şikâyetler <span id="report-badge">0</span></button>
+    </nav>
+    <a class="back" href="/">← Siteye dön</a>
+  </aside>
+  <main>
+    <header><div><p class="eyebrow">SEARYA</p><h1 id="page-title">Genel Bakış</h1></div><button id="refresh-btn">Verileri yenile</button></header>
+    <div id="notice" class="notice">Veriler yükleniyor…</div>
+    <section id="dashboard" class="panel active">
+      <div id="metrics" class="metrics"></div>
+      <article class="card chart-card"><div class="card-head"><h2>Son 7 gün</h2><span>Ziyaret ve üyelik</span></div><div id="chart" class="chart"></div></article>
+      <div class="split"><article class="card"><div class="card-head"><h2>Onay bekleyen ilanlar</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Açık şikâyetler</h2></div><div id="report-preview"></div></article></div>
+    </section>
+    <section id="listings" class="panel"><div class="card"><div class="card-head"><h2>Tüm ilanlar</h2><input data-search="listing-table" placeholder="İlan ara…"></div><div class="table-wrap"><table><thead><tr><th>İlan</th><th>Sahibi</th><th>Fiyat</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="listing-table"></tbody></table></div></div></section>
+    <section id="users" class="panel"><div class="card"><div class="card-head"><h2>Kullanıcılar</h2><input data-search="user-table" placeholder="Kullanıcı ara…"></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Rol</th><th>Haklar</th><th>Son görülme</th><th>İşlem</th></tr></thead><tbody id="user-table"></tbody></table></div></div></section>
+    <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Paket satışları</h2></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
+    <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Şikâyetler</h2></div><div class="table-wrap"><table><thead><tr><th>Şikâyet eden</th><th>Hedef</th><th>Neden</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
+  </main>
+  <script type="module" src="/src/admin.js?v=20260808-3"></script>
+</body>
+</html>
