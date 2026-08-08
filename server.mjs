@@ -2,8 +2,10 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash, createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { Polar } from '@polar-sh/sdk';
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import { initialForSaleListings, initialWtbListings } from './src/data/mockData.js';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
@@ -181,6 +183,12 @@ const packages = Object.freeze({
   buyer_connections_10: { key: 'buyer_connections_10', name: '10 Bağlantı Paketi', amountCents: 900, buyerConnections: 10 },
   seller_listings_3: { key: 'seller_listings_3', name: '3 İlan Paketi', amountCents: 900, sellerListingCredits: 3 },
   seller_vip_10: { key: 'seller_vip_10', name: 'Satıcı Pro Lansman Paketi', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 }
+});
+
+const polarProductEnvironments = Object.freeze({
+  buyer_connections_10: 'POLAR_PRODUCT_BUYER_CONNECTIONS_10',
+  seller_listings_3: 'POLAR_PRODUCT_SELLER_LISTINGS_3',
+  seller_vip_10: 'POLAR_PRODUCT_SELLER_VIP_10'
 });
 
 function nowIso() {
@@ -389,16 +397,50 @@ function grantPackage(userId, packageKey) {
   return true;
 }
 
-function verifyStripeSignature(rawBody, signatureHeader) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret || !signatureHeader) return false;
-  const entries = Object.fromEntries(signatureHeader.split(',').map(item => item.split('=')));
-  const timestamp = Number(entries.t);
-  if (!timestamp || Math.abs(Date.now() / 1000 - timestamp) > 300 || !entries.v1) return false;
-  const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody.toString('utf8')}`).digest('hex');
-  const actualBuffer = Buffer.from(entries.v1, 'hex');
-  const expectedBuffer = Buffer.from(expected, 'hex');
-  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+function polarProductId(packageKey) {
+  const environmentName = polarProductEnvironments[packageKey];
+  return environmentName ? String(process.env[environmentName] || '').trim() : '';
+}
+
+function polarPaymentConfigured() {
+  return Boolean(
+    process.env.POLAR_ACCESS_TOKEN &&
+    process.env.POLAR_WEBHOOK_SECRET &&
+    Object.keys(packages).every(packageKey => polarProductId(packageKey))
+  );
+}
+
+function requestIpAddress(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const candidate = forwarded || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  return /^[a-f0-9:.]+$/i.test(candidate) ? candidate : undefined;
+}
+
+function fulfillPolarOrder(order) {
+  const metadata = order?.metadata || {};
+  const purchaseId = String(metadata.purchase_id || '');
+  const userId = String(metadata.user_id || '');
+  const packageKey = String(metadata.package_key || '');
+  const purchase = purchaseId ? db.prepare('SELECT * FROM purchases WHERE id=?').get(purchaseId) : null;
+  const pack = packages[packageKey];
+  if (!order?.paid || !purchase || !pack) return { fulfilled: false, reason: 'invalid_order' };
+  if (purchase.user_id !== userId || purchase.package_key !== packageKey) return { fulfilled: false, reason: 'metadata_mismatch' };
+  if (order.productId !== polarProductId(packageKey)) return { fulfilled: false, reason: 'product_mismatch' };
+  if (String(order.currency || '').toLowerCase() !== 'usd' || Number(order.subtotalAmount) !== pack.amountCents) return { fulfilled: false, reason: 'amount_mismatch' };
+  let granted = false;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const update = db.prepare(`UPDATE purchases SET status='paid',provider_ref=?,updated_at=? WHERE id=? AND status<>'paid'`).run(order.id || null, nowIso(), purchase.id);
+    if (update.changes === 1) {
+      grantPackage(purchase.user_id, purchase.package_key);
+      granted = true;
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+  return { fulfilled: true, granted, purchaseId: purchase.id, userId: purchase.user_id, packageKey: purchase.package_key };
 }
 
 function seedData() {
@@ -455,7 +497,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
@@ -474,24 +516,27 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true }, { 'Set-Cookie': visitorCookie('', true) });
   }
 
-  if (method === 'POST' && pathname === '/api/stripe/webhook') {
+  if (method === 'POST' && pathname === '/api/polar/webhook') {
+    if (!process.env.POLAR_WEBHOOK_SECRET) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Ödeme webhook anahtarı yapılandırılmadı.');
     const raw = await readBody(req, 2 * 1024 * 1024);
-    if (!verifyStripeSignature(raw, req.headers['stripe-signature'])) return fail(res, 400, 'INVALID_SIGNATURE', 'Webhook imzası geçersiz.');
-    const event = JSON.parse(raw.toString('utf8'));
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data?.object || {};
-      const purchaseId = session.metadata?.purchase_id;
-      const purchase = purchaseId ? db.prepare('SELECT * FROM purchases WHERE id=?').get(purchaseId) : null;
-      if (purchase && purchase.status !== 'paid') {
-        db.exec('BEGIN');
-        try {
-          db.prepare('UPDATE purchases SET status=\'paid\',provider_ref=?,updated_at=? WHERE id=?').run(session.id || null, nowIso(), purchase.id);
-          grantPackage(purchase.user_id, purchase.package_key);
-          db.exec('COMMIT');
-        } catch (error) { db.exec('ROLLBACK'); throw error; }
+    let event;
+    try {
+      event = validateEvent(raw, req.headers, process.env.POLAR_WEBHOOK_SECRET);
+    } catch (error) {
+      if (error instanceof WebhookVerificationError) return fail(res, 403, 'INVALID_SIGNATURE', 'Webhook imzası geçersiz.');
+      throw error;
+    }
+    if (event.type === 'order.paid') {
+      const result = fulfillPolarOrder(event.data);
+      if (!result.fulfilled) {
+        console.warn(`Polar order ignored: ${result.reason}`);
+      } else if (result.granted) {
+        const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(result.userId);
+        const pack = packages[result.packageKey];
+        if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya paketiniz aktifleştirildi', text: `${pack.name} hesabınıza tanımlandı.`, idempotencyKey: `purchase-${result.purchaseId}` }).catch(console.error);
       }
     }
-    return json(res, 200, { received: true });
+    return json(res, 202, { received: true });
   }
 
   if (method === 'POST' && pathname === '/api/auth/register') {
@@ -806,26 +851,28 @@ async function handleApi(req, res, url) {
       if (user.email) sendEmail({ to: user.email, subject: 'Searya paketiniz aktifleştirildi', text: `${pack.name} hesabınıza tanımlandı.`, idempotencyKey: `purchase-${purchaseId}` }).catch(console.error);
       return json(res, 200, { mode: 'demo', paid: true, packageKey: pack.key, amountCents: pack.amountCents, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
     }
-    if (PAYMENT_MODE !== 'stripe' || !process.env.STRIPE_SECRET_KEY) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Canlı ödeme sağlayıcısı henüz yapılandırılmadı.');
-    const form = new URLSearchParams({
-      mode: 'payment',
-      success_url: `${APP_ORIGIN}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${APP_ORIGIN}/?payment=cancelled`,
-      client_reference_id: user.id,
-      customer_email: user.email,
-      'line_items[0][quantity]': '1',
-      'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][unit_amount]': String(pack.amountCents),
-      'line_items[0][price_data][product_data][name]': pack.name,
-      'metadata[purchase_id]': purchaseId,
-      'metadata[user_id]': user.id,
-      'metadata[package_key]': pack.key
-    });
-    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: form });
-    const stripe = await response.json();
-    if (!response.ok || !stripe.url) return fail(res, 502, 'PAYMENT_PROVIDER_ERROR', stripe.error?.message || 'Ödeme oturumu oluşturulamadı.');
-    db.prepare('UPDATE purchases SET provider_ref=?,updated_at=? WHERE id=?').run(stripe.id, nowIso(), purchaseId);
-    return json(res, 200, { mode: 'stripe', checkoutUrl: stripe.url });
+    const productId = polarProductId(pack.key);
+    if (PAYMENT_MODE !== 'polar' || !process.env.POLAR_ACCESS_TOKEN || !productId) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Canlı ödeme sağlayıcısı henüz yapılandırılmadı.');
+    const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN, server: process.env.POLAR_SERVER === 'sandbox' ? 'sandbox' : 'production' });
+    try {
+      const checkout = await polar.checkouts.create({
+        products: [productId],
+        customerName: user.name,
+        customerEmail: user.email,
+        customerIpAddress: requestIpAddress(req),
+        externalCustomerId: user.id,
+        allowDiscountCodes: false,
+        successUrl: `${APP_ORIGIN}/?payment=success&checkout_id={CHECKOUT_ID}`,
+        returnUrl: `${APP_ORIGIN}/?payment=cancelled`,
+        metadata: { purchase_id: purchaseId, user_id: user.id, package_key: pack.key }
+      });
+      db.prepare('UPDATE purchases SET provider_ref=?,updated_at=? WHERE id=?').run(checkout.id, nowIso(), purchaseId);
+      return json(res, 200, { mode: 'polar', checkoutUrl: checkout.url });
+    } catch (error) {
+      console.error('Polar checkout error:', error?.message || error);
+      db.prepare(`UPDATE purchases SET status='failed',updated_at=? WHERE id=?`).run(nowIso(), purchaseId);
+      return fail(res, 502, 'PAYMENT_PROVIDER_ERROR', 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.');
+    }
   }
 
   if (method === 'POST' && pathname === '/api/reports') {
@@ -1026,4 +1073,4 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-export { server, db, packages, hashPassword, verifyPassword, listingFromRow };
+export { server, db, packages, hashPassword, verifyPassword, listingFromRow, fulfillPolarOrder };

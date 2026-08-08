@@ -28,8 +28,9 @@ Copy `.env.example` to `.env` and configure:
 
 - `APP_ORIGIN`: the final HTTPS origin.
 - `NODE_ENV=production`.
-- `PAYMENT_MODE=stripe`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`.
-- Stripe webhook URL: `https://your-domain.example/api/stripe/webhook`.
+- `PAYMENT_MODE=polar`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET` and the three Polar product IDs.
+- Use `POLAR_SERVER=sandbox` while testing and `POLAR_SERVER=production` for live payments.
+- Polar webhook URL: `https://your-domain.example/api/polar/webhook` (Raw format, `order.paid` event).
 - `RESEND_API_KEY`, `EMAIL_FROM` and a verified sender domain for transactional email.
 - A strong `SEARYA_ADMIN_EMAIL` and `SEARYA_ADMIN_PASSWORD` before the first start.
 
@@ -43,7 +44,7 @@ Do not use `PAYMENT_MODE=demo` in production. Demo checkout is deliberately disa
 - Server-side buyer connection limits and seller listing credits
 - Early contact-information blocking in new conversations
 - Listing moderation, reports, blocks and administrator review API/UI
-- Stripe Checkout + signed webhook support when credentials are configured
+- Polar Checkout + signed and idempotent `order.paid` webhook support
 - Resend transactional email support when credentials are configured
 - Shareable listing URLs, sitemap, robots.txt and social metadata
 - Privacy, terms, cookies and transfer-checklist drafts

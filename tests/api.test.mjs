@@ -15,8 +15,12 @@ process.env.NODE_ENV = 'test';
 process.env.SEARYA_ADMIN_EMAIL = 'admin@searya.test';
 process.env.SEARYA_ADMIN_PASSWORD = 'AdminSecurePass123';
 process.env.SEARYA_ADMIN_NAME = 'Test Admin';
+process.env.POLAR_WEBHOOK_SECRET = 'test-polar-webhook-secret';
+process.env.POLAR_PRODUCT_BUYER_CONNECTIONS_10 = '11111111-1111-4111-8111-111111111111';
+process.env.POLAR_PRODUCT_SELLER_LISTINGS_3 = '22222222-2222-4222-8222-222222222222';
+process.env.POLAR_PRODUCT_SELLER_VIP_10 = '33333333-3333-4333-8333-333333333333';
 
-const { server, db } = await import('../server.mjs');
+const { server, db, fulfillPolarOrder } = await import('../server.mjs');
 if (!server.listening) await once(server, 'listening');
 const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
@@ -101,6 +105,35 @@ test('demo checkout credits only the authenticated user', async () => {
   const checkout = await checkoutResponse.json();
   assert.equal(checkout.paid, true);
   assert.equal(checkout.user.buyerConnections, 12);
+});
+
+test('Polar fulfillment validates the product and grants a paid order only once', async () => {
+  const registerResponse = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Polar Buyer', email: 'polar-buyer@example.com', password: 'SecurePass123', role: 'buyer' })
+  });
+  const user = (await registerResponse.json()).user;
+  const purchaseId = 'polar-purchase-test';
+  const createdAt = new Date().toISOString();
+  db.prepare(`INSERT INTO purchases(id,user_id,package_key,amount_cents,currency,status,created_at,updated_at) VALUES(?,?,?,900,'usd','pending',?,?)`).run(purchaseId, user.id, 'buyer_connections_10', createdAt, createdAt);
+  const order = {
+    id: 'polar-order-test', paid: true, currency: 'usd', subtotalAmount: 900,
+    productId: process.env.POLAR_PRODUCT_BUYER_CONNECTIONS_10,
+    metadata: { purchase_id: purchaseId, user_id: user.id, package_key: 'buyer_connections_10' }
+  };
+  assert.deepEqual(fulfillPolarOrder(order).granted, true);
+  assert.deepEqual(fulfillPolarOrder(order).granted, false);
+  assert.equal(db.prepare('SELECT buyer_connections AS count FROM users WHERE id=?').get(user.id).count, 12);
+  assert.equal(db.prepare('SELECT status FROM purchases WHERE id=?').get(purchaseId).status, 'paid');
+});
+
+test('Polar webhook rejects unsigned requests', async () => {
+  const response = await fetch(`${baseUrl}/api/polar/webhook`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, 'INVALID_SIGNATURE');
 });
 
 test('Seller Pro grants separate listing, verification and boost credits', async () => {
