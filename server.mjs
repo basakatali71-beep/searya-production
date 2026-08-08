@@ -445,35 +445,6 @@ function polarCheckoutErrorMessage(error) {
   return 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.';
 }
 
-let polarCheckoutProbe = { status: 'idle' };
-
-async function runPolarCheckoutProbe() {
-  if (PAYMENT_MODE !== 'polar' || polarServer() !== 'sandbox' || !polarPaymentConfigured()) {
-    polarCheckoutProbe = { status: 'skipped' };
-    return;
-  }
-  polarCheckoutProbe = { status: 'checking' };
-  try {
-    const productId = polarProductId(Object.keys(packages)[0]);
-    const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN, server: polarServer() });
-    const checkout = await polar.checkouts.create({
-      products: [productId],
-      successUrl: `${APP_ORIGIN}/?payment=probe-success`,
-      metadata: { searya_probe: 'true' }
-    });
-    polarCheckoutProbe = { status: checkout?.url ? 'ready' : 'invalid_response' };
-  } catch (error) {
-    const diagnostic = polarErrorDiagnostic(error);
-    polarCheckoutProbe = {
-      status: 'failed',
-      statusCode: diagnostic.statusCode,
-      type: diagnostic.type,
-      detail: diagnostic.detail
-    };
-    console.error('Polar startup probe failed:', diagnostic);
-  }
-}
-
 function fulfillPolarOrder(order) {
   const metadata = order?.metadata || {};
   const purchaseId = String(metadata.purchase_id || '');
@@ -555,7 +526,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', paymentProbe: polarCheckoutProbe, emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
@@ -1125,7 +1096,6 @@ server.listen(PORT, HOST, () => {
   console.log(`Searya running at ${APP_ORIGIN}`);
   console.log(`Database: ${DB_PATH}`);
   console.log(`Payment mode: ${PAYMENT_MODE}`);
-  runPolarCheckoutProbe().catch(error => console.error('Polar startup probe error:', error));
 });
 
 function shutdown() {
