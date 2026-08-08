@@ -242,3 +242,84 @@ test('administrator can review and approve a pending listing', async () => {
   });
   assert.equal(activate.status, 200);
 });
+
+test('verification email can be requested again without revealing account state', async () => {
+  const register = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Verify Again', email: 'verify-again@example.com', password: 'SecurePass123', role: 'buyer' })
+  });
+  assert.equal(register.status, 201);
+  const user = (await register.json()).user;
+  db.prepare('UPDATE users SET email_verified=0 WHERE id=?').run(user.id);
+  const resend = await fetch(`${baseUrl}/api/auth/resend-verification`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email })
+  });
+  assert.equal(resend.status, 200);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM email_verifications WHERE user_id=? AND used_at IS NULL').get(user.id).count, 1);
+  const unknown = await fetch(`${baseUrl}/api/auth/resend-verification`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'missing@example.com' })
+  });
+  assert.equal(unknown.status, 200);
+});
+
+test('unread messages are counted and blocking stops existing conversations', async () => {
+  const sellerRegister = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.10' },
+    body: JSON.stringify({ name: 'Message Seller', email: 'message-seller@example.com', password: 'SecurePass123', role: 'seller' })
+  });
+  const sellerCookie = sellerRegister.headers.getSetCookie()[0].split(';')[0];
+  const seller = (await sellerRegister.json()).user;
+  const listingResponse = await fetch(`${baseUrl}/api/listings`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: sellerCookie },
+    body: JSON.stringify({ type: 'sale', title: 'Mesajlaşma Test Projesi', category: 'saas', price: 640, description: 'Okunmamış mesaj ve engelleme akışını doğrulayan yeterli açıklama.', techStack: ['Node.js'], coverImage: 'data:image/png;base64,iVBORw0KGgo=' })
+  });
+  const listing = (await listingResponse.json()).listing;
+  const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@searya.test', password: 'AdminSecurePass123' })
+  });
+  const adminCookie = adminLogin.headers.getSetCookie()[0].split(';')[0];
+  await fetch(`${baseUrl}/api/admin/listings/${listing.id}/moderate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminCookie }, body: JSON.stringify({ action: 'approve' })
+  });
+  const buyerRegister = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.11' },
+    body: JSON.stringify({ name: 'Message Buyer', email: 'message-buyer@example.com', password: 'SecurePass123', role: 'buyer' })
+  });
+  const buyerCookie = buyerRegister.headers.getSetCookie()[0].split(';')[0];
+  const buyer = (await buyerRegister.json()).user;
+  const threadResponse = await fetch(`${baseUrl}/api/threads`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: buyerCookie }, body: JSON.stringify({ listingId: listing.id, message: 'Bu proje hakkında detaylı bilgi almak istiyorum.' })
+  });
+  const threadId = (await threadResponse.json()).threadId;
+  const sellerMessage = await fetch(`${baseUrl}/api/threads/${threadId}/messages`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: sellerCookie }, body: JSON.stringify({ message: 'Elbette, proje hâlen satış için uygundur.' })
+  });
+  assert.equal(sellerMessage.status, 201);
+  const unread = await fetch(`${baseUrl}/api/threads/unread-count`, { headers: { Cookie: buyerCookie } }).then(response => response.json());
+  assert.equal(unread.unreadCount, 1);
+  const threads = await fetch(`${baseUrl}/api/threads`, { headers: { Cookie: buyerCookie } }).then(response => response.json());
+  assert.equal(threads.threads.find(thread => thread.id === threadId).unread, true);
+  const read = await fetch(`${baseUrl}/api/threads/${threadId}/read`, { method: 'POST', headers: { Cookie: buyerCookie } }).then(response => response.json());
+  assert.equal(read.unreadCount, 0);
+  const block = await fetch(`${baseUrl}/api/blocks`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: buyerCookie }, body: JSON.stringify({ userId: seller.id })
+  });
+  assert.equal(block.status, 201);
+  const blockedMessage = await fetch(`${baseUrl}/api/threads/${threadId}/messages`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: sellerCookie }, body: JSON.stringify({ message: 'Bu mesaj engellemeden sonra gönderilmemeli.' })
+  });
+  assert.equal(blockedMessage.status, 403);
+  assert.equal((await blockedMessage.json()).error.code, 'USER_BLOCKED');
+  assert.ok(buyer.id);
+});
+
+test('registration limits use the forwarded client IP instead of the Render proxy IP', async () => {
+  for (let index = 0; index < 9; index += 1) {
+    const response = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `198.51.100.${index + 1}` },
+      body: JSON.stringify({ name: `Proxy User ${index}`, email: `proxy-${index}@example.com`, password: 'SecurePass123', role: 'buyer' })
+    });
+    assert.equal(response.status, 201);
+  }
+});

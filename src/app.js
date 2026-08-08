@@ -1,6 +1,6 @@
 import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260807-3';
 import { translations } from './data/translations.js?v=20260808-7';
-import { ApiError, SearyaApi } from './api.js?v=20260808-4';
+import { ApiError, SearyaApi } from './api.js?v=20260808-5';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
@@ -94,6 +94,8 @@ let state = {
   currentUser: null,
   backendReady: false,
   backendMessage: '',
+  paymentMode: 'disabled',
+  unreadMessageCount: 0,
   openListingSlug: ''
 };
 
@@ -200,8 +202,10 @@ function applyAuthenticatedUser(user) {
     state.sellerListingCredits = 0;
     state.sellerVipCredits = 0;
     state.boostCredits = 0;
+    state.unreadMessageCount = 0;
   }
   updateBuyerCreditBadge();
+  updateUnreadMessageBadge();
   const navLabel = document.getElementById('t-nav-register');
   const navButton = document.getElementById('nav-register-btn');
   if (navLabel) navLabel.textContent = user ? String(user.name || '').split(' ')[0] : (state.lang === 'en' ? 'Sign Up' : 'Kayıt Ol');
@@ -217,15 +221,22 @@ async function hydrateBackendState() {
       SearyaApi.listings('wtb')
     ]);
     state.backendReady = Boolean(health?.ok);
+    state.paymentMode = health?.paymentMode || 'disabled';
     state.backendMessage = '';
     updateServiceStatus();
+    updatePaymentAvailability();
     state.forSaleListings = withClientMetrics(salePayload?.listings || []);
     state.wtbListings = withClientMetrics(wtbPayload?.listings || []);
     applyAuthenticatedUser(session?.user || null);
     if (session?.user) {
-      const alertsPayload = await SearyaApi.alerts();
+      const [alertsPayload, unreadPayload] = await Promise.all([SearyaApi.alerts(), SearyaApi.unreadMessageCount()]);
       state.savedAlerts = (alertsPayload.alerts || []).map(alert => ({ ...alert, tech: alert.query || '' }));
+      state.unreadMessageCount = Number(unreadPayload?.unreadCount || 0);
+      updateUnreadMessageBadge();
       updateAlertControls();
+    } else {
+      state.unreadMessageCount = 0;
+      updateUnreadMessageBadge();
     }
     renderListings();
     renderWeeklyPicks();
@@ -250,6 +261,23 @@ function updateServiceStatus() {
     ? 'The service is temporarily unavailable. Listings may be out of date.'
     : 'Hizmete şu anda ulaşılamıyor. İlanlar güncel olmayabilir.';
   banner.classList.remove('hidden');
+}
+
+function updatePaymentAvailability() {
+  const disabled = state.paymentMode === 'disabled';
+  const labels = {
+    'simple-buyer-pack-btn': state.lang === 'en' ? 'Payments coming soon' : 'Ödeme yakında',
+    'simple-standard-btn': state.lang === 'en' ? 'Payments coming soon' : 'Ödeme yakında',
+    'simple-verified-btn': state.lang === 'en' ? 'Payments coming soon' : 'Ödeme yakında'
+  };
+  Object.entries(labels).forEach(([id, label]) => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.dataset.paymentUnavailable = disabled ? 'true' : 'false';
+    if (disabled) button.textContent = label;
+  });
+  const note = document.getElementById('t-simple-pricing-note');
+  if (disabled && note) note.textContent = state.lang === 'en' ? 'Payment infrastructure is being prepared · Free access remains available' : 'Ödeme altyapısı hazırlanıyor · Ücretsiz kullanım devam ediyor';
 }
 
 function requireAuthenticated() {
@@ -523,6 +551,8 @@ function updateStaticTranslations() {
     setFeatureList('t-simple-verified-list', simplePricing.verifiedFeatures, 'text-emerald-400');
   }
   updateBuyerCreditBadge();
+  updateUnreadMessageBadge();
+  updatePaymentAvailability();
   updateAlertControls();
   renderWeeklyPicks();
 
@@ -1159,6 +1189,10 @@ function openGuideModal(type) {
 // Package Purchase Modal Checkout Handler
 function openPackagePurchaseModal(packageName, price, packageKey) {
   const isEn = state.lang === 'en';
+  if (state.paymentMode === 'disabled') {
+    showToast(isEn ? 'Payment infrastructure is being prepared. Free access remains available.' : 'Ödeme altyapısı hazırlanıyor. Ücretsiz kullanım devam ediyor.');
+    return;
+  }
   const backdrop = el.modalBackdrop();
   const content = el.modalContent();
 
@@ -2773,6 +2807,16 @@ async function loadThreadsFromApi() {
   if (!state.messages.some(thread => thread.id === state.activeThreadId)) state.activeThreadId = state.messages[0]?.id || '';
 }
 
+async function markActiveThreadRead() {
+  const activeThread = state.messages.find(thread => thread.id === state.activeThreadId);
+  if (!activeThread?.unread) return;
+  const result = await SearyaApi.markThreadRead(activeThread.id);
+  activeThread.unread = false;
+  activeThread.unreadCount = 0;
+  state.unreadMessageCount = Number(result?.unreadCount || 0);
+  updateUnreadMessageBadge();
+}
+
 async function toggleInboxDrawer() {
   const drawer = el.inboxDrawer();
   if (!drawer) return;
@@ -2782,6 +2826,7 @@ async function toggleInboxDrawer() {
     state.inboxOpen = true;
     try {
       await loadThreadsFromApi();
+      await markActiveThreadRead();
       renderInboxDrawerContent();
     } catch (error) {
       showToast(apiErrorMessage(error));
@@ -2822,6 +2867,16 @@ function updateBuyerCreditBadge() {
     : `${state.buyerConnections} yeni satıcı bağlantısı kaldı`;
   badge.setAttribute('aria-label', label);
   el.inboxBtn()?.setAttribute('title', label);
+}
+
+function updateUnreadMessageBadge() {
+  const badge = document.getElementById('unread-message-count');
+  if (!badge) return;
+  const count = Math.max(0, Number(state.unreadMessageCount || 0));
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.classList.toggle('hidden', count === 0);
+  badge.classList.toggle('flex', count > 0);
+  el.inboxBtn()?.setAttribute('aria-label', state.lang === 'en' ? `Messages, ${count} unread` : `Mesajlarım, ${count} okunmamış`);
 }
 
 function openBuyerConnectionPack() {
@@ -2925,8 +2980,9 @@ function renderInboxDrawerContent() {
   document.getElementById('close-inbox-btn')?.addEventListener('click', toggleInboxDrawer);
 
   document.querySelectorAll('.thread-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       state.activeThreadId = btn.dataset.threadId;
+      try { await markActiveThreadRead(); } catch (error) { showToast(apiErrorMessage(error)); }
       renderInboxDrawerContent();
     });
   });
@@ -3053,6 +3109,7 @@ function renderAuthCard() {
           </label>
           <a href="#" id="forgot-password-link" class="font-bold text-purple-600 dark:text-purple-400 hover:underline">${isEn ? 'Forgot password?' : 'Şifremi unuttum?'}</a>
         </div>
+        <p class="text-center text-[11px] text-slate-500 dark:text-slate-400">${isEn ? "Didn't receive verification email?" : 'Doğrulama e-postası gelmedi mi?'} <a href="#" id="resend-verification-link" class="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">${isEn ? 'Send again' : 'Tekrar gönder'}</a></p>
 
         <button type="submit" id="auth-submit-btn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/25 transition-all transform active:scale-95 cursor-pointer">
           ${isEn ? 'Log In' : 'Giriş Yap'}
@@ -3189,6 +3246,21 @@ function renderAuthCard() {
       } else {
         showToast(isEn ? 'If the account exists, reset instructions were sent.' : 'Hesap varsa sıfırlama bağlantısı gönderildi.');
       }
+    } catch (error) {
+      showToast(apiErrorMessage(error));
+    }
+  });
+
+  document.getElementById('resend-verification-link')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const emailInput = document.getElementById('auth-email');
+    if (!emailInput?.checkValidity()) {
+      emailInput?.reportValidity();
+      return;
+    }
+    try {
+      await SearyaApi.resendVerification(emailInput.value);
+      showToast(isEn ? 'If the account is unverified, a new link was sent.' : 'Hesap doğrulanmamışsa yeni bağlantı gönderildi.');
     } catch (error) {
       showToast(apiErrorMessage(error));
     }

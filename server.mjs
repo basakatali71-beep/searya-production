@@ -1,9 +1,9 @@
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import { initialForSaleListings, initialWtbListings } from './src/data/mockData.js';
@@ -13,8 +13,12 @@ const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const APP_ORIGIN = process.env.APP_ORIGIN || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
-const PAYMENT_MODE = process.env.PAYMENT_MODE || (NODE_ENV === 'production' ? 'disabled' : 'demo');
-const DB_PATH = resolve(ROOT, process.env.SEARYA_DB_PATH || './data/searya.sqlite');
+const REQUESTED_PAYMENT_MODE = process.env.PAYMENT_MODE || (NODE_ENV === 'production' ? 'disabled' : 'demo');
+const POLAR_SERVER = String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
+const PAYMENT_MODE = NODE_ENV === 'production' && REQUESTED_PAYMENT_MODE === 'polar' && POLAR_SERVER !== 'production' ? 'disabled' : REQUESTED_PAYMENT_MODE;
+const DEFAULT_DB_PATH = NODE_ENV === 'production' && existsSync('/var/data') ? '/var/data/searya.sqlite' : './data/searya.sqlite';
+const DB_PATH = resolve(ROOT, process.env.SEARYA_DB_PATH || DEFAULT_DB_PATH);
+const BACKUP_DIR = resolve(process.env.SEARYA_BACKUP_DIR || resolve(DB_PATH, '..', 'backups'));
 const SESSION_COOKIE = 'searya_session';
 const VISITOR_COOKIE = 'searya_visitor';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -93,6 +97,7 @@ db.exec(`
   ) STRICT;
 
   CREATE INDEX IF NOT EXISTS messages_thread_created ON messages(thread_id, created_at);
+  CREATE INDEX IF NOT EXISTS messages_unread ON messages(thread_id, sender_id, read_at);
 
   CREATE TABLE IF NOT EXISTS contacted_projects (
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -177,6 +182,9 @@ if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name ===
 }
 if (!db.prepare('PRAGMA table_info(listings)').all().some(column => column.name === 'boosted_until')) {
   db.exec('ALTER TABLE listings ADD COLUMN boosted_until TEXT;');
+}
+if (!db.prepare('PRAGMA table_info(alerts)').all().some(column => column.name === 'last_sent_at')) {
+  db.exec('ALTER TABLE alerts ADD COLUMN last_sent_at TEXT;');
 }
 
 const packages = Object.freeze({
@@ -285,6 +293,10 @@ function createSession(userId) {
   return token;
 }
 
+function unreadMessageCount(userId) {
+  return db.prepare(`SELECT COUNT(*) AS count FROM messages m JOIN threads t ON t.id=m.thread_id WHERE (t.user_a=? OR t.user_b=?) AND m.sender_id<>? AND m.read_at IS NULL`).get(userId, userId, userId).count;
+}
+
 function json(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', ...headers });
@@ -365,9 +377,17 @@ function mapListingInput(body, user) {
 }
 
 const rateBuckets = new Map();
+
+function requestIpAddress(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const cloudflare = String(req.headers['cf-connecting-ip'] || '').trim();
+  const candidate = forwarded || cloudflare || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  return /^[a-f0-9:.]+$/i.test(candidate) ? candidate : undefined;
+}
+
 function rateLimited(req, key, limit, windowMs) {
   const now = Date.now();
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = requestIpAddress(req) || 'unknown';
   const bucketKey = `${ip}:${key}`;
   const bucket = rateBuckets.get(bucketKey);
   if (!bucket || bucket.resetAt <= now) { rateBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs }); return false; }
@@ -388,6 +408,52 @@ async function sendEmail({ to, subject, text, idempotencyKey }) {
   });
   if (!response.ok) throw new Error(`E-posta sağlayıcısı ${response.status} döndürdü.`);
   return { configured: true, data: await response.json() };
+}
+
+async function sendVerificationEmail(user) {
+  const verificationToken = randomBytes(32).toString('base64url');
+  const createdAt = nowIso();
+  db.prepare('DELETE FROM email_verifications WHERE user_id=? AND used_at IS NULL').run(user.id);
+  db.prepare('INSERT INTO email_verifications(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(verificationToken), user.id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), createdAt);
+  const verifyUrl = `${APP_ORIGIN}/?verify_token=${encodeURIComponent(verificationToken)}`;
+  await sendEmail({ to: user.email, subject: 'Searya e-posta doğrulama', text: `Merhaba ${user.name}, e-posta adresinizi 24 saat içinde doğrulayın: ${verifyUrl}`, idempotencyKey: `verify-${user.id}-${sha256(verificationToken).slice(0, 16)}` });
+}
+
+async function sendDueProjectAlerts() {
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return;
+  const currentTime = Date.now();
+  const alertRows = db.prepare(`SELECT a.*,u.email,u.name FROM alerts a JOIN users u ON u.id=a.user_id WHERE u.status='active' AND u.email_verified=1`).all();
+  for (const alert of alertRows) {
+    const lastSentAt = alert.last_sent_at || alert.created_at;
+    const intervalMs = alert.frequency === 'weekly' ? 7 * 86400000 : alert.frequency === 'daily' ? 86400000 : 0;
+    if (currentTime - new Date(lastSentAt).getTime() < intervalMs) continue;
+    const query = String(alert.query || '').toLocaleLowerCase('tr-TR');
+    const matches = db.prepare(`SELECT slug,title,price_cents FROM listings WHERE status='approved' AND type='sale' AND updated_at>? AND price_cents BETWEEN ? AND ? AND (?='all' OR category=?) AND (?='' OR lower(title || ' ' || content_json) LIKE ?) ORDER BY updated_at DESC LIMIT 10`).all(lastSentAt, alert.min_price * 100, alert.max_price * 100, alert.category, alert.category, query, `%${query}%`);
+    if (matches.length) {
+      const lines = matches.map(item => `• ${item.title} — $${(item.price_cents / 100).toLocaleString('en-US')}\n  ${APP_ORIGIN}/?listing=${encodeURIComponent(item.slug)}`).join('\n');
+      try {
+        await sendEmail({ to: alert.email, subject: `Searya’da ${matches.length} yeni proje eşleşmesi`, text: `Merhaba ${alert.name},\n\nProje alarmınıza uyan yeni ilanlar:\n\n${lines}\n\nAlarmınızı Searya hesabınızdan yönetebilirsiniz.`, idempotencyKey: `alert-${alert.id}-${sha256(lastSentAt).slice(0, 16)}` });
+      } catch (error) {
+        console.error('Project alert email error:', error?.message || error);
+        continue;
+      }
+    }
+    db.prepare('UPDATE alerts SET last_sent_at=? WHERE id=?').run(nowIso(), alert.id);
+  }
+}
+
+async function createDatabaseBackup() {
+  mkdirSync(BACKUP_DIR, { recursive: true });
+  const stamp = nowIso().replace(/[:.]/g, '-');
+  const destination = resolve(BACKUP_DIR, `searya-${stamp}.sqlite`);
+  if (!destination.startsWith(`${BACKUP_DIR}/`)) throw new Error('Geçersiz yedekleme yolu.');
+  await backup(db, destination);
+  const backups = readdirSync(BACKUP_DIR).filter(name => /^searya-.*\.sqlite$/.test(name)).sort().reverse();
+  for (const filename of backups.slice(7)) {
+    const oldBackup = resolve(BACKUP_DIR, filename);
+    if (oldBackup.startsWith(`${BACKUP_DIR}/`)) unlinkSync(oldBackup);
+  }
+  console.log(`Database backup created: ${destination}`);
 }
 
 function grantPackage(userId, packageKey) {
@@ -411,13 +477,7 @@ function polarPaymentConfigured() {
 }
 
 function polarServer() {
-  return String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
-}
-
-function requestIpAddress(req) {
-  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const candidate = forwarded || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
-  return /^[a-f0-9:.]+$/i.test(candidate) ? candidate : undefined;
+  return POLAR_SERVER;
 }
 
 function polarErrorDiagnostic(error) {
@@ -583,10 +643,7 @@ async function handleApi(req, res, url) {
     const verificationRequired = NODE_ENV === 'production';
     db.prepare(`INSERT INTO users(id,email,password_hash,name,role,status,is_admin,email_verified,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at) VALUES(?,?,?,?,?,'active',0,?,0,2,1,0,0,?,?)`).run(id, email, hashPassword(password), name, role, verificationRequired ? 0 : 1, now, now);
     if (verificationRequired) {
-      const verificationToken = randomBytes(32).toString('base64url');
-      db.prepare('INSERT INTO email_verifications(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(verificationToken), id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), now);
-      const verifyUrl = `${APP_ORIGIN}/?verify_token=${encodeURIComponent(verificationToken)}`;
-      await sendEmail({ to: email, subject: 'Searya e-posta doğrulama', text: `Merhaba ${name}, e-posta adresinizi 24 saat içinde doğrulayın: ${verifyUrl}`, idempotencyKey: `verify-${id}` });
+      await sendVerificationEmail({ id, email, name });
       return json(res, 201, { user: null, verificationRequired: true });
     }
     const token = createSession(id);
@@ -675,6 +732,16 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true, message: 'Hesap varsa sıfırlama talimatı gönderildi.', ...(previewToken ? { previewToken } : {}) });
   }
 
+  if (method === 'POST' && pathname === '/api/auth/resend-verification') {
+    if (rateLimited(req, 'resend-verification', 5, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Bir süre sonra yeniden deneyin.');
+    if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'E-posta servisi yapılandırılmadı.');
+    const body = await readJson(req);
+    const email = String(body.email || '').trim().toLowerCase();
+    const user = db.prepare(`SELECT id,email,name,email_verified FROM users WHERE email=? AND status='active'`).get(email);
+    if (user && !user.email_verified) await sendVerificationEmail(user);
+    return json(res, 200, { ok: true, message: 'Hesap doğrulanmamışsa yeni bağlantı gönderildi.' });
+  }
+
   if (method === 'POST' && pathname === '/api/auth/reset-password') {
     const body = await readJson(req);
     const password = String(body.password || '');
@@ -735,15 +802,25 @@ async function handleApi(req, res, url) {
     if (rateLimited(req, `listing:${user.id}`, 10, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Saatlik ilan sınırına ulaştınız.');
     const input = mapListingInput(await readJson(req), user);
     const priorityReview = 0;
-    if (input.type === 'sale') {
-      if (user.seller_free_listings > 0) db.prepare('UPDATE users SET seller_free_listings=seller_free_listings-1 WHERE id=?').run(user.id);
-      else if (user.seller_listing_credits > 0) db.prepare('UPDATE users SET seller_listing_credits=seller_listing_credits-1 WHERE id=?').run(user.id);
-      else return fail(res, 402, 'LISTING_CREDIT_REQUIRED', 'Yeni bir satıcı ilan paketi gereklidir.');
-    }
     const id = randomUUID();
     const createdAt = nowIso();
     const status = user.is_admin ? 'approved' : 'pending';
-    db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,0,?,0,?,?)`).run(id, user.id, input.type, input.title, uniqueSlug(input.title), input.category, Math.round(input.price * 100), JSON.stringify(input.content), status, priorityReview, createdAt, createdAt);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      if (input.type === 'sale') {
+        const freeCredit = db.prepare('UPDATE users SET seller_free_listings=seller_free_listings-1 WHERE id=? AND seller_free_listings>0').run(user.id);
+        if (!freeCredit.changes) {
+          const paidCredit = db.prepare('UPDATE users SET seller_listing_credits=seller_listing_credits-1 WHERE id=? AND seller_listing_credits>0').run(user.id);
+          if (!paidCredit.changes) throw Object.assign(new Error('Yeni bir satıcı ilan paketi gereklidir.'), { status: 402, code: 'LISTING_CREDIT_REQUIRED' });
+        }
+      }
+      db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,0,?,0,?,?)`).run(id, user.id, input.type, input.title, uniqueSlug(input.title), input.category, Math.round(input.price * 100), JSON.stringify(input.content), status, priorityReview, createdAt, createdAt);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      if (error.code === 'LISTING_CREDIT_REQUIRED') return fail(res, 402, error.code, error.message);
+      throw error;
+    }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     if (user.email) sendEmail({ to: user.email, subject: 'Searya ilanınız alındı', text: `${input.title} ilanınız ${status === 'pending' ? 'güvenlik incelemesine alındı' : 'yayınlandı'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
     return json(res, 201, { listing: listingFromRow(row), moderation: status === 'pending' ? 'pending' : 'approved', user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
@@ -800,13 +877,19 @@ async function handleApi(req, res, url) {
     return json(res, 200, { listing: listingFromRow(updated), moderation: updated.status, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
 
+  if (method === 'GET' && pathname === '/api/threads/unread-count') {
+    const user = requireUser(req, res); if (!user) return;
+    return json(res, 200, { unreadCount: unreadMessageCount(user.id) });
+  }
+
   if (method === 'GET' && pathname === '/api/threads') {
     const user = requireUser(req, res); if (!user) return;
     const rows = db.prepare(`SELECT t.*,l.title,l.price_cents,l.type,u1.name AS a_name,u2.name AS b_name FROM threads t JOIN listings l ON l.id=t.listing_id JOIN users u1 ON u1.id=t.user_a JOIN users u2 ON u2.id=t.user_b WHERE t.user_a=? OR t.user_b=? ORDER BY t.updated_at DESC`).all(user.id, user.id);
     const result = rows.map(thread => {
       const partnerName = thread.user_a === user.id ? thread.b_name : thread.a_name;
       const messages = db.prepare('SELECT * FROM messages WHERE thread_id=? ORDER BY created_at').all(thread.id).map(message => ({ id: message.id, sender: message.sender_id === user.id ? 'me' : 'them', text: message.body, textEn: message.body, time: new Date(message.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }));
-      return { id: thread.id, listingId: thread.listing_id, partnerName, partnerAvatar: '', projectTitle: thread.title, askingPrice: `$${(thread.price_cents / 100).toLocaleString('en-US')}`, unread: false, messages };
+      const unreadCount = db.prepare('SELECT COUNT(*) AS count FROM messages WHERE thread_id=? AND sender_id<>? AND read_at IS NULL').get(thread.id, user.id).count;
+      return { id: thread.id, listingId: thread.listing_id, partnerName, partnerAvatar: '', projectTitle: thread.title, askingPrice: `$${(thread.price_cents / 100).toLocaleString('en-US')}`, unread: unreadCount > 0, unreadCount, messages };
     });
     return json(res, 200, { threads: result, user: publicUser(user) });
   }
@@ -821,30 +904,51 @@ async function handleApi(req, res, url) {
     if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, listing.user_id, listing.user_id, user.id)) return fail(res, 403, 'USER_BLOCKED', 'Bu kullanıcıyla yeni görüşme başlatılamaz.');
     let thread = db.prepare('SELECT * FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(listing.id, pair[0], pair[1]);
     if (!thread) {
-      if (listing.type === 'sale') {
-        const contacted = db.prepare('SELECT 1 FROM contacted_projects WHERE user_id=? AND listing_id=?').get(user.id, listing.id);
-        if (!contacted) {
-          const freshUser = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
-          if (freshUser.buyer_connections <= 0) return fail(res, 402, 'CONNECTION_CREDIT_REQUIRED', 'Yeni satıcı bağlantısı için bağlantı paketi gereklidir.');
-          db.prepare('UPDATE users SET buyer_connections=buyer_connections-1 WHERE id=?').run(user.id);
-          db.prepare('INSERT INTO contacted_projects(user_id,listing_id,created_at) VALUES(?,?,?)').run(user.id, listing.id, nowIso());
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        thread = db.prepare('SELECT * FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(listing.id, pair[0], pair[1]);
+        if (!thread) {
+          if (listing.type === 'sale') {
+            const contacted = db.prepare('SELECT 1 FROM contacted_projects WHERE user_id=? AND listing_id=?').get(user.id, listing.id);
+            if (!contacted) {
+              const credit = db.prepare('UPDATE users SET buyer_connections=buyer_connections-1 WHERE id=? AND buyer_connections>0').run(user.id);
+              if (!credit.changes) throw Object.assign(new Error('Yeni satıcı bağlantısı için bağlantı paketi gereklidir.'), { status: 402, code: 'CONNECTION_CREDIT_REQUIRED' });
+              db.prepare('INSERT INTO contacted_projects(user_id,listing_id,created_at) VALUES(?,?,?)').run(user.id, listing.id, nowIso());
+            }
+          }
+          const id = randomUUID();
+          const createdAt = nowIso();
+          db.prepare('INSERT INTO threads(id,listing_id,user_a,user_b,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, listing.id, pair[0], pair[1], createdAt, createdAt);
+          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(randomUUID(), id, user.id, cleanText(body.message || `${listing.title} ilanı hakkında görüşmek istiyorum.`, 1000), createdAt);
+          thread = db.prepare('SELECT * FROM threads WHERE id=?').get(id);
         }
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        if (error.code === 'CONNECTION_CREDIT_REQUIRED') return fail(res, 402, error.code, error.message);
+        throw error;
       }
-      const id = randomUUID();
-      const createdAt = nowIso();
-      db.prepare('INSERT INTO threads(id,listing_id,user_a,user_b,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, listing.id, pair[0], pair[1], createdAt, createdAt);
-      db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(randomUUID(), id, user.id, cleanText(body.message || `${listing.title} ilanı hakkında görüşmek istiyorum.`, 1000), createdAt);
-      thread = db.prepare('SELECT * FROM threads WHERE id=?').get(id);
     }
     return json(res, 201, { threadId: thread.id, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
 
   const messageMatch = pathname.match(/^\/api\/threads\/([^/]+)\/messages$/);
+  const threadReadMatch = pathname.match(/^\/api\/threads\/([^/]+)\/read$/);
+  if (method === 'POST' && threadReadMatch) {
+    const user = requireUser(req, res); if (!user) return;
+    const thread = db.prepare('SELECT id FROM threads WHERE id=? AND (user_a=? OR user_b=?)').get(decodeURIComponent(threadReadMatch[1]), user.id, user.id);
+    if (!thread) return fail(res, 404, 'NOT_FOUND', 'Görüşme bulunamadı.');
+    db.prepare('UPDATE messages SET read_at=? WHERE thread_id=? AND sender_id<>? AND read_at IS NULL').run(nowIso(), thread.id, user.id);
+    return json(res, 200, { ok: true, unreadCount: unreadMessageCount(user.id) });
+  }
+
   if (method === 'POST' && messageMatch) {
     const user = requireUser(req, res); if (!user) return;
     if (rateLimited(req, `message:${user.id}`, 60, 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Çok hızlı mesaj gönderiyorsunuz.');
     const thread = db.prepare('SELECT * FROM threads WHERE id=? AND (user_a=? OR user_b=?)').get(decodeURIComponent(messageMatch[1]), user.id, user.id);
     if (!thread) return fail(res, 404, 'NOT_FOUND', 'Görüşme bulunamadı.');
+    const partnerId = thread.user_a === user.id ? thread.user_b : thread.user_a;
+    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, partnerId, partnerId, user.id)) return fail(res, 403, 'USER_BLOCKED', 'Engellenen kullanıcıyla mesajlaşılamaz.');
     const body = await readJson(req);
     const text = cleanText(body.message, 1000);
     if (!text) return fail(res, 422, 'EMPTY_MESSAGE', 'Mesaj boş olamaz.');
@@ -854,7 +958,7 @@ async function handleApi(req, res, url) {
     const id = randomUUID();
     db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(id, thread.id, user.id, text, createdAt);
     db.prepare('UPDATE threads SET updated_at=? WHERE id=?').run(createdAt, thread.id);
-    const recipientId = thread.user_a === user.id ? thread.user_b : thread.user_a;
+    const recipientId = partnerId;
     const recipient = db.prepare('SELECT email,name FROM users WHERE id=?').get(recipientId);
     if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni mesajınız var', text: `${user.name} size yeni bir mesaj gönderdi: ${text.slice(0, 180)}`, idempotencyKey: `message-${id}` }).catch(console.error);
     return json(res, 201, { message: { id, sender: 'me', text, textEn: text, time: 'Şimdi' } });
@@ -1096,6 +1200,16 @@ server.listen(PORT, HOST, () => {
   console.log(`Searya running at ${APP_ORIGIN}`);
   console.log(`Database: ${DB_PATH}`);
   console.log(`Payment mode: ${PAYMENT_MODE}`);
+  if (NODE_ENV === 'production') {
+    const backupStart = setTimeout(() => createDatabaseBackup().catch(error => console.error('Database backup error:', error)), 60_000);
+    const alertStart = setTimeout(() => sendDueProjectAlerts().catch(error => console.error('Project alert job error:', error)), 120_000);
+    const backupTimer = setInterval(() => createDatabaseBackup().catch(error => console.error('Database backup error:', error)), 24 * 60 * 60 * 1000);
+    const alertTimer = setInterval(() => sendDueProjectAlerts().catch(error => console.error('Project alert job error:', error)), 5 * 60 * 1000);
+    backupStart.unref();
+    alertStart.unref();
+    backupTimer.unref();
+    alertTimer.unref();
+  }
 });
 
 function shutdown() {

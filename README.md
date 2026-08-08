@@ -20,7 +20,7 @@ The app uses Node's built-in HTTP, crypto and SQLite modules; no third-party ser
 npm run check
 ```
 
-The integration tests cover health checks, seeded listings, secure registration/session cookies, server-side listing credits, package credits and administrator moderation.
+The integration tests cover health checks, secure registration/session cookies, verification-email retries, rate limits behind a proxy, server-side listing credits, unread messages, blocks, package credits and administrator moderation.
 
 ## Production configuration
 
@@ -28,13 +28,14 @@ Copy `.env.example` to `.env` and configure:
 
 - `APP_ORIGIN`: the final HTTPS origin.
 - `NODE_ENV=production`.
-- `PAYMENT_MODE=polar`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET` and the three Polar product IDs.
-- Use `POLAR_SERVER=sandbox` while testing and `POLAR_SERVER=production` for live payments.
-- Polar webhook URL: `https://your-domain.example/api/polar/webhook` (Raw format, `order.paid` event).
+- Keep `PAYMENT_MODE=disabled` until an approved live payment provider is configured. A Polar sandbox configuration is automatically disabled in production so test checkout can never be shown to customers.
 - `RESEND_API_KEY`, `EMAIL_FROM` and a verified sender domain for transactional email.
 - A strong `SEARYA_ADMIN_EMAIL` and `SEARYA_ADMIN_PASSWORD` before the first start.
+- On Render with a persistent disk mounted at `/var/data`, use `SEARYA_DB_PATH=/var/data/searya.sqlite` and optionally `SEARYA_BACKUP_DIR=/var/data/backups`.
 
 Do not use `PAYMENT_MODE=demo` in production. Demo checkout is deliberately disabled when `NODE_ENV=production`.
+
+The server creates one SQLite backup per day and retains the latest seven files. These backups protect against application mistakes but live on the same disk; provider snapshots or an external database backup should also be enabled before storing valuable production data.
 
 ## Included launch controls
 
@@ -44,8 +45,10 @@ Do not use `PAYMENT_MODE=demo` in production. Demo checkout is deliberately disa
 - Server-side buyer connection limits and seller listing credits
 - Early contact-information blocking in new conversations
 - Listing moderation, reports, blocks and administrator review API/UI
-- Polar Checkout + signed and idempotent `order.paid` webhook support
+- Production-safe payment waiting state while the live provider application is pending
 - Resend transactional email support when credentials are configured
+- Verification-email resend, project-alert delivery and unread-message counters
+- Daily SQLite backup rotation with seven-file retention
 - Shareable listing URLs, sitemap, robots.txt and social metadata
 - Privacy, terms, cookies and transfer-checklist drafts
 
