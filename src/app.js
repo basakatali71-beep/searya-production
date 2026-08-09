@@ -40,6 +40,41 @@ function safeImageUrl(value, fallback = 'https://images.unsplash.com/photo-16180
   return fallback;
 }
 
+async function optimizeListingImage(file) {
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!allowedTypes.includes(file?.type) || file.size > 5 * 1024 * 1024) {
+    throw new Error(state.lang === 'en' ? 'Use a PNG, JPG or WebP image under 5 MB.' : '5 MB altında PNG, JPG veya WebP görsel kullanın.');
+  }
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = () => reject(new Error(state.lang === 'en' ? 'The image could not be read.' : 'Görsel okunamadı.'));
+      candidate.src = objectUrl;
+    });
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    let scale = Math.min(1, 1600 / Math.max(1, longestSide));
+    let dataUrl = '';
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      dataUrl = canvas.toDataURL('image/webp', Math.max(0.62, 0.86 - attempt * 0.08));
+      if (dataUrl.length <= 2_800_000) return dataUrl;
+      scale *= 0.78;
+    }
+    if (dataUrl.length > 3_500_000) throw new Error(state.lang === 'en' ? 'The image is still too large. Choose a smaller image.' : 'Görsel hâlâ çok büyük. Daha küçük bir görsel seçin.');
+    return dataUrl;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function recencyInHours(value) {
   const text = String(value || '').toLocaleLowerCase('tr-TR');
   if (text.includes('şimdi') || text.includes('just now')) return 0;
@@ -208,8 +243,18 @@ function applyAuthenticatedUser(user) {
   updateUnreadMessageBadge();
   const navLabel = document.getElementById('t-nav-register');
   const navButton = document.getElementById('nav-register-btn');
-  if (navLabel) navLabel.textContent = user ? String(user.name || '').split(' ')[0] : (state.lang === 'en' ? 'Sign Up' : 'Kayıt Ol');
-  if (navButton) navButton.setAttribute('aria-label', user ? (state.lang === 'en' ? 'Open account' : 'Hesabımı aç') : (state.lang === 'en' ? 'Sign up' : 'Kayıt ol'));
+  const navIcon = document.getElementById('nav-account-icon');
+  const profileState = document.getElementById('nav-profile-state');
+  if (navLabel) navLabel.textContent = user ? (state.lang === 'en' ? 'My account' : 'Profilim') : (state.lang === 'en' ? 'Sign Up' : 'Kayıt Ol');
+  if (navIcon) navIcon.className = user ? 'ph-bold ph-user-circle text-base' : 'ph-bold ph-user-plus text-sm';
+  profileState?.classList.toggle('hidden', !user);
+  if (navButton) {
+    const label = user ? (state.lang === 'en' ? 'My profile and listings' : 'Profilim ve ilanlarım') : (state.lang === 'en' ? 'Sign up' : 'Kayıt ol');
+    navButton.setAttribute('aria-label', label);
+    navButton.setAttribute('title', label);
+    navButton.classList.toggle('bg-indigo-500/10', Boolean(user));
+    navButton.classList.toggle('border-indigo-500/30', Boolean(user));
+  }
 }
 
 async function hydrateBackendState() {
@@ -302,8 +347,8 @@ async function handleUrlState() {
     try {
       const result = await SearyaApi.verifyEmail(verifyToken);
       applyAuthenticatedUser(result.user);
-      showToast(state.lang === 'en' ? 'Email verified. Welcome to Searya!' : 'E-posta doğrulandı. Searya’ya hoş geldiniz!');
-    } catch (error) { showToast(apiErrorMessage(error)); }
+      openVerificationResultModal(true);
+    } catch (error) { openVerificationResultModal(false, apiErrorMessage(error)); }
     url.searchParams.delete('verify_token');
     history.replaceState({}, '', url);
   }
@@ -318,6 +363,54 @@ async function handleUrlState() {
     history.replaceState({}, '', url);
   }
   await openListingFromUrl();
+}
+
+function openVerificationPendingModal(email) {
+  const isEn = state.lang === 'en';
+  const content = el.modalContent();
+  const backdrop = el.modalBackdrop();
+  if (!content || !backdrop) return;
+  content.innerHTML = `
+    <div class="p-6 sm:p-9 text-center space-y-6">
+      <div class="w-16 h-16 mx-auto rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center"><i class="ph-bold ph-envelope-simple-open text-3xl"></i></div>
+      <div><p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">${isEn ? 'One last step' : 'Son bir adım'}</p><h3 class="mt-2 text-2xl font-black text-slate-900 dark:text-white">${isEn ? 'Verify your email' : 'Lütfen e-postanızı doğrulayın'}</h3><p class="mt-2 text-sm leading-6 text-slate-500">${isEn ? 'We sent a verification link to' : 'Doğrulama bağlantısını şu adrese gönderdik:'}<br><strong class="text-slate-800 dark:text-slate-200">${escapeHtml(email)}</strong></p></div>
+      <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left text-xs text-slate-500"><i class="ph-bold ph-info text-indigo-500 mr-1"></i>${isEn ? 'Open the email and click the link. Check spam if it does not arrive within a few minutes.' : 'E-postayı açıp doğrulama bağlantısına tıklayın. Birkaç dakika içinde gelmezse spam klasörünü kontrol edin.'}</div>
+      <p id="verification-pending-status" class="hidden rounded-xl px-3 py-2.5 text-xs font-bold"></p>
+      <div class="grid sm:grid-cols-2 gap-3"><button id="verification-resend-btn" class="py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-bold">${isEn ? 'Send again' : 'Tekrar gönder'}</button><button id="verification-login-btn" class="py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 text-white text-sm font-bold">${isEn ? 'Go to sign in' : 'Giriş ekranına dön'}</button></div>
+    </div>`;
+  backdrop.classList.remove('hidden');
+  document.getElementById('verification-login-btn')?.addEventListener('click', () => showOnboardingPage('login'));
+  document.getElementById('verification-resend-btn')?.addEventListener('click', async event => {
+    const status = document.getElementById('verification-pending-status');
+    event.currentTarget.disabled = true;
+    try {
+      await SearyaApi.resendVerification(email);
+      if (status) {
+        status.textContent = isEn ? 'A new verification link was sent.' : 'Yeni doğrulama bağlantısı gönderildi.';
+        status.className = 'rounded-xl px-3 py-2.5 text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300';
+      }
+    } catch (error) {
+      if (status) {
+        status.textContent = apiErrorMessage(error);
+        status.className = 'rounded-xl px-3 py-2.5 text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300';
+      }
+    } finally { event.currentTarget.disabled = false; }
+  });
+}
+
+function openVerificationResultModal(success, errorMessage = '') {
+  const isEn = state.lang === 'en';
+  const content = el.modalContent();
+  const backdrop = el.modalBackdrop();
+  if (!content || !backdrop) return;
+  content.innerHTML = `
+    <div class="p-7 sm:p-10 text-center space-y-6">
+      <div class="w-20 h-20 mx-auto rounded-3xl ${success ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'} flex items-center justify-center"><i class="ph-bold ${success ? 'ph-check-circle' : 'ph-warning-circle'} text-4xl"></i></div>
+      <div><h3 class="text-2xl font-black text-slate-900 dark:text-white">${success ? (isEn ? 'Verification successful' : 'Doğrulama başarılı') : (isEn ? 'Verification failed' : 'Doğrulama tamamlanamadı')}</h3><p class="mt-3 text-sm leading-6 text-slate-500">${success ? (isEn ? 'Your email is verified. You can now sign in and use your account.' : 'E-posta adresiniz doğrulandı. Artık giriş yapabilir ve hesabınızı kullanabilirsiniz.') : escapeHtml(errorMessage)}</p></div>
+      <button id="verification-result-btn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 text-white text-sm font-bold">${success ? (isEn ? 'Continue to my account' : 'Hesabıma devam et') : (isEn ? 'Back to sign in' : 'Giriş ekranına dön')}</button>
+    </div>`;
+  backdrop.classList.remove('hidden');
+  document.getElementById('verification-result-btn')?.addEventListener('click', () => success ? openAccountModal() : showOnboardingPage('login'));
 }
 
 function openResetPasswordModal(token) {
@@ -998,7 +1091,7 @@ function setupEventListeners() {
   });
 }
 
-async function openAccountModal() {
+async function openAccountModal(options = {}) {
   if (!requireAuthenticated()) return;
   const isEn = state.lang === 'en';
   const user = state.currentUser;
@@ -1020,6 +1113,7 @@ async function openAccountModal() {
         </div>
         <button id="close-account-modal" aria-label="${isEn ? 'Close' : 'Kapat'}" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="ph-bold ph-x"></i></button>
       </div>
+      ${options.notice ? `<div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/30 flex items-start gap-3"><span class="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-check"></i></span><div><strong class="text-sm text-emerald-800 dark:text-emerald-300">${isEn ? 'Listing received' : 'İlanınız alındı'}</strong><p class="mt-1 text-xs leading-5 text-emerald-700/80 dark:text-emerald-300/80">${escapeHtml(options.notice)}</p></div></div>` : ''}
       <div class="account-credit-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.buyerConnections}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Connections' : 'Bağlantı'}</span></div>
         <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.sellerFreeListings + user.sellerListingCredits}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Listing credits' : 'İlan hakkı'}</span></div>
@@ -1029,7 +1123,7 @@ async function openAccountModal() {
       <section class="space-y-3">
         <div class="flex items-center justify-between"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'My listings' : 'İlanlarım'}</h4><button id="account-new-listing" class="text-[11px] font-bold text-blue-600 dark:text-blue-400">+ ${isEn ? 'New listing' : 'Yeni ilan'}</button></div>
         <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
-          ${listings.length ? listings.map(item => `<article class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"><div class="min-w-0"><strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(item.title)}</strong><span class="text-[10px] text-slate-500">${escapeHtml(statusLabel(item.status))}${item.isBoosted ? ` · ${isEn ? 'Boosted' : 'Öne çıkarıldı'}` : ''} · $${Number(item.askingPrice || item.budget).toLocaleString('tr-TR')}</span></div><div class="flex gap-2 flex-shrink-0">${item.type === 'sale' && !item.isVerified && user.sellerVipCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="verification" class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500" aria-label="${isEn ? 'Request verification review' : 'Doğrulama incelemesi iste'}" title="${isEn ? 'Use verification review' : 'Doğrulama hakkını kullan'}"><i class="ph-bold ph-shield-check"></i></button>` : ''}${item.type === 'sale' && ['Aktif', 'Doğrulanmış'].includes(item.status) && user.boostCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="boost" class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500" aria-label="${isEn ? 'Boost for 7 days' : '7 gün öne çıkar'}" title="${isEn ? 'Use 7-day boost' : '7 günlük öne çıkarma kullan'}"><i class="ph-bold ph-trend-up"></i></button>` : ''}<button data-edit-listing="${item.id}" class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500" aria-label="${isEn ? 'Edit' : 'Düzenle'}"><i class="ph-bold ph-pencil-simple"></i></button><button data-delete-listing="${item.id}" class="w-8 h-8 rounded-lg bg-red-500/10 text-red-500" aria-label="${isEn ? 'Remove' : 'Kaldır'}"><i class="ph-bold ph-trash"></i></button></div></article>`).join('') : `<p class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 text-center">${isEn ? 'You have no listings yet.' : 'Henüz ilanınız yok.'}</p>`}
+          ${listings.length ? listings.map(item => `<article class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(item.title)}</strong><span class="inline-flex mt-1 text-[10px] font-bold px-2 py-1 rounded-full ${item.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : item.status === 'rejected' ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}">${escapeHtml(statusLabel(item.status))}</span></div><strong class="text-xs text-slate-700 dark:text-slate-300">$${Number(item.askingPrice || item.budget).toLocaleString('tr-TR')}</strong></div><div class="flex flex-wrap gap-2">${item.type === 'sale' && !item.isVerified && user.sellerVipCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="verification" class="px-3 py-2 rounded-lg bg-purple-500/10 text-purple-500 text-[10px] font-bold" title="${isEn ? 'Use verification review' : 'Doğrulama hakkını kullan'}"><i class="ph-bold ph-shield-check mr-1"></i>${isEn ? 'Verify' : 'Doğrula'}</button>` : ''}${item.type === 'sale' && ['Aktif', 'Doğrulanmış'].includes(item.status) && user.boostCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="boost" class="px-3 py-2 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold"><i class="ph-bold ph-trend-up mr-1"></i>${isEn ? 'Boost' : 'Öne çıkar'}</button>` : ''}<button data-edit-listing="${item.id}" class="px-3 py-2 rounded-lg bg-blue-500/10 text-blue-500 text-[10px] font-bold"><i class="ph-bold ph-pencil-simple mr-1"></i>${isEn ? 'Edit' : 'Düzenle'}</button><button data-delete-listing="${item.id}" class="px-3 py-2 rounded-lg bg-red-500/10 text-red-500 text-[10px] font-bold"><i class="ph-bold ph-trash mr-1"></i>${isEn ? 'Delete' : 'Sil'}</button></div></article>`).join('') : `<p class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 text-center">${isEn ? 'You have no listings yet.' : 'Henüz ilanınız yok.'}</p>`}
         </div>
       </section>
       <div class="grid ${user.isAdmin ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
@@ -2632,6 +2726,7 @@ function openCreateListingModal(editListing = null) {
 
       <!-- Action Footer -->
       <div class="pt-4 border-t border-slate-200 dark:border-slate-800">
+        <p id="listing-form-status" class="hidden mb-3 rounded-xl px-3 py-2.5 text-xs font-bold" role="status" aria-live="polite"></p>
         <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
           <i class="ph-bold ph-paper-plane-tilt text-base"></i>
           <span>${editListing ? (state.lang === 'en' ? 'Save changes' : 'Değişiklikleri kaydet') : (state.lang === 'en' ? 'Publish Listing' : 'İlanı Yayınla')}</span>
@@ -2671,28 +2766,33 @@ function openCreateListingModal(editListing = null) {
 
   const fileInput = document.getElementById('form-image-file');
   const previewBox = document.getElementById('image-upload-preview-box');
+  const formStatus = document.getElementById('listing-form-status');
+  const setFormStatus = (message, type = 'info') => {
+    if (!formStatus) return;
+    formStatus.textContent = message;
+    const color = type === 'error' ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300' : type === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300';
+    formStatus.className = `mb-3 rounded-xl px-3 py-2.5 text-xs font-bold ${color}`;
+  };
 
   if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (file) {
-        const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-        if (!allowedTypes.includes(file.type) || file.size > 5 * 1024 * 1024) {
-          e.target.value = '';
-          showToast(state.lang === 'en' ? 'Use a PNG, JPG or WebP image under 5 MB.' : '5 MB altında PNG, JPG veya WebP görsel kullanın.');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          uploadedImageData = event.target.result;
+        if (previewBox) previewBox.innerHTML = `<i class="ph-bold ph-circle-notch animate-spin text-2xl text-emerald-500"></i><span class="text-xs text-slate-500">${state.lang === 'en' ? 'Optimizing image…' : 'Görsel optimize ediliyor…'}</span>`;
+        try {
+          uploadedImageData = await optimizeListingImage(file);
           if (previewBox) {
             previewBox.innerHTML = `
               <img src="${uploadedImageData}" class="h-20 w-auto rounded-xl object-cover shadow-md mx-auto border border-emerald-500">
-              <span class="text-xs text-emerald-500 font-bold flex items-center gap-1"><i class="ph-bold ph-check"></i> ${state.lang === 'en' ? 'Image uploaded!' : 'Görsel yüklendi!'}</span>
+              <span class="text-xs text-emerald-500 font-bold flex items-center gap-1"><i class="ph-bold ph-check"></i> ${state.lang === 'en' ? 'Image ready' : 'Görsel hazır'}</span>
             `;
           }
-        };
-        reader.readAsDataURL(file);
+          setFormStatus(state.lang === 'en' ? 'Image optimized and ready to publish.' : 'Görsel optimize edildi ve yayına hazır.', 'success');
+        } catch (error) {
+          e.target.value = '';
+          uploadedImageData = '';
+          setFormStatus(error.message, 'error');
+        }
       }
     });
   }
@@ -2709,56 +2809,23 @@ function openCreateListingModal(editListing = null) {
     const finalImage = safeImageUrl(uploadedImageData);
 
     if (!title || !Number.isFinite(price) || price <= 0 || stack.length === 0 || desc.length < 20) {
-      showToast(state.lang === 'en' ? 'Please complete all required fields correctly.' : 'Lütfen zorunlu alanları doğru şekilde doldurun.');
+      setFormStatus(state.lang === 'en' ? 'Please complete all required fields correctly.' : 'Lütfen zorunlu alanları doğru şekilde doldurun.', 'error');
       return;
     }
     if (type === 'sale' && !uploadedImageData) {
-      showToast(state.lang === 'en' ? 'Please add a real project image.' : 'Lütfen projeye ait gerçek bir ilan fotoğrafı ekleyin.');
+      setFormStatus(state.lang === 'en' ? 'Please add a real project image.' : 'Lütfen projeye ait gerçek bir ilan fotoğrafı ekleyin.', 'error');
       return;
     }
 
-    const newListing = {
-      id: `proj-${Date.now()}`,
-      type,
-      title,
-      titleEn: title,
-      slug: title.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-      category,
-      categoryEn: category.toUpperCase(),
-      askingPrice: price,
-      budget: price,
-      mrr: 0,
-      status: state.lang === 'en' ? "Active" : "Aktif",
-      statusEn: "Active",
-      isAnonymous: false,
-      isVerified: false,
-      views: 0,
-      seller: {
-        name: "Alex Rivera",
-        handle: "@arivera_dev",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80",
-        githubVerified: false
-      },
-      buyer: {
-        name: "Alex Rivera",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-      },
-      shortDesc: desc,
-      shortDescEn: desc,
-      description: desc,
-      descriptionEn: desc,
-      coverImage: finalImage,
-      techStack: stack,
-      techPreference: stack.join(', '),
-      techPreferenceEn: stack.join(', '),
-      mrrRequirement: state.lang === 'en' ? 'Flexible — share verified metrics in DM.' : 'Esnek — doğrulanmış metrikleri DM üzerinden paylaşın.',
-      mrrRequirementEn: 'Flexible — share verified metrics in DM.',
-      createdAt: state.lang === 'en' ? "Just now" : "Şimdi"
-    };
-
     if (!requireAuthenticated()) return;
     const submitButton = e.currentTarget.querySelector('button[type="submit"]');
-    if (submitButton) submitButton.disabled = true;
+    const originalButtonHtml = submitButton?.innerHTML || '';
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.classList.add('opacity-70', 'cursor-wait');
+      submitButton.innerHTML = `<i class="ph-bold ph-circle-notch animate-spin text-base"></i><span>${state.lang === 'en' ? 'Submitting…' : 'Gönderiliyor…'}</span>`;
+    }
+    setFormStatus(state.lang === 'en' ? 'Your listing is being submitted securely…' : 'İlanınız güvenli biçimde gönderiliyor…');
     try {
       const listingPayload = {
         type,
@@ -2774,7 +2841,7 @@ function openCreateListingModal(editListing = null) {
       closeModal();
       if (editListing) {
         await hydrateBackendState();
-        showToast(state.lang === 'en' ? 'Changes were sent for review.' : 'Değişiklikler incelemeye gönderildi.');
+        await openAccountModal({ notice: state.lang === 'en' ? 'Your changes were saved and sent for review.' : 'Değişiklikleriniz kaydedildi ve yeniden incelemeye gönderildi.' });
         return;
       }
       if (result.moderation === 'approved') {
@@ -2783,16 +2850,21 @@ function openCreateListingModal(editListing = null) {
         switchTab(type === 'sale' ? 'sale' : 'wtb');
         renderWeeklyPicks();
         showToast(t().toastPublished);
+        await openAccountModal({ notice: state.lang === 'en' ? 'Your listing is now live.' : 'İlanınız başarıyla yayınlandı.' });
       } else {
-        showToast(state.lang === 'en' ? 'Your listing was submitted for moderation.' : 'İlanınız güvenlik kontrolü için onaya gönderildi.');
+        await openAccountModal({ notice: state.lang === 'en' ? 'Your listing is visible below with “Pending review” status. It will appear publicly after approval.' : 'İlanınız aşağıda “Onay bekliyor” durumuyla görünüyor. Yönetici onayından sonra herkese açık yayınlanacak.' });
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === 'LISTING_CREDIT_REQUIRED') {
         closeModal();
         openPackagePurchaseModal(state.lang === 'en' ? '3 Listing Pack' : '3 İlan Paketi', '$9', 'seller_listings_3');
       } else {
-        showToast(apiErrorMessage(error));
-        if (submitButton) submitButton.disabled = false;
+        setFormStatus(apiErrorMessage(error), 'error');
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.classList.remove('opacity-70', 'cursor-wait');
+          submitButton.innerHTML = originalButtonHtml;
+        }
       }
     }
   });
@@ -3223,8 +3295,8 @@ function renderAuthCard() {
         : await SearyaApi.login({ email, password });
       state.backendReady = true;
       if (payload.verificationRequired) {
-        showToast(isEn ? 'Check your email to verify your account.' : 'Hesabınızı doğrulamak için e-postanızı kontrol edin.');
         showMainAppPage();
+        openVerificationPendingModal(email);
         return;
       }
       applyAuthenticatedUser(payload.user);

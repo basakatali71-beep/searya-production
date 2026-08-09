@@ -180,9 +180,10 @@
           </button>
 
           <!-- Onboarding & Registration Trigger Button -->
-          <button id="nav-register-btn" type="button" aria-label="Kayıt Ol" class="flex p-2.5 md:px-4 md:py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-xs font-extrabold items-center gap-1.5 shadow-sm active:scale-95">
-            <i class="ph-bold ph-user-plus text-sm"></i>
+          <button id="nav-register-btn" type="button" aria-label="Kayıt Ol" title="Kayıt Ol" class="relative flex p-2.5 md:px-4 md:py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-xs font-extrabold items-center gap-1.5 shadow-sm active:scale-95">
+            <i id="nav-account-icon" class="ph-bold ph-user-plus text-sm"></i>
             <span id="t-nav-register" class="hidden md:inline">Kayıt Ol</span>
+            <span id="nav-profile-state" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-900" aria-hidden="true"></span>
           </button>
 
           <!-- Direct Messages Trigger (Inbox) -->
@@ -1110,7 +1111,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-25"></script>
+  <script type="module" src="./src/app.js?v=20260810-26"></script>
 
 </body>
 </html>

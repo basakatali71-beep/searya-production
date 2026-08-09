@@ -643,7 +643,13 @@ async function handleApi(req, res, url) {
     const verificationRequired = NODE_ENV === 'production';
     db.prepare(`INSERT INTO users(id,email,password_hash,name,role,status,is_admin,email_verified,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at) VALUES(?,?,?,?,?,'active',0,?,0,2,1,0,0,?,?)`).run(id, email, hashPassword(password), name, role, verificationRequired ? 0 : 1, now, now);
     if (verificationRequired) {
-      await sendVerificationEmail({ id, email, name });
+      try {
+        await sendVerificationEmail({ id, email, name });
+      } catch (error) {
+        db.prepare('DELETE FROM email_verifications WHERE user_id=?').run(id);
+        db.prepare('DELETE FROM users WHERE id=?').run(id);
+        throw error;
+      }
       return json(res, 201, { user: null, verificationRequired: true });
     }
     const token = createSession(id);
