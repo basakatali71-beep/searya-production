@@ -3171,7 +3171,21 @@ function renderAuthCard() {
     document.querySelectorAll('.auth-role-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         authRole = btn.dataset.role;
-        renderAuthCard();
+
+        const activeRoleClasses = {
+          buyer: ['border-emerald-500', 'bg-emerald-500/10', 'text-emerald-600'],
+          seller: ['border-purple-500', 'bg-purple-500/10', 'text-purple-600'],
+          both: ['border-indigo-500', 'bg-indigo-500/10', 'text-indigo-600']
+        };
+        const inactiveRoleClasses = ['border-slate-200', 'dark:border-slate-800', 'text-slate-600', 'dark:text-slate-400'];
+        const allRoleClasses = [...inactiveRoleClasses, ...Object.values(activeRoleClasses).flat()];
+
+        document.querySelectorAll('.auth-role-btn').forEach(roleButton => {
+          const selected = roleButton.dataset.role === authRole;
+          roleButton.classList.remove(...allRoleClasses);
+          roleButton.classList.add(...(selected ? activeRoleClasses[authRole] : inactiveRoleClasses));
+          roleButton.setAttribute('aria-pressed', String(selected));
+        });
       });
     });
   }
