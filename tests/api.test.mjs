@@ -33,10 +33,19 @@ after(async () => {
 test('health and seeded listings are available', async () => {
   const health = await fetch(`${baseUrl}/api/health`).then(response => response.json());
   assert.equal(health.ok, true);
+  assert.deepEqual(health.socialAuth, { google: false, apple: false });
 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   assert.ok(listings.listings.length >= 10);
   assert.equal(listings.listings.every(item => item.type === 'sale'), true);
+});
+
+test('unconfigured social sign-in fails safely instead of showing a dead action', async () => {
+  const response = await fetch(`${baseUrl}/api/auth/oauth/google/start?role=both`, { redirect: 'manual' });
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get('location'));
+  assert.equal(location.searchParams.get('oauth'), 'error');
+  assert.equal(location.searchParams.get('provider'), 'google');
 });
 
 test('registration creates a secure session and listing credits are enforced', async () => {

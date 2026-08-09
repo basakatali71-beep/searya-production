@@ -130,6 +130,7 @@ let state = {
   backendReady: false,
   backendMessage: '',
   paymentMode: 'disabled',
+  socialAuth: { google: false, apple: false },
   unreadMessageCount: 0,
   openListingSlug: ''
 };
@@ -267,9 +268,11 @@ async function hydrateBackendState() {
     ]);
     state.backendReady = Boolean(health?.ok);
     state.paymentMode = health?.paymentMode || 'disabled';
+    state.socialAuth = { google: Boolean(health?.socialAuth?.google), apple: Boolean(health?.socialAuth?.apple) };
     state.backendMessage = '';
     updateServiceStatus();
     updatePaymentAvailability();
+    updateSocialAuthAvailability();
     state.forSaleListings = withClientMetrics(salePayload?.listings || []);
     state.wtbListings = withClientMetrics(wtbPayload?.listings || []);
     applyAuthenticatedUser(session?.user || null);
@@ -325,6 +328,29 @@ function updatePaymentAvailability() {
   if (disabled && note) note.textContent = state.lang === 'en' ? 'Payment infrastructure is being prepared · Free access remains available' : 'Ödeme altyapısı hazırlanıyor · Ücretsiz kullanım devam ediyor';
 }
 
+function updateSocialAuthAvailability() {
+  const isEn = state.lang === 'en';
+  document.querySelectorAll('.social-auth-btn').forEach(button => {
+    const provider = button.dataset.provider;
+    const configured = Boolean(state.socialAuth?.[provider]);
+    const providerName = provider === 'google' ? 'Google' : 'Apple';
+    const label = button.querySelector('[data-social-label]');
+    if (label) label.textContent = configured
+      ? (isEn ? `Continue with ${providerName}` : `${providerName} ile devam et`)
+      : (isEn ? `${providerName} setup required` : `${providerName} kurulumu gerekli`);
+    button.setAttribute('aria-disabled', String(!configured));
+    button.classList.toggle('opacity-55', !configured);
+    button.classList.toggle('cursor-not-allowed', !configured);
+    button.classList.toggle('cursor-pointer', configured);
+  });
+  const status = document.getElementById('social-auth-status');
+  if (status) {
+    const anyConfigured = Boolean(state.socialAuth?.google || state.socialAuth?.apple);
+    status.textContent = anyConfigured ? '' : (isEn ? 'Social sign-in becomes active after secure provider keys are added.' : 'Sosyal giriş, güvenli sağlayıcı anahtarları eklendiğinde otomatik açılır.');
+    status.classList.toggle('hidden', anyConfigured);
+  }
+}
+
 function requireAuthenticated() {
   if (state.currentUser) return true;
   showToast(state.lang === 'en' ? 'Please sign in to continue.' : 'Devam etmek için giriş yapmalısınız.');
@@ -342,6 +368,8 @@ async function handleUrlState() {
   const resetToken = url.searchParams.get('reset_token');
   const verifyToken = url.searchParams.get('verify_token');
   const payment = url.searchParams.get('payment');
+  const oauth = url.searchParams.get('oauth');
+  const oauthProvider = url.searchParams.get('provider');
   if (resetToken) return openResetPasswordModal(resetToken);
   if (verifyToken) {
     try {
@@ -362,7 +390,31 @@ async function handleUrlState() {
     url.searchParams.delete('payment');
     history.replaceState({}, '', url);
   }
+  if (oauth === 'success') {
+    const providerName = oauthProvider === 'apple' ? 'Apple' : 'Google';
+    showToast(state.lang === 'en' ? `${providerName} sign-in successful.` : `${providerName} ile giriş başarılı.`);
+    url.searchParams.delete('oauth');
+    url.searchParams.delete('provider');
+    history.replaceState({}, '', url);
+    if (state.currentUser) await openAccountModal();
+  } else if (oauth === 'error') {
+    openSocialAuthErrorModal(url.searchParams.get('reason') || (state.lang === 'en' ? 'Social sign-in could not be completed.' : 'Sosyal giriş tamamlanamadı.'));
+    url.searchParams.delete('oauth');
+    url.searchParams.delete('provider');
+    url.searchParams.delete('reason');
+    history.replaceState({}, '', url);
+  }
   await openListingFromUrl();
+}
+
+function openSocialAuthErrorModal(message) {
+  const isEn = state.lang === 'en';
+  const content = el.modalContent();
+  const backdrop = el.modalBackdrop();
+  if (!content || !backdrop) return;
+  content.innerHTML = `<div class="p-7 sm:p-10 text-center space-y-5"><div class="w-16 h-16 mx-auto rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center"><i class="ph-bold ph-warning-circle text-3xl"></i></div><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Social sign-in unavailable' : 'Sosyal giriş kullanılamıyor'}</h3><p class="mt-2 text-sm leading-6 text-slate-500">${escapeHtml(message)}</p></div><button id="social-auth-error-login" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 text-white text-sm font-bold">${isEn ? 'Use email sign-in' : 'E-posta ile giriş yap'}</button></div>`;
+  backdrop.classList.remove('hidden');
+  document.getElementById('social-auth-error-login')?.addEventListener('click', () => showOnboardingPage('login'));
 }
 
 function openVerificationPendingModal(email) {
@@ -3143,6 +3195,7 @@ function renderAuthCard() {
   const formContainer = document.getElementById('ob-form-fields-container');
 
   if (!formContainer) return;
+  updateSocialAuthAvailability();
 
   const activeTabStyle = "py-2.5 rounded-xl font-extrabold text-xs transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
   const inactiveTabStyle = "py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
@@ -3354,9 +3407,16 @@ function renderAuthCard() {
 
   // Social Auth Buttons Click Listeners
   document.querySelectorAll('.social-auth-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.onclick = (e) => {
       e.preventDefault();
-      showToast(isEn ? 'Social login will be enabled after OAuth keys are configured.' : 'Sosyal giriş, OAuth anahtarları yapılandırıldıktan sonra açılacak.');
-    });
+      const provider = btn.dataset.provider;
+      const providerName = provider === 'google' ? 'Google' : 'Apple';
+      if (!state.socialAuth?.[provider]) {
+        showToast(isEn ? `${providerName} sign-in is not configured yet. Use email sign-in for now.` : `${providerName} ile giriş henüz yapılandırılmadı. Şimdilik e-posta ile giriş yapın.`);
+        return;
+      }
+      const role = authMode === 'register' ? authRole : 'buyer';
+      window.location.assign(`/api/auth/oauth/${provider}/start?role=${encodeURIComponent(role)}`);
+    };
   });
 }

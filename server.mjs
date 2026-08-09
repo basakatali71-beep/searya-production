@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, randomBytes, randomUUID, scryptSync, sign, timingSafeEqual, verify } from 'node:crypto';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
@@ -21,6 +21,7 @@ const DB_PATH = resolve(ROOT, process.env.SEARYA_DB_PATH || DEFAULT_DB_PATH);
 const BACKUP_DIR = resolve(process.env.SEARYA_BACKUP_DIR || resolve(DB_PATH, '..', 'backups'));
 const SESSION_COOKIE = 'searya_session';
 const VISITOR_COOKIE = 'searya_visitor';
+const OAUTH_COOKIE = 'searya_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const MAX_JSON_BYTES = 6 * 1024 * 1024;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
@@ -52,6 +53,16 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS oauth_states (
+    state_hash TEXT PRIMARY KEY,
+    provider TEXT NOT NULL CHECK(provider IN ('google','apple')),
+    role TEXT NOT NULL DEFAULT 'buyer',
+    code_verifier TEXT NOT NULL,
+    nonce TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   ) STRICT;
@@ -275,13 +286,29 @@ function getUser(req) {
 function sessionCookie(token, clear = false) {
   const parts = [`${SESSION_COOKIE}=${clear ? '' : encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   parts.push(`Max-Age=${clear ? 0 : SESSION_TTL_SECONDS}`);
-  if (NODE_ENV === 'production') parts.push('Secure');
+  if (NODE_ENV === 'production') {
+    parts.push('Secure');
+    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
+  }
+  return parts.join('; ');
+}
+
+function oauthCookie(state, clear = false) {
+  const sameSite = NODE_ENV === 'production' ? 'None' : 'Lax';
+  const parts = [`${OAUTH_COOKIE}=${clear ? '' : encodeURIComponent(state)}`, 'Path=/api/auth/oauth', 'HttpOnly', `SameSite=${sameSite}`, `Max-Age=${clear ? 0 : 600}`];
+  if (NODE_ENV === 'production') {
+    parts.push('Secure');
+    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
+  }
   return parts.join('; ');
 }
 
 function visitorCookie(visitorId, clear = false) {
   const parts = [`${VISITOR_COOKIE}=${clear ? '' : encodeURIComponent(visitorId)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${clear ? 0 : 60 * 60 * 24 * 365}`];
-  if (NODE_ENV === 'production') parts.push('Secure');
+  if (NODE_ENV === 'production') {
+    parts.push('Secure');
+    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
+  }
   return parts.join('; ');
 }
 
@@ -303,6 +330,13 @@ function json(res, status, payload, headers = {}) {
   res.end(body);
 }
 
+function redirect(res, location, cookies = []) {
+  const headers = { Location: location, 'Cache-Control': 'no-store' };
+  if (cookies.length) headers['Set-Cookie'] = cookies;
+  res.writeHead(302, headers);
+  res.end();
+}
+
 function fail(res, status, code, message) {
   return json(res, status, { error: { code, message } });
 }
@@ -322,6 +356,11 @@ async function readJson(req) {
   const raw = await readBody(req);
   if (!raw.length) return {};
   try { return JSON.parse(raw.toString('utf8')); } catch { throw Object.assign(new Error('Geçersiz JSON.'), { status: 400 }); }
+}
+
+async function readForm(req) {
+  const raw = await readBody(req, 128 * 1024);
+  return Object.fromEntries(new URLSearchParams(raw.toString('utf8')));
 }
 
 function requireUser(req, res, admin = false) {
@@ -417,6 +456,172 @@ async function sendVerificationEmail(user) {
   db.prepare('INSERT INTO email_verifications(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(verificationToken), user.id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), createdAt);
   const verifyUrl = `${APP_ORIGIN}/?verify_token=${encodeURIComponent(verificationToken)}`;
   await sendEmail({ to: user.email, subject: 'Searya e-posta doğrulama', text: `Merhaba ${user.name}, e-posta adresinizi 24 saat içinde doğrulayın: ${verifyUrl}`, idempotencyKey: `verify-${user.id}-${sha256(verificationToken).slice(0, 16)}` });
+}
+
+function socialAuthConfigured(provider) {
+  if (provider === 'google') return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  if (provider === 'apple') return Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY);
+  return false;
+}
+
+function oauthRedirectUri(provider) {
+  return `${APP_ORIGIN}/api/auth/oauth/${provider}/callback`;
+}
+
+function oauthErrorRedirect(provider, reason = 'Giriş işlemi tamamlanamadı.') {
+  const params = new URLSearchParams({ oauth: 'error', provider, reason });
+  return `${APP_ORIGIN}/?${params}`;
+}
+
+function base64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+function decodeJwt(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) throw new Error('Geçersiz kimlik belirteci.');
+  return {
+    header: JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')),
+    payload: JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')),
+    signingInput: `${parts[0]}.${parts[1]}`,
+    signature: Buffer.from(parts[2], 'base64url')
+  };
+}
+
+function appleClientSecret() {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = base64UrlJson({ alg: 'ES256', kid: process.env.APPLE_KEY_ID, typ: 'JWT' });
+  const payload = base64UrlJson({
+    iss: process.env.APPLE_TEAM_ID,
+    iat: issuedAt,
+    exp: issuedAt + 5 * 60,
+    aud: 'https://appleid.apple.com',
+    sub: process.env.APPLE_CLIENT_ID
+  });
+  const signingInput = `${header}.${payload}`;
+  const privateKey = createPrivateKey(String(process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'));
+  const signature = sign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' });
+  return `${signingInput}.${signature.toString('base64url')}`;
+}
+
+async function verifiedAppleClaims(idToken, expectedNonce) {
+  const decoded = decodeJwt(idToken);
+  if (decoded.header.alg !== 'RS256' || !decoded.header.kid) throw new Error('Apple kimlik belirteci doğrulanamadı.');
+  const response = await fetch('https://appleid.apple.com/auth/keys');
+  if (!response.ok) throw new Error('Apple doğrulama anahtarlarına ulaşılamadı.');
+  const jwks = await response.json();
+  const jwk = jwks.keys?.find(key => key.kid === decoded.header.kid && key.alg === 'RS256');
+  if (!jwk) throw new Error('Apple doğrulama anahtarı bulunamadı.');
+  const validSignature = verify('RSA-SHA256', Buffer.from(decoded.signingInput), createPublicKey({ key: jwk, format: 'jwk' }), decoded.signature);
+  const audience = Array.isArray(decoded.payload.aud) ? decoded.payload.aud : [decoded.payload.aud];
+  if (!validSignature || decoded.payload.iss !== 'https://appleid.apple.com' || !audience.includes(process.env.APPLE_CLIENT_ID) || Number(decoded.payload.exp || 0) <= Math.floor(Date.now() / 1000) || decoded.payload.nonce !== expectedNonce) {
+    throw new Error('Apple kimlik belirteci doğrulanamadı.');
+  }
+  return decoded.payload;
+}
+
+function beginOauth(req, res, url, provider) {
+  if (!socialAuthConfigured(provider)) return redirect(res, oauthErrorRedirect(provider, `${provider === 'google' ? 'Google' : 'Apple'} ile giriş henüz yapılandırılmadı.`));
+  const role = ['buyer', 'seller', 'both'].includes(url.searchParams.get('role')) ? url.searchParams.get('role') : 'buyer';
+  const state = randomBytes(32).toString('base64url');
+  const nonce = randomBytes(24).toString('base64url');
+  const codeVerifier = randomBytes(48).toString('base64url');
+  db.prepare('DELETE FROM oauth_states WHERE expires_at<=?').run(nowIso());
+  db.prepare('INSERT INTO oauth_states(state_hash,provider,role,code_verifier,nonce,expires_at,created_at) VALUES(?,?,?,?,?,?,?)').run(sha256(state), provider, role, codeVerifier, nonce, new Date(Date.now() + 10 * 60 * 1000).toISOString(), nowIso());
+  let authorizationUrl;
+  if (provider === 'google') {
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      redirect_uri: oauthRedirectUri('google'),
+      response_type: 'code',
+      scope: 'openid email profile',
+      state,
+      nonce,
+      code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
+      code_challenge_method: 'S256',
+      prompt: 'select_account'
+    });
+    authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  } else {
+    const params = new URLSearchParams({
+      client_id: process.env.APPLE_CLIENT_ID,
+      redirect_uri: oauthRedirectUri('apple'),
+      response_type: 'code',
+      response_mode: 'form_post',
+      scope: 'name email',
+      state,
+      nonce
+    });
+    authorizationUrl = `https://appleid.apple.com/auth/authorize?${params}`;
+  }
+  return redirect(res, authorizationUrl, [oauthCookie(state)]);
+}
+
+function consumeOauthState(req, provider, state) {
+  const cookieState = String(parseCookies(req)[OAUTH_COOKIE] || '');
+  if (!state || !cookieState || state.length !== cookieState.length || !timingSafeEqual(Buffer.from(state), Buffer.from(cookieState))) throw new Error('Giriş oturumu geçersiz veya süresi dolmuş.');
+  const row = db.prepare('SELECT * FROM oauth_states WHERE state_hash=? AND provider=? AND expires_at>?').get(sha256(state), provider, nowIso());
+  db.prepare('DELETE FROM oauth_states WHERE state_hash=?').run(sha256(state));
+  if (!row) throw new Error('Giriş oturumu geçersiz veya süresi dolmuş.');
+  return row;
+}
+
+function socialUserSession({ email, name, role }) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('Sağlayıcıdan geçerli e-posta alınamadı.');
+  let user = db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail);
+  if (user && user.status !== 'active') throw new Error('Bu hesap kullanıma kapalı.');
+  if (!user) {
+    const id = randomUUID();
+    const createdAt = nowIso();
+    db.prepare(`INSERT INTO users(id,email,password_hash,name,role,status,is_admin,email_verified,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at) VALUES(?,?,NULL,?,?, 'active',0,1,0,2,1,0,0,?,?)`).run(id, normalizedEmail, cleanText(name || normalizedEmail.split('@')[0], 80), role, createdAt, createdAt);
+    user = db.prepare('SELECT * FROM users WHERE id=?').get(id);
+    sendEmail({ to: normalizedEmail, subject: 'Searya hesabınız hazır', text: `Merhaba ${user.name}, Searya hesabınız sosyal giriş ile oluşturuldu.`, idempotencyKey: `social-welcome-${id}` }).catch(console.error);
+  } else if (!user.email_verified) {
+    db.prepare('UPDATE users SET email_verified=1,last_seen_at=? WHERE id=?').run(nowIso(), user.id);
+    user = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+  }
+  return { user, token: createSession(user.id) };
+}
+
+async function completeOauth(req, res, url, provider) {
+  try {
+    const input = req.method === 'POST' ? await readForm(req) : Object.fromEntries(url.searchParams);
+    if (input.error) throw new Error('Giriş işlemi kullanıcı tarafından iptal edildi.');
+    const oauthState = consumeOauthState(req, provider, String(input.state || ''));
+    if (!input.code) throw new Error('Yetkilendirme kodu alınamadı.');
+    let identity;
+    if (provider === 'google') {
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ code: input.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: oauthRedirectUri('google'), grant_type: 'authorization_code', code_verifier: oauthState.code_verifier })
+      });
+      const tokens = await tokenResponse.json();
+      if (!tokenResponse.ok || !tokens.access_token) throw new Error('Google oturumu doğrulanamadı.');
+      const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+      const profile = await profileResponse.json();
+      if (!profileResponse.ok || profile.email_verified !== true) throw new Error('Google e-posta adresi doğrulanamadı.');
+      identity = { email: profile.email, name: profile.name };
+    } else {
+      const tokenResponse = await fetch('https://appleid.apple.com/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: process.env.APPLE_CLIENT_ID, client_secret: appleClientSecret(), code: input.code, grant_type: 'authorization_code', redirect_uri: oauthRedirectUri('apple') })
+      });
+      const tokens = await tokenResponse.json();
+      if (!tokenResponse.ok || !tokens.id_token) throw new Error('Apple oturumu doğrulanamadı.');
+      const claims = await verifiedAppleClaims(tokens.id_token, oauthState.nonce);
+      if (!(claims.email_verified === true || claims.email_verified === 'true')) throw new Error('Apple e-posta adresi doğrulanamadı.');
+      let suppliedName = '';
+      try { const appleUser = JSON.parse(input.user || '{}'); suppliedName = [appleUser.name?.firstName, appleUser.name?.lastName].filter(Boolean).join(' '); } catch {}
+      identity = { email: claims.email, name: suppliedName || String(claims.email || '').split('@')[0] };
+    }
+    const session = socialUserSession({ ...identity, role: oauthState.role });
+    return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [sessionCookie(session.token), oauthCookie('', true)]);
+  } catch (error) {
+    return redirect(res, oauthErrorRedirect(provider, error.message || 'Giriş işlemi tamamlanamadı.'), [oauthCookie('', true)]);
+  }
 }
 
 async function sendDueProjectAlerts() {
@@ -577,6 +782,10 @@ bootstrapAdmin();
 async function handleApi(req, res, url) {
   const method = req.method || 'GET';
   const pathname = url.pathname;
+  const oauthStartMatch = pathname.match(/^\/api\/auth\/oauth\/(google|apple)\/start$/);
+  const oauthCallbackMatch = pathname.match(/^\/api\/auth\/oauth\/(google|apple)\/callback$/);
+  if (method === 'GET' && oauthStartMatch) return beginOauth(req, res, url, oauthStartMatch[1]);
+  if (oauthCallbackMatch && ((oauthCallbackMatch[1] === 'google' && method === 'GET') || (oauthCallbackMatch[1] === 'apple' && method === 'POST'))) return completeOauth(req, res, url, oauthCallbackMatch[1]);
   const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
   if (mutation) {
     const origin = req.headers.origin;
@@ -586,7 +795,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google'), apple: socialAuthConfigured('apple') }, time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
