@@ -287,8 +287,8 @@
                     </div>
                     <div class="sy-preview-dashboard">
                       <div class="sy-preview-metrics">
-                        <span><span id="t-preview-visits">İlan görünümü</span><strong>Önizleme</strong></span>
-                        <span><span id="t-preview-conversion">Veri durumu</span><strong>Temsili</strong></span>
+                        <span><span id="t-preview-visits">İlan görünümü</span><strong id="t-preview-view-value">Önizleme</strong></span>
+                        <span><span id="t-preview-conversion">Veri durumu</span><strong id="t-preview-data-value">Temsili</strong></span>
                       </div>
                       <div class="sy-preview-chart" aria-hidden="true">
                         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -655,7 +655,7 @@
             <p id="t-launch-chat-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Kontrollü bağlantı, sınırsız devam</p>
             <div class="my-6">
               <span class="text-4xl font-black text-indigo-600 dark:text-indigo-400">$0</span>
-              <span class="text-xs text-slate-500"> lansman boyunca</span>
+              <span id="t-launch-chat-period" class="text-xs text-slate-500">lansman boyunca</span>
             </div>
             <ul id="t-launch-chat-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
               <li>İlk 6 mesajda iletişim bilgisi koruması</li><li>Şikâyet ve kullanıcı engelleme</li><li>Yönetici ilan incelemesi</li>
@@ -1064,7 +1064,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-31"></script>
+  <script type="module" src="./src/app.js?v=20260810-32"></script>
 
 </body>
 </html>

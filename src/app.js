@@ -93,6 +93,7 @@ function withClientMetrics(items) {
 }
 
 const savedClientState = readClientState();
+const requestedLanguage = new URLSearchParams(window.location.search).get('lang');
 
 // Application State
 let state = {
@@ -105,7 +106,9 @@ let state = {
   messages: [...initialMessages],
   activeThreadId: 'thread-1',
   theme: savedClientState.theme === 'light' ? 'light' : 'dark',
-  lang: savedClientState.lang === 'en' ? 'en' : 'tr',
+  lang: requestedLanguage === 'en' || requestedLanguage === 'tr'
+    ? requestedLanguage
+    : (savedClientState.lang === 'en' ? 'en' : 'tr'),
   pricingTab: 'seller', // 'buyer' | 'seller'
   inboxOpen: false,
   buyerConnections: Number.isInteger(savedClientState.buyerConnections) && savedClientState.buyerConnections >= 0
@@ -552,6 +555,9 @@ function setup3DTiltEffect() {
 // Update UI Text on Language Change
 function setLanguage(lang) {
   state.lang = lang === 'en' ? 'en' : 'tr';
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', state.lang);
+  history.replaceState({}, '', url);
   persistClientState();
   updateStaticTranslations();
   updateServiceStatus();
@@ -664,7 +670,10 @@ function updateStaticTranslations() {
     't-preview-content': isEn ? 'Content' : 'İçerikler',
     't-preview-users': isEn ? 'Users' : 'Kullanıcılar',
     't-preview-visits': isEn ? 'Listing view' : 'İlan görünümü',
-    't-preview-conversion': isEn ? 'Data status' : 'Veri durumu'
+    't-preview-conversion': isEn ? 'Data status' : 'Veri durumu',
+    't-preview-view-value': isEn ? 'Preview' : 'Önizleme',
+    't-preview-data-value': isEn ? 'Sample' : 'Temsili',
+    't-launch-chat-period': isEn ? 'during launch' : 'lansman boyunca'
   };
   Object.entries(previewTranslations).forEach(([id, value]) => {
     const node = document.getElementById(id);
