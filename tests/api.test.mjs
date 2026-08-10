@@ -33,7 +33,7 @@ after(async () => {
 test('health and seeded listings are available', async () => {
   const health = await fetch(`${baseUrl}/api/health`).then(response => response.json());
   assert.equal(health.ok, true);
-  assert.deepEqual(health.socialAuth, { google: false, apple: false });
+  assert.deepEqual(health.socialAuth, { google: false });
 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   assert.ok(listings.listings.length >= 10);

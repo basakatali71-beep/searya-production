@@ -130,7 +130,7 @@ let state = {
   backendReady: false,
   backendMessage: '',
   paymentMode: 'disabled',
-  socialAuth: { google: false, apple: false },
+  socialAuth: { google: false },
   unreadMessageCount: 0,
   openListingSlug: ''
 };
@@ -268,7 +268,7 @@ async function hydrateBackendState() {
     ]);
     state.backendReady = Boolean(health?.ok);
     state.paymentMode = health?.paymentMode || 'disabled';
-    state.socialAuth = { google: Boolean(health?.socialAuth?.google), apple: Boolean(health?.socialAuth?.apple) };
+    state.socialAuth = { google: Boolean(health?.socialAuth?.google) };
     state.backendMessage = '';
     updateServiceStatus();
     updatePaymentAvailability();
@@ -345,7 +345,7 @@ function updateSocialAuthAvailability() {
   });
   const status = document.getElementById('social-auth-status');
   if (status) {
-    const anyConfigured = Boolean(state.socialAuth?.google || state.socialAuth?.apple);
+    const anyConfigured = Boolean(state.socialAuth?.google);
     status.textContent = anyConfigured ? '' : (isEn ? 'Social sign-in becomes active after secure provider keys are added.' : 'Sosyal giriş, güvenli sağlayıcı anahtarları eklendiğinde otomatik açılır.');
     status.classList.toggle('hidden', anyConfigured);
   }
@@ -391,7 +391,7 @@ async function handleUrlState() {
     history.replaceState({}, '', url);
   }
   if (oauth === 'success') {
-    const providerName = oauthProvider === 'apple' ? 'Apple' : 'Google';
+    const providerName = 'Google';
     showToast(state.lang === 'en' ? `${providerName} sign-in successful.` : `${providerName} ile giriş başarılı.`);
     url.searchParams.delete('oauth');
     url.searchParams.delete('provider');

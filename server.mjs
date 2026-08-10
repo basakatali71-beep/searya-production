@@ -782,10 +782,10 @@ bootstrapAdmin();
 async function handleApi(req, res, url) {
   const method = req.method || 'GET';
   const pathname = url.pathname;
-  const oauthStartMatch = pathname.match(/^\/api\/auth\/oauth\/(google|apple)\/start$/);
-  const oauthCallbackMatch = pathname.match(/^\/api\/auth\/oauth\/(google|apple)\/callback$/);
+  const oauthStartMatch = pathname.match(/^\/api\/auth\/oauth\/(google)\/start$/);
+  const oauthCallbackMatch = pathname.match(/^\/api\/auth\/oauth\/(google)\/callback$/);
   if (method === 'GET' && oauthStartMatch) return beginOauth(req, res, url, oauthStartMatch[1]);
-  if (oauthCallbackMatch && ((oauthCallbackMatch[1] === 'google' && method === 'GET') || (oauthCallbackMatch[1] === 'apple' && method === 'POST'))) return completeOauth(req, res, url, oauthCallbackMatch[1]);
+  if (oauthCallbackMatch && method === 'GET') return completeOauth(req, res, url, oauthCallbackMatch[1]);
   const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
   if (mutation) {
     const origin = req.headers.origin;
@@ -795,7 +795,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google'), apple: socialAuthConfigured('apple') }, time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google') }, time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
