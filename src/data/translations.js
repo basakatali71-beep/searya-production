@@ -28,7 +28,8 @@ export const translations = {
     statResponse: "Platform Yaklaşımı",
     statResponseVal: "Komisyonsuz",
     btnExplore: "Projeleri Keşfet →",
-    btnSellProject: "Proje Sat",
+    btnSellProject: "Ücretsiz İlan Ver",
+    sellerLaunchNote: "Lansmana özel: Satıcılar 3 aktif ilanı ücretsiz yayınlayabilir.",
 
     // Onboarding Full-Screen Page Translations
     obSkipBtn: "Şimdi değil, ilanları keşfet →",
@@ -76,10 +77,10 @@ export const translations = {
     featuredCardBadge: "Örnek Proje Önizlemesi",
     featuredCardTitle: "AI Writer Pro",
     featuredCardCategory: "Bir dijital proje ilanının platformda nasıl görüneceğini inceleyin.",
-    featuredCardRevenue: "Aylık Gelir",
-    featuredCardRevVal: "$2,450",
-    featuredCardUsers: "Kullanıcılar",
-    featuredCardUsersVal: "1,240",
+    featuredCardRevenue: "İlan Türü",
+    featuredCardRevVal: "Dijital Proje",
+    featuredCardUsers: "İletişim",
+    featuredCardUsersVal: "Platform İçi",
     featuredCardBtn: "İlan Detaylarını İncele →",
 
     // Marketplace Grid & Tabs
@@ -292,7 +293,7 @@ export const translations = {
     footerCommunitySoon: "Resmî topluluk kanalları yakında burada.",
     cookiePreferences: "Çerez Tercihleri",
     cookieTitle: "Gizlilik tercihiniz",
-    cookieText: "Zorunlu çerezler oturum için kullanılır. İzin verirseniz yalnızca anonim ziyaret istatistikleri tutulur.",
+    cookieText: "Zorunlu çerezler oturum için kullanılır. İzin verirseniz anonim ziyaret ve kampanya dönüşümleri ölçülür.",
     cookieDetails: "Ayrıntıları incele",
     cookieEssential: "Yalnızca zorunlu",
     cookieAccept: "Analitiğe izin ver",
@@ -336,7 +337,8 @@ export const translations = {
     statResponse: "Platform Approach",
     statResponseVal: "No Commission",
     btnExplore: "Explore Projects →",
-    btnSellProject: "Sell Project",
+    btnSellProject: "Post for Free",
+    sellerLaunchNote: "Launch offer: Sellers can publish 3 active listings for free.",
 
     // Onboarding Full-Screen Page Translations
     obSkipBtn: "Not now, explore listings →",
@@ -384,10 +386,10 @@ export const translations = {
     featuredCardBadge: "Sample Project Preview",
     featuredCardTitle: "AI Writer Pro",
     featuredCardCategory: "See how a digital project listing is presented on the marketplace.",
-    featuredCardRevenue: "Monthly Revenue",
-    featuredCardRevVal: "$2,450",
-    featuredCardUsers: "Active Users",
-    featuredCardUsersVal: "1,240",
+    featuredCardRevenue: "Listing Type",
+    featuredCardRevVal: "Digital Project",
+    featuredCardUsers: "Contact",
+    featuredCardUsersVal: "Built-in Chat",
     featuredCardBtn: "Inspect Project Details →",
 
     // Marketplace Grid & Tabs
@@ -600,7 +602,7 @@ export const translations = {
     footerCommunitySoon: "Official community channels are coming soon.",
     cookiePreferences: "Cookie Preferences",
     cookieTitle: "Your privacy preference",
-    cookieText: "Essential cookies support sign-in. With permission, only anonymous visit statistics are collected.",
+    cookieText: "Essential cookies support sign-in. With permission, anonymous visits and campaign conversions are measured.",
     cookieDetails: "View details",
     cookieEssential: "Essential only",
     cookieAccept: "Allow analytics",

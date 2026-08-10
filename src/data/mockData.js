@@ -17,8 +17,8 @@ const baseForSaleListings = [
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
       githubVerified: true
     },
-    shortDesc: "GPT-4o tabanlı e-ticaret ve pazarlama içerik üretim platformu. 1,240 ödeyen kullanıcı.",
-    shortDescEn: "GPT-4o powered e-commerce & marketing copy generator. 1,240 paying users.",
+    shortDesc: "GPT-4o tabanlı e-ticaret ve pazarlama içerik üretim platformu için temsili örnek ilan.",
+    shortDescEn: "Representative sample listing for a GPT-4o powered e-commerce and marketing copy platform.",
     fullDesc: "AI Copywriter Pro, Shopify ve WordPress satıcıları için otomatik SEO uyumlu ürün açıklamaları üretir. Stripe entegrasyonu tamamlanmıştır. Satış sonrası 30 gün teknik destek verilecektir.",
     fullDescEn: "AI Copywriter Pro generates automated SEO-optimized product descriptions for Shopify & WordPress merchants. Integrated with Stripe. Includes 30 days post-sale support.",
     coverImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",

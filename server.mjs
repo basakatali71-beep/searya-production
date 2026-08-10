@@ -149,11 +149,33 @@ db.exec(`
     id TEXT PRIMARY KEY,
     visitor_id TEXT NOT NULL,
     path TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'direct',
+    medium TEXT NOT NULL DEFAULT 'direct',
+    campaign TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    term TEXT NOT NULL DEFAULT '',
+    referrer TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   ) STRICT;
 
   CREATE INDEX IF NOT EXISTS page_views_created ON page_views(created_at DESC);
   CREATE INDEX IF NOT EXISTS page_views_visitor_created ON page_views(visitor_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS analytics_events (
+    id TEXT PRIMARY KEY,
+    event_name TEXT NOT NULL,
+    visitor_id TEXT NOT NULL,
+    user_id TEXT,
+    source TEXT NOT NULL DEFAULT 'direct',
+    medium TEXT NOT NULL DEFAULT 'direct',
+    campaign TEXT NOT NULL DEFAULT '',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS analytics_events_created ON analytics_events(created_at DESC);
+  CREATE INDEX IF NOT EXISTS analytics_events_name_created ON analytics_events(event_name, created_at DESC);
+  CREATE INDEX IF NOT EXISTS analytics_events_visitor_created ON analytics_events(visitor_id, created_at DESC);
 
   CREATE TABLE IF NOT EXISTS blocks (
     blocker_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -203,6 +225,18 @@ if (!db.prepare('PRAGMA table_info(listings)').all().some(column => column.name 
 if (!db.prepare('PRAGMA table_info(alerts)').all().some(column => column.name === 'last_sent_at')) {
   db.exec('ALTER TABLE alerts ADD COLUMN last_sent_at TEXT;');
 }
+for (const [column, definition] of [
+  ['source', "TEXT NOT NULL DEFAULT 'direct'"],
+  ['medium', "TEXT NOT NULL DEFAULT 'direct'"],
+  ['campaign', "TEXT NOT NULL DEFAULT ''"],
+  ['content', "TEXT NOT NULL DEFAULT ''"],
+  ['term', "TEXT NOT NULL DEFAULT ''"],
+  ['referrer', "TEXT NOT NULL DEFAULT ''"]
+]) {
+  if (!db.prepare('PRAGMA table_info(page_views)').all().some(item => item.name === column)) {
+    db.exec(`ALTER TABLE page_views ADD COLUMN ${column} ${definition};`);
+  }
+}
 
 const packages = Object.freeze({
   buyer_connections_10: { key: 'buyer_connections_10', name: '10 Bağlantı Paketi', amountCents: 900, buyerConnections: 10 },
@@ -222,6 +256,44 @@ function nowIso() {
 
 function cleanText(value, max = 500) {
   return String(value ?? '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function analyticsVisitorId(req) {
+  const visitorId = String(parseCookies(req)[VISITOR_COOKIE] || '');
+  return /^[a-f0-9-]{20,50}$/i.test(visitorId) ? visitorId : '';
+}
+
+function analyticsAttribution(pathValue = '/', referrerValue = '') {
+  let pageUrl;
+  try { pageUrl = new URL(String(pathValue || '/'), APP_ORIGIN); }
+  catch { pageUrl = new URL('/', APP_ORIGIN); }
+  const referrer = cleanText(referrerValue, 500);
+  let referrerHost = '';
+  try { referrerHost = referrer ? new URL(referrer).hostname.replace(/^www\./, '').toLowerCase() : ''; }
+  catch { referrerHost = ''; }
+  const sourceParam = cleanText(pageUrl.searchParams.get('utm_source'), 80).toLowerCase();
+  const mediumParam = cleanText(pageUrl.searchParams.get('utm_medium'), 80).toLowerCase();
+  const source = sourceParam || (/(^|\.)t\.co$|(^|\.)(x|twitter)\.com$/.test(referrerHost) ? 'x' : /(^|\.)google\./.test(referrerHost) ? 'google' : referrerHost || 'direct');
+  const medium = mediumParam || (source === 'direct' ? 'direct' : 'referral');
+  return {
+    source,
+    medium,
+    campaign: cleanText(pageUrl.searchParams.get('utm_campaign'), 120),
+    content: cleanText(pageUrl.searchParams.get('utm_content'), 120),
+    term: cleanText(pageUrl.searchParams.get('utm_term'), 120),
+    referrer
+  };
+}
+
+function recordAnalyticsEvent(req, eventName, metadata = {}) {
+  const visitorId = analyticsVisitorId(req);
+  if (!visitorId) return;
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const attribution = db.prepare(`SELECT source,medium,campaign FROM page_views WHERE visitor_id=? AND created_at>=? ORDER BY CASE WHEN source='direct' THEN 1 ELSE 0 END,created_at DESC LIMIT 1`).get(visitorId, since)
+    || { source: 'direct', medium: 'direct', campaign: '' };
+  db.prepare(`INSERT INTO analytics_events(id,event_name,visitor_id,user_id,source,medium,campaign,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(
+    randomUUID(), cleanText(eventName, 60), visitorId, null, attribution.source, attribution.medium, attribution.campaign, JSON.stringify(metadata || {}).slice(0, 2000), nowIso()
+  );
 }
 
 function slugify(value) {
@@ -528,6 +600,7 @@ function socialUserSession({ email, name, role }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('Sağlayıcıdan geçerli e-posta alınamadı.');
   let user = db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail);
   if (user && user.status !== 'active') throw new Error('Bu hesap kullanıma kapalı.');
+  const created = !user;
   if (!user) {
     const id = randomUUID();
     const createdAt = nowIso();
@@ -538,7 +611,7 @@ function socialUserSession({ email, name, role }) {
     db.prepare('UPDATE users SET email_verified=1,last_seen_at=? WHERE id=?').run(nowIso(), user.id);
     user = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
   }
-  return { user, token: createSession(user.id) };
+  return { user, token: createSession(user.id), created };
 }
 
 async function completeOauth(req, res, url, provider) {
@@ -559,6 +632,7 @@ async function completeOauth(req, res, url, provider) {
     if (!profileResponse.ok || profile.email_verified !== true) throw new Error('Google e-posta adresi doğrulanamadı.');
     const identity = { email: profile.email, name: profile.name };
     const session = socialUserSession({ ...identity, role: oauthState.role });
+    if (session.created) recordAnalyticsEvent(req, 'signup_completed', { method: provider, role: oauthState.role });
     return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [sessionCookie(session.token), oauthCookie('', true)]);
   } catch (error) {
     return redirect(res, oauthErrorRedirect(provider, error.message || 'Giriş işlemi tamamlanamadı.'), [oauthCookie('', true)]);
@@ -745,13 +819,18 @@ async function handleApi(req, res, url) {
     const cookies = parseCookies(req);
     const existingId = String(cookies[VISITOR_COOKIE] || '');
     const visitorId = /^[a-f0-9-]{20,50}$/i.test(existingId) ? existingId : randomUUID();
-    db.prepare('INSERT INTO page_views(id,visitor_id,path,created_at) VALUES(?,?,?,?)').run(randomUUID(), visitorId, cleanText(body.path || '/', 240), nowIso());
+    const path = cleanText(body.path || '/', 500);
+    const attribution = analyticsAttribution(path, body.referrer || req.headers.referer || '');
+    db.prepare('INSERT INTO page_views(id,visitor_id,path,source,medium,campaign,content,term,referrer,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(randomUUID(), visitorId, path, attribution.source, attribution.medium, attribution.campaign, attribution.content, attribution.term, attribution.referrer, nowIso());
     return json(res, 201, { ok: true }, existingId ? {} : { 'Set-Cookie': visitorCookie(visitorId) });
   }
 
   if (method === 'DELETE' && pathname === '/api/analytics/consent') {
     const visitorId = String(parseCookies(req)[VISITOR_COOKIE] || '');
-    if (visitorId) db.prepare('DELETE FROM page_views WHERE visitor_id=?').run(visitorId);
+    if (visitorId) {
+      db.prepare('DELETE FROM page_views WHERE visitor_id=?').run(visitorId);
+      db.prepare('DELETE FROM analytics_events WHERE visitor_id=?').run(visitorId);
+    }
     return json(res, 200, { ok: true }, { 'Set-Cookie': visitorCookie('', true) });
   }
 
@@ -800,9 +879,11 @@ async function handleApi(req, res, url) {
         db.prepare('DELETE FROM users WHERE id=?').run(id);
         throw error;
       }
+      recordAnalyticsEvent(req, 'signup_completed', { method: 'email', role });
       return json(res, 201, { user: null, verificationRequired: true });
     }
     const token = createSession(id);
+    recordAnalyticsEvent(req, 'signup_completed', { method: 'email', role });
     sendEmail({ to: email, subject: 'Searya hesabınız hazır', text: `Merhaba ${name}, Searya hesabınız oluşturuldu.`, idempotencyKey: `welcome-${id}` }).catch(console.error);
     return json(res, 201, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)), verificationRequired: false }, { 'Set-Cookie': sessionCookie(token) });
   }
@@ -982,6 +1063,7 @@ async function handleApi(req, res, url) {
       throw error;
     }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
+    recordAnalyticsEvent(req, 'listing_created', { type: input.type });
     if (user.email) sendEmail({ to: user.email, subject: 'Searya ilanınız alındı', text: `${input.title} ilanınız ${status === 'pending' ? 'güvenlik incelemesine alındı' : 'yayınlandı'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
     return json(res, 201, { listing: listingFromRow(row), moderation: status === 'pending' ? 'pending' : 'approved', user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -1099,6 +1181,7 @@ async function handleApi(req, res, url) {
       }
     }
     if (createdThread) {
+      recordAnalyticsEvent(req, 'conversation_started');
       const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(listing.user_id);
       if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni bir görüşme başladı', text: `${user.name}, ${listing.title} ilanınız hakkında sizinle iletişime geçti.`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
     }
@@ -1230,6 +1313,7 @@ async function handleApi(req, res, url) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const sevenDaysIso = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000); sevenDaysIso.setHours(0, 0, 0, 0);
+    const thirtyDaysIso = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000); thirtyDaysIso.setHours(0, 0, 0, 0);
     const dailyRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS views,COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE created_at>=? GROUP BY day`).all(sevenDaysIso.toISOString());
     const signupRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS signups FROM users WHERE created_at>=? AND email IS NOT NULL AND is_admin=0 GROUP BY day`).all(sevenDaysIso.toISOString());
     const dailyMap = new Map(dailyRows.map(row => [row.day, row]));
@@ -1239,6 +1323,24 @@ async function handleApi(req, res, url) {
       const day = date.toISOString().slice(0, 10);
       return { day, views: dailyMap.get(day)?.views || 0, visitors: dailyMap.get(day)?.visitors || 0, signups: signupMap.get(day) || 0 };
     });
+    const campaignVisits = db.prepare(`WITH ranked AS (
+      SELECT visitor_id,source,medium,campaign,ROW_NUMBER() OVER(PARTITION BY visitor_id ORDER BY CASE WHEN source='direct' THEN 1 ELSE 0 END,created_at DESC) AS rank
+      FROM page_views WHERE created_at>=?
+    ) SELECT source,medium,campaign,COUNT(*) AS visitors FROM ranked WHERE rank=1 GROUP BY source,medium,campaign`).all(thirtyDaysIso.toISOString());
+    const campaignEvents = db.prepare(`SELECT source,medium,campaign,event_name AS eventName,COUNT(DISTINCT visitor_id) AS total FROM analytics_events WHERE created_at>=? GROUP BY source,medium,campaign,event_name`).all(thirtyDaysIso.toISOString());
+    const campaignMap = new Map();
+    const campaignKey = row => `${row.source}\u0000${row.medium}\u0000${row.campaign}`;
+    for (const row of campaignVisits) campaignMap.set(campaignKey(row), { source: row.source, medium: row.medium, campaign: row.campaign, visitors: row.visitors, signups: 0, listings: 0, conversations: 0 });
+    for (const row of campaignEvents) {
+      const key = campaignKey(row);
+      const item = campaignMap.get(key) || { source: row.source, medium: row.medium, campaign: row.campaign, visitors: 0, signups: 0, listings: 0, conversations: 0 };
+      if (row.eventName === 'signup_completed') item.signups = row.total;
+      if (row.eventName === 'listing_created') item.listings = row.total;
+      if (row.eventName === 'conversation_started') item.conversations = row.total;
+      campaignMap.set(key, item);
+    }
+    const campaigns = [...campaignMap.values()].sort((a, b) => b.visitors - a.visitors || b.signups - a.signups).slice(0, 30);
+    const measuredEventCount = eventName => db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM analytics_events WHERE event_name=? AND created_at>=?').get(eventName, thirtyDaysIso.toISOString()).count;
     return json(res, 200, {
       counts: {
         pendingListings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='pending'`).get().count,
@@ -1253,6 +1355,16 @@ async function handleApi(req, res, url) {
         revenueCents: db.prepare(`SELECT COALESCE(SUM(amount_cents),0) AS total FROM purchases WHERE status='paid'`).get().total
       },
       daily,
+      analytics: {
+        windowDays: 30,
+        funnel: {
+          visitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(thirtyDaysIso.toISOString()).count,
+          signups: measuredEventCount('signup_completed'),
+          listings: measuredEventCount('listing_created'),
+          conversations: measuredEventCount('conversation_started')
+        },
+        campaigns
+      },
       pendingListings: db.prepare(`SELECT * FROM listings WHERE status='pending' ORDER BY priority_review DESC,created_at`).all().map(listingFromRow),
       recentListings: db.prepare(`SELECT l.*,u.name AS owner_name,u.email AS owner_email FROM listings l JOIN users u ON u.id=l.user_id WHERE l.user_id NOT LIKE 'seed-%' ORDER BY l.created_at DESC LIMIT 50`).all().map(row => ({ ...listingFromRow(row), ownerName: row.owner_name, ownerEmail: row.owner_email })),
       users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,buyer_connections AS buyerConnections,seller_listing_credits AS sellerListingCredits,seller_vip_credits AS sellerVipCredits,boost_credits AS boostCredits,created_at AS createdAt,last_seen_at AS lastSeenAt FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 100`).all(),

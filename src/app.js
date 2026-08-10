@@ -1,6 +1,6 @@
-import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260807-3';
-import { translations } from './data/translations.js?v=20260810-9';
-import { ApiError, SearyaApi } from './api.js?v=20260808-5';
+import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260810-4';
+import { translations } from './data/translations.js?v=20260810-10';
+import { ApiError, SearyaApi } from './api.js?v=20260810-6';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
@@ -209,12 +209,12 @@ async function startApp() {
 function initCookieConsent() {
   const banner = document.getElementById('cookie-consent-banner');
   const preference = localStorage.getItem(COOKIE_CONSENT_KEY);
-  if (preference === 'analytics') SearyaApi.trackPageView(`${location.pathname}${location.search}`).catch(() => {});
+  if (preference === 'analytics') SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer).catch(() => {});
   else if (!preference) banner?.classList.remove('hidden');
   document.getElementById('cookie-accept-btn')?.addEventListener('click', () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, 'analytics');
     banner?.classList.add('hidden');
-    SearyaApi.trackPageView(`${location.pathname}${location.search}`).catch(() => {});
+    SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer).catch(() => {});
     showToast(state.lang === 'en' ? 'Analytics cookies enabled.' : 'Analitik çerezleri etkinleştirildi.');
   });
   document.getElementById('cookie-essential-btn')?.addEventListener('click', () => {
@@ -626,6 +626,7 @@ function updateStaticTranslations() {
   const sRespVal = document.getElementById('t-stat-response-val');
   const btnExp = document.getElementById('t-btn-explore');
   const btnSell = document.getElementById('t-btn-sell-project');
+  const sellerLaunchNote = document.getElementById('t-seller-launch-note');
 
   if (sListings) sListings.textContent = dict.statListings;
   if (sListingsVal) sListingsVal.textContent = dict.statListingsVal;
@@ -635,6 +636,7 @@ function updateStaticTranslations() {
   if (sRespVal) sRespVal.textContent = dict.statResponseVal;
   if (btnExp) btnExp.textContent = dict.btnExplore;
   if (btnSell) btnSell.textContent = dict.btnSellProject;
+  if (sellerLaunchNote) sellerLaunchNote.textContent = dict.sellerLaunchNote;
 
   // Featured 3D Hero Card
   const fcBadge = document.getElementById('t-featured-card-badge');
@@ -652,15 +654,17 @@ function updateStaticTranslations() {
   if (fcRev) fcRev.textContent = dict.featuredCardRevenue;
   if (fcRevVal) fcRevVal.textContent = dict.featuredCardRevVal;
   if (fcUsers) fcUsers.textContent = dict.featuredCardUsers;
-  if (fcUsersVal) fcUsersVal.textContent = `${dict.featuredCardUsersVal} 👥`;
+  if (fcUsersVal) fcUsersVal.textContent = dict.featuredCardUsersVal;
   if (fcBtn) fcBtn.textContent = dict.featuredCardBtn;
+  const featuredTag = document.getElementById('t-featured-card-price-tag');
+  if (featuredTag) featuredTag.textContent = isEn ? 'Sample Listing' : 'Temsili İlan';
   const previewTranslations = {
     't-preview-live': isEn ? 'Live' : 'Canlı',
     't-preview-overview': isEn ? 'Overview' : 'Genel bakış',
     't-preview-content': isEn ? 'Content' : 'İçerikler',
     't-preview-users': isEn ? 'Users' : 'Kullanıcılar',
-    't-preview-visits': isEn ? 'Visits' : 'Ziyaret',
-    't-preview-conversion': isEn ? 'Conversion' : 'Dönüşüm'
+    't-preview-visits': isEn ? 'Listing view' : 'İlan görünümü',
+    't-preview-conversion': isEn ? 'Data status' : 'Veri durumu'
   };
   Object.entries(previewTranslations).forEach(([id, value]) => {
     const node = document.getElementById(id);
@@ -2438,7 +2442,7 @@ function openProjectDetailModal(p) {
               <div class="flex-1 bg-emerald-500/80 hover:bg-emerald-500 rounded-md h-[80%] transition-all relative group cursor-pointer" title="Mart: $2,100">
                 <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$2.1k</span>
               </div>
-              <div class="flex-1 bg-emerald-500 hover:bg-emerald-400 rounded-md h-[100%] transition-all relative group cursor-pointer" title="Nisan: $2,450">
+              <div class="flex-1 bg-emerald-500 hover:bg-emerald-400 rounded-md h-[100%] transition-all relative group cursor-pointer" title="${state.lang === 'en' ? 'Sample trend' : 'Temsili eğilim'}">
                 <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$2.45k</span>
               </div>
             </div>

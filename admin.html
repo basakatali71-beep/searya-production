@@ -7,6 +7,7 @@
   <title>Searya Yönetim Merkezi</title>
   <link rel="icon" href="/public/searya-logo.png">
   <link rel="stylesheet" href="/src/styles/admin.css?v=20260807-1">
+  <style>.utm-example{margin:-4px 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#080d16;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.utm-example code{color:#a9bfff}.funnel{margin-bottom:0}</style>
 </head>
 <body>
   <aside>
@@ -14,6 +15,7 @@
     <p class="eyebrow">YÖNETİM MERKEZİ</p>
     <nav>
       <button class="active" data-section="dashboard">Genel Bakış</button>
+      <button data-section="analytics">Reklam Ölçümü</button>
       <button data-section="listings">İlanlar <span id="pending-badge">0</span></button>
       <button data-section="users">Kullanıcılar</button>
       <button data-section="purchases">Paket Satışları</button>
@@ -29,11 +31,15 @@
       <article class="card chart-card"><div class="card-head"><h2>Son 7 gün</h2><span>Ziyaret ve üyelik</span></div><div id="chart" class="chart"></div></article>
       <div class="split"><article class="card"><div class="card-head"><h2>Onay bekleyen ilanlar</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Açık şikâyetler</h2></div><div id="report-preview"></div></article></div>
     </section>
+    <section id="analytics" class="panel">
+      <div class="card"><div class="card-head"><div><h2>30 günlük dönüşüm hunisi</h2><span>Yalnızca analitik izni veren ziyaretçiler</span></div></div><div id="funnel-metrics" class="metrics funnel"></div></div>
+      <div class="card"><div class="card-head"><div><h2>Kampanya performansı</h2><span>X reklam bağlantılarında UTM kullanın</span></div></div><div class="utm-example">Örnek: <code>https://searya.com/?utm_source=x&amp;utm_medium=paid&amp;utm_campaign=seller_launch</code></div><div class="table-wrap"><table><thead><tr><th>Kaynak</th><th>Tür</th><th>Kampanya</th><th>Ziyaretçi</th><th>Kayıt</th><th>İlan</th><th>Görüşme</th></tr></thead><tbody id="campaign-table"></tbody></table></div></div>
+    </section>
     <section id="listings" class="panel"><div class="card"><div class="card-head"><h2>Tüm ilanlar</h2><input data-search="listing-table" placeholder="İlan ara…"></div><div class="table-wrap"><table><thead><tr><th>İlan</th><th>Sahibi</th><th>Fiyat</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="listing-table"></tbody></table></div></div></section>
     <section id="users" class="panel"><div class="card"><div class="card-head"><h2>Kullanıcılar</h2><input data-search="user-table" placeholder="Kullanıcı ara…"></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Rol</th><th>Haklar</th><th>Son görülme</th><th>İşlem</th></tr></thead><tbody id="user-table"></tbody></table></div></div></section>
     <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Paket satışları</h2></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
     <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Şikâyetler</h2></div><div class="table-wrap"><table><thead><tr><th>Şikâyet eden</th><th>Hedef</th><th>Neden</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
   </main>
-  <script type="module" src="/src/admin.js?v=20260808-3"></script>
+  <script type="module" src="/src/admin.js?v=20260810-4"></script>
 </body>
 </html>

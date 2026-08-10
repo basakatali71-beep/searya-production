@@ -249,6 +249,9 @@
                 <span id="t-btn-sell-project">Proje Sat</span>
               </button>
             </div>
+            <p id="t-seller-launch-note" class="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+              Lansmana özel: Satıcılar 3 aktif ilanı ücretsiz yayınlayabilir.
+            </p>
           </div>
 
           <!-- Right HOLOGRAPHIC & WEIGHTLESS FLOATING FEATURED CARD -->
@@ -266,8 +269,8 @@
                     <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
                     Örnek Proje Önizlemesi
                   </span>
-                  <span class="px-3 py-1 rounded-xl text-xs font-black bg-emerald-600 text-white shadow-md">
-                    $24,000
+                  <span id="t-featured-card-price-tag" class="px-3 py-1 rounded-xl text-xs font-black bg-indigo-600 text-white shadow-md">
+                    Temsili İlan
                   </span>
                 </div>
 
@@ -284,8 +287,8 @@
                     </div>
                     <div class="sy-preview-dashboard">
                       <div class="sy-preview-metrics">
-                        <span><span id="t-preview-visits">Ziyaret</span><strong>12.4K</strong></span>
-                        <span><span id="t-preview-conversion">Dönüşüm</span><strong>%18.6</strong></span>
+                        <span><span id="t-preview-visits">İlan görünümü</span><strong>Önizleme</strong></span>
+                        <span><span id="t-preview-conversion">Veri durumu</span><strong>Temsili</strong></span>
                       </div>
                       <div class="sy-preview-chart" aria-hidden="true">
                         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -300,19 +303,19 @@
                     AI Writer Pro
                   </h3>
                   <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal" id="t-featured-card-category">
-                    GPT-4o altyapılı içerik üretim platformu. 1,200+ aktif ödeyen kullanıcı.
+                    Bir dijital proje ilanının platformda nasıl görüneceğini inceleyin.
                   </p>
                 </div>
 
                 <!-- Live Revenue & User Stats Grid -->
                 <div class="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-xs">
                   <div>
-                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-revenue">Aylık Gelir</span>
-                    <span class="text-emerald-600 dark:text-emerald-400 font-extrabold text-base block mt-0.5" id="t-featured-card-revval">$2,450 / Ay</span>
+                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-revenue">İlan Türü</span>
+                    <span class="text-emerald-600 dark:text-emerald-400 font-extrabold text-base block mt-0.5" id="t-featured-card-revval">Dijital Proje</span>
                   </div>
                   <div>
-                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-users">Kullanıcılar</span>
-                    <span class="text-slate-900 dark:text-white font-extrabold text-base block mt-0.5" id="t-featured-card-usersval">1,240 👥</span>
+                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-users">İletişim</span>
+                    <span class="text-slate-900 dark:text-white font-extrabold text-base block mt-0.5" id="t-featured-card-usersval">Platform İçi</span>
                   </div>
                 </div>
 
@@ -1056,12 +1059,12 @@
   <div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
   <section id="cookie-consent-banner" class="hidden fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[140] sm:max-w-md p-5 rounded-2xl bg-white/95 dark:bg-[#101725]/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 shadow-2xl" role="dialog" aria-label="Çerez tercihleri">
-    <div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-shield-check text-xl"></i></div><div><h3 id="cookie-consent-title" class="font-black text-sm text-slate-900 dark:text-white">Gizlilik tercihiniz</h3><p id="cookie-consent-text" class="text-xs leading-relaxed text-slate-500 dark:text-slate-400 mt-1">Zorunlu çerezler oturum için kullanılır. İzin verirseniz yalnızca anonim ziyaret istatistikleri tutulur.</p><a id="cookie-details-link" href="./legal/cookies.html" class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 inline-block">Ayrıntıları incele</a></div></div>
+    <div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-shield-check text-xl"></i></div><div><h3 id="cookie-consent-title" class="font-black text-sm text-slate-900 dark:text-white">Gizlilik tercihiniz</h3><p id="cookie-consent-text" class="text-xs leading-relaxed text-slate-500 dark:text-slate-400 mt-1">Zorunlu çerezler oturum için kullanılır. İzin verirseniz anonim ziyaret ve kampanya dönüşümleri ölçülür.</p><a id="cookie-details-link" href="./legal/cookies.html" class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 inline-block">Ayrıntıları incele</a></div></div>
     <div class="grid grid-cols-2 gap-2 mt-4"><button id="cookie-essential-btn" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">Yalnızca zorunlu</button><button id="cookie-accept-btn" class="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">Analitiğe izin ver</button></div>
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-30"></script>
+  <script type="module" src="./src/app.js?v=20260810-31"></script>
 
 </body>
 </html>

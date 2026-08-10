@@ -121,3 +121,45 @@ test('free launch allows ten new seller connections in a rolling 30-day window',
   });
   assert.equal(existing.status, 201);
 });
+
+test('campaign attribution reaches the administrator conversion funnel', async () => {
+  const pageView = await fetch(`${baseUrl}/api/analytics/pageview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: '/?utm_source=x&utm_medium=paid&utm_campaign=seller_launch', referrer: 'https://t.co/example' })
+  });
+  assert.equal(pageView.status, 201);
+  const visitorCookie = pageView.headers.getSetCookie()[0].split(';')[0];
+
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+    body: JSON.stringify({ name: 'Campaign User', email: 'campaign@example.com', password: 'SecurePass123', role: 'both' })
+  });
+  assert.equal(registration.status, 201);
+  const sessionCookie = registration.headers.getSetCookie()[0].split(';')[0];
+  const cookies = `${visitorCookie}; ${sessionCookie}`;
+
+  const listing = await fetch(`${baseUrl}/api/listings`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookies }, body: JSON.stringify(listingBody(20))
+  });
+  assert.equal(listing.status, 201);
+
+  const seedListing = (await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json())).listings.find(item => String(item.ownerId).startsWith('seed-'));
+  const conversation = await fetch(`${baseUrl}/api/threads`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookies }, body: JSON.stringify({ listingId: seedListing.id, message: 'Kampanya dönüşüm testi için bilgi istiyorum.' })
+  });
+  assert.equal(conversation.status, 201);
+
+  const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'free-admin@searya.test', password: 'AdminSecurePass123' })
+  });
+  const adminCookie = adminLogin.headers.getSetCookie()[0].split(';')[0];
+  const overview = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
+  const campaign = overview.analytics.campaigns.find(item => item.source === 'x' && item.medium === 'paid' && item.campaign === 'seller_launch');
+  assert.ok(campaign);
+  assert.equal(campaign.visitors, 1);
+  assert.equal(campaign.signups, 1);
+  assert.equal(campaign.listings, 1);
+  assert.equal(campaign.conversations, 1);
+});
