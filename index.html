@@ -186,7 +186,7 @@
           <button id="inbox-btn" aria-label="Mesajlarım" class="relative p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-all" title="Mesajlarım">
             <i class="ph-bold ph-chat-circle-dots text-lg"></i>
             <span id="unread-message-count" class="hidden absolute -top-2 -left-2 min-w-5 h-5 px-1 bg-rose-500 text-white rounded-full ring-2 ring-white dark:ring-slate-900 text-[10px] font-black items-center justify-center">0</span>
-            <span id="buyer-credit-count" class="absolute -top-2 -right-2 min-w-5 h-5 px-1 bg-emerald-500 text-slate-950 rounded-full ring-2 ring-white dark:ring-slate-900 text-[10px] font-black flex items-center justify-center">2</span>
+            <span id="buyer-credit-count" class="absolute -top-2 -right-2 min-w-5 h-5 px-1 bg-emerald-500 text-slate-950 rounded-full ring-2 ring-white dark:ring-slate-900 text-[10px] font-black flex items-center justify-center">10</span>
           </button>
 
           <!-- Create Listing CTA Button -->
@@ -589,128 +589,82 @@
 
     </main>
 
-    <!-- SIMPLE PRICING SECTION -->
+    <!-- FREE LAUNCH SECTION -->
     <section class="sy-pricing py-16 sm:py-20 bg-slate-100/70 dark:bg-[#060A12] border-t border-slate-200 dark:border-slate-800/80 transition-colors duration-300 relative overflow-hidden" id="pricing-section">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 relative z-10">
         <div class="text-center max-w-3xl mx-auto space-y-3">
           <span id="t-simple-pricing-kicker" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-extrabold">
-            Satış komisyonu yok
+            Lansmana özel ücretsiz
           </span>
           <h2 id="t-simple-pricing-title" class="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-            İhtiyacın kadar kullan, yalnızca kullandığın kadar öde.
+            Projeni yayınla, doğru kişiyle bağlantı kur.
           </h2>
           <p id="t-simple-pricing-subtitle" class="text-sm sm:text-base text-slate-600 dark:text-slate-400 font-medium">
-            Alıcılar bağlantı paketi, satıcılar ilan paketi satın alır. Satış komisyonu yoktur.
+            Searya lansman döneminde ücretsiz. Kredi kartı gerekmez ve satıştan komisyon alınmaz.
           </p>
         </div>
 
-        <div class="flex justify-center">
-          <div class="simple-pricing-switch inline-grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 shadow-sm" role="tablist" aria-label="Paket türü">
-            <button id="simple-pricing-buyer-tab" type="button" role="tab" aria-selected="true" class="simple-pricing-tab active flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all">
-              <i class="ph-bold ph-user-focus"></i><span id="t-simple-buyer-tab">Alıcıyım</span>
-            </button>
-            <button id="simple-pricing-seller-tab" type="button" role="tab" aria-selected="false" class="simple-pricing-tab flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all">
-              <i class="ph-bold ph-storefront"></i><span id="t-simple-seller-tab">Satıcıyım</span>
-            </button>
-          </div>
-        </div>
-
-        <div id="simple-pricing-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
-          <article data-pricing-audience="buyer" class="pricing-plan-card glass-card rounded-3xl border border-emerald-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
+        <div id="simple-pricing-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
+          <article class="pricing-plan-card glass-card rounded-3xl border border-emerald-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
             <span id="t-simple-free-role" class="text-[10px] font-black tracking-widest text-emerald-600 dark:text-emerald-400 mb-4">ALICI</span>
             <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl mb-5">
               <i class="ph-bold ph-binoculars"></i>
             </div>
-            <h3 id="t-simple-free-title" class="text-xl font-black text-slate-900 dark:text-white">Ücretsiz Keşfet</h3>
-            <p id="t-simple-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Alıcılar için gereken her şey</p>
+            <h3 id="t-simple-free-title" class="text-xl font-black text-slate-900 dark:text-white">Ücretsiz Alıcı Hesabı</h3>
+            <p id="t-simple-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Projeleri keşfet ve sahipleriyle görüş</p>
             <div class="my-6">
-              <span class="text-4xl font-black text-emerald-600 dark:text-emerald-400">$0</span>
-              <span id="t-simple-free-period" class="text-xs text-slate-500"> / sonsuza kadar</span>
+              <span class="text-4xl font-black text-emerald-600 dark:text-emerald-400">10</span>
+              <span id="t-simple-free-period" class="text-xs text-slate-500"> yeni bağlantı / 30 gün</span>
             </div>
-            <ul id="t-simple-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1"></ul>
+            <ul id="t-simple-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
+              <li>Tüm ilanları incele</li><li>10 yeni satıcı görüşmesi</li><li>Mevcut sohbetlerde sınırsız mesaj</li>
+            </ul>
             <button id="simple-buyer-btn" class="mt-7 w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition-all">
               Ücretsiz Katıl
             </button>
           </article>
 
-          <article data-pricing-audience="buyer" class="pricing-plan-card glass-card rounded-3xl border-2 border-emerald-500/50 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-lg shadow-emerald-500/10">
-            <span id="t-simple-buyer-pack-role" class="text-[10px] font-black tracking-widest text-emerald-600 dark:text-emerald-400 mb-4">ALICI</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-chat-circle-dots"></i>
-            </div>
-            <h3 id="t-simple-buyer-pack-title" class="text-xl font-black text-slate-900 dark:text-white">10 Bağlantı Paketi</h3>
-            <p id="t-simple-buyer-pack-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Yeni satıcılarla görüşmeye devam et</p>
-            <div class="my-6">
-              <span class="text-4xl font-black text-emerald-600 dark:text-emerald-400">$9</span>
-              <span id="t-simple-buyer-pack-period" class="text-xs text-slate-500"> / tek seferlik</span>
-            </div>
-            <ul id="t-simple-buyer-pack-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1"></ul>
-            <button id="simple-buyer-pack-btn" class="mt-7 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all">
-              10 Bağlantı Satın Al
-            </button>
-          </article>
-
-          <article data-pricing-audience="seller" class="hidden pricing-plan-card glass-card rounded-3xl border border-purple-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
+          <article class="pricing-plan-card glass-card rounded-3xl border border-purple-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
             <span id="t-simple-seller-free-role" class="text-[10px] font-black tracking-widest text-purple-600 dark:text-purple-400 mb-4">SATICI</span>
             <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-gift"></i>
+              <i class="ph-bold ph-storefront"></i>
             </div>
-            <h3 id="t-simple-seller-free-title" class="text-xl font-black text-slate-900 dark:text-white">İlk İlan Ücretsiz</h3>
-            <p id="t-simple-seller-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Platformu risk almadan dene</p>
+            <h3 id="t-simple-seller-free-title" class="text-xl font-black text-slate-900 dark:text-white">Ücretsiz Satıcı Hesabı</h3>
+            <p id="t-simple-seller-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Projelerini profesyonel biçimde sergile</p>
             <div class="my-6">
-              <span class="text-4xl font-black text-purple-600 dark:text-purple-400">$0</span>
-              <span id="t-simple-seller-free-period" class="text-xs text-slate-500"> / tek seferlik</span>
+              <span class="text-4xl font-black text-purple-600 dark:text-purple-400">3</span>
+              <span id="t-simple-seller-free-period" class="text-xs text-slate-500"> aktif ilan</span>
             </div>
-            <ul id="t-simple-seller-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1"></ul>
+            <ul id="t-simple-seller-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
+              <li>3 aktif proje ilanı</li><li>Alıcı mesajlarını ücretsiz al</li><li>İlanlarını düzenle veya sil</li>
+            </ul>
             <button id="simple-seller-free-btn" class="mt-7 w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-slate-700 hover:border-purple-500 transition-all">
               Ücretsiz İlan Ver
             </button>
           </article>
 
-          <article data-pricing-audience="seller" class="hidden pricing-plan-card glass-card rounded-3xl border-2 border-purple-500/40 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-lg shadow-purple-500/10">
-            <span id="t-simple-standard-role" class="text-[10px] font-black tracking-widest text-purple-600 dark:text-purple-400 mb-4">SATICI</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-stack-plus"></i>
+          <article class="pricing-plan-card glass-card rounded-3xl border border-indigo-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
+            <span class="text-[10px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mb-4">SEARYA</span>
+            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl mb-5">
+              <i class="ph-bold ph-chat-circle-dots"></i>
             </div>
-            <h3 id="t-simple-standard-title" class="text-xl font-black text-slate-900 dark:text-white">3 İlan Paketi</h3>
-            <p id="t-simple-standard-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Yeni projelerini satışa çıkar</p>
+            <h3 id="t-launch-chat-title" class="text-xl font-black text-slate-900 dark:text-white">Güvenli Başlangıç</h3>
+            <p id="t-launch-chat-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Kontrollü bağlantı, sınırsız devam</p>
             <div class="my-6">
-              <span class="text-4xl font-black text-purple-600 dark:text-purple-400">$9</span>
-              <span id="t-simple-standard-period" class="text-xs text-slate-500"> / tek seferlik</span>
+              <span class="text-4xl font-black text-indigo-600 dark:text-indigo-400">$0</span>
+              <span class="text-xs text-slate-500"> lansman boyunca</span>
             </div>
-            <ul id="t-simple-standard-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1"></ul>
-            <button id="simple-standard-btn" class="mt-7 w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-500/20 transition-all">
-              3 İlan Satın Al
-            </button>
-          </article>
-
-          <article data-pricing-audience="seller" class="hidden pricing-plan-card pricing-plan-vip relative rounded-3xl border-2 border-emerald-500/70 bg-gradient-to-b from-emerald-950 via-[#0D131F] to-[#0D131F] p-6 flex flex-col shadow-xl shadow-emerald-500/10 text-white">
-            <span id="t-simple-verified-badge" class="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-black whitespace-nowrap shadow-lg">
-              Lansman fiyatı
-            </span>
-            <span id="t-simple-verified-role" class="text-[10px] font-black tracking-widest text-emerald-400 mb-4">SATICI</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-emerald-400/15 text-emerald-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-rocket-launch"></i>
-            </div>
-            <h3 id="t-simple-verified-title" class="text-xl font-black">Satıcı Pro</h3>
-            <p id="t-simple-verified-desc" class="text-xs text-emerald-100/60 mt-1">Daha fazla ilan ve güven araçları</p>
-            <div class="my-6 flex items-end gap-2 flex-wrap">
-              <span class="text-sm font-bold text-emerald-100/45 line-through">$24.99</span>
-              <span class="text-4xl font-black text-emerald-400">$19.99</span>
-              <span id="t-simple-verified-period" class="text-xs text-emerald-100/60"> / tek seferlik</span>
-            </div>
-            <ul id="t-simple-verified-list" class="space-y-3 text-sm text-emerald-50/80 flex-1"></ul>
-            <button id="simple-verified-btn" class="mt-7 w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/20 transition-all">
-              Satıcı Pro'ya Geç
+            <ul id="t-launch-chat-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
+              <li>İlk 6 mesajda iletişim bilgisi koruması</li><li>Şikâyet ve kullanıcı engelleme</li><li>Yönetici ilan incelemesi</li>
+            </ul>
+            <button id="launch-explore-btn" class="mt-7 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/20 transition-all">
+              İlanları Keşfet
             </button>
           </article>
         </div>
 
-        <p id="t-simple-verification-note" class="text-center text-[11px] text-slate-500 dark:text-slate-400 -mt-4 hidden">
-          Doğrulama rozeti satın alınamaz; yalnızca inceleme kriterlerini geçen ilanlara verilir.
-        </p>
         <p id="t-simple-pricing-note" class="text-center text-xs text-slate-500 dark:text-slate-400">
-          Tek seferlik ödeme · Otomatik yenileme yok · Satıştan komisyon alınmaz
+          Lansman döneminde ücretsiz · Kart gerekmez · Satıştan komisyon alınmaz
         </p>
       </div>
     </section>
@@ -1107,7 +1061,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-29"></script>
+  <script type="module" src="./src/app.js?v=20260810-30"></script>
 
 </body>
 </html>

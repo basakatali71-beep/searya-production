@@ -1,5 +1,5 @@
 import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260807-3';
-import { translations } from './data/translations.js?v=20260810-8';
+import { translations } from './data/translations.js?v=20260810-9';
 import { ApiError, SearyaApi } from './api.js?v=20260808-5';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
@@ -110,13 +110,13 @@ let state = {
   inboxOpen: false,
   buyerConnections: Number.isInteger(savedClientState.buyerConnections) && savedClientState.buyerConnections >= 0
     ? savedClientState.buyerConnections
-    : 2,
+    : 10,
   contactedProjects: Array.isArray(savedClientState.contactedProjects)
     ? savedClientState.contactedProjects.filter(item => typeof item === 'string').slice(0, 100)
     : [],
   sellerFreeListings: Number.isInteger(savedClientState.sellerFreeListings) && savedClientState.sellerFreeListings >= 0
     ? savedClientState.sellerFreeListings
-    : 1,
+    : 3,
   sellerListingCredits: Number.isInteger(savedClientState.sellerListingCredits) && savedClientState.sellerListingCredits >= 0
     ? savedClientState.sellerListingCredits
     : 0,
@@ -130,6 +130,8 @@ let state = {
   backendReady: false,
   backendMessage: '',
   paymentMode: 'disabled',
+  launchFree: true,
+  launchLimits: { activeListings: 3, newConnections: 10, connectionWindowDays: 30 },
   socialAuth: { google: false },
   unreadMessageCount: 0,
   openListingSlug: ''
@@ -233,8 +235,8 @@ function applyAuthenticatedUser(user) {
     state.sellerVipCredits = Number(user.sellerVipCredits || 0);
     state.boostCredits = Number(user.boostCredits || 0);
   } else {
-    state.buyerConnections = 0;
-    state.sellerFreeListings = 0;
+    state.buyerConnections = state.launchFree ? Number(state.launchLimits?.newConnections || 10) : 0;
+    state.sellerFreeListings = state.launchFree ? Number(state.launchLimits?.activeListings || 3) : 0;
     state.sellerListingCredits = 0;
     state.sellerVipCredits = 0;
     state.boostCredits = 0;
@@ -268,6 +270,8 @@ async function hydrateBackendState() {
     ]);
     state.backendReady = Boolean(health?.ok);
     state.paymentMode = health?.paymentMode || 'disabled';
+    state.launchFree = Boolean(health?.launchFree);
+    state.launchLimits = health?.launchLimits || state.launchLimits;
     state.socialAuth = { google: Boolean(health?.socialAuth?.google) };
     state.backendMessage = '';
     updateServiceStatus();
@@ -312,7 +316,7 @@ function updateServiceStatus() {
 }
 
 function updatePaymentAvailability() {
-  const disabled = state.paymentMode === 'disabled';
+  const disabled = state.paymentMode === 'disabled' || state.launchFree;
   const labels = {
     'simple-buyer-pack-btn': state.lang === 'en' ? 'Payments coming soon' : 'Ödeme yakında',
     'simple-standard-btn': state.lang === 'en' ? 'Payments coming soon' : 'Ödeme yakında',
@@ -325,7 +329,8 @@ function updatePaymentAvailability() {
     if (disabled) button.textContent = label;
   });
   const note = document.getElementById('t-simple-pricing-note');
-  if (disabled && note) note.textContent = state.lang === 'en' ? 'Payment infrastructure is being prepared · Free access remains available' : 'Ödeme altyapısı hazırlanıyor · Ücretsiz kullanım devam ediyor';
+  if (state.launchFree && note) note.textContent = state.lang === 'en' ? 'Free during launch · No card required · No sales commission' : 'Lansman döneminde ücretsiz · Kart gerekmez · Satış komisyonu yok';
+  else if (disabled && note) note.textContent = state.lang === 'en' ? 'Payment infrastructure is being prepared · Free access remains available' : 'Ödeme altyapısı hazırlanıyor · Ücretsiz kullanım devam ediyor';
 }
 
 function updateSocialAuthAvailability() {
@@ -719,11 +724,15 @@ function updateStaticTranslations() {
     setText('simple-verified-btn', simplePricing.verifiedButton);
     setText('t-simple-verification-note', simplePricing.verificationNote);
     setText('t-simple-pricing-note', simplePricing.note);
+    setText('t-launch-chat-title', simplePricing.chatTitle);
+    setText('t-launch-chat-desc', simplePricing.chatDesc);
+    setText('launch-explore-btn', simplePricing.exploreButton);
     setFeatureList('t-simple-free-list', simplePricing.freeFeatures, 'text-emerald-500');
     setFeatureList('t-simple-buyer-pack-list', simplePricing.buyerPackFeatures, 'text-emerald-500');
     setFeatureList('t-simple-seller-free-list', simplePricing.sellerFreeFeatures, 'text-purple-500');
     setFeatureList('t-simple-standard-list', simplePricing.standardFeatures, 'text-purple-500');
     setFeatureList('t-simple-verified-list', simplePricing.verifiedFeatures, 'text-emerald-400');
+    setFeatureList('t-launch-chat-list', simplePricing.chatFeatures, 'text-indigo-500');
   }
   updateBuyerCreditBadge();
   updateUnreadMessageBadge();
@@ -1155,6 +1164,10 @@ function setupEventListeners() {
   document.getElementById('simple-buyer-btn')?.addEventListener('click', () => showOnboardingPage('register'));
   document.getElementById('simple-buyer-pack-btn')?.addEventListener('click', openBuyerConnectionPack);
   document.getElementById('simple-seller-free-btn')?.addEventListener('click', openCreateListingModal);
+  document.getElementById('launch-explore-btn')?.addEventListener('click', () => {
+    switchTab('sale');
+    document.getElementById('listings-grid')?.scrollIntoView({ behavior: 'smooth' });
+  });
   document.getElementById('simple-standard-btn')?.addEventListener('click', () => openPackagePurchaseModal(state.lang === 'en' ? '3 Listing Pack' : '3 İlan Paketi', '$9', 'seller_listings_3'));
   document.getElementById('simple-verified-btn')?.addEventListener('click', () => openPackagePurchaseModal(state.lang === 'en' ? 'Seller Pro Launch Pack' : 'Satıcı Pro Lansman Paketi', '$19.99', 'seller_vip_10'));
   document.getElementById('simple-pricing-buyer-tab')?.addEventListener('click', () => switchSimplePricingAudience('buyer'));
@@ -1196,6 +1209,15 @@ async function openAccountModal(options = {}) {
   try { listings = (await SearyaApi.myListings()).listings || []; }
   catch (error) { showToast(apiErrorMessage(error)); }
   const statusLabel = value => ({ pending: isEn ? 'Pending review' : 'Onay bekliyor', rejected: isEn ? 'Rejected' : 'Reddedildi', Aktif: isEn ? 'Active' : 'Aktif', Doğrulanmış: isEn ? 'Verified' : 'Doğrulanmış' }[value] || value);
+  const accountUsageCards = state.launchFree ? `
+    <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20"><strong class="block text-xl text-emerald-600">${user.buyerConnections}</strong><span class="text-[10px] text-slate-500">${isEn ? 'New connections left / 30 days' : '30 günlük yeni bağlantı hakkı'}</span></div>
+    <div class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-500/20"><strong class="block text-xl text-purple-600">${user.sellerFreeListings}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Active listing slots left' : 'Kalan aktif ilan alanı'}</span></div>
+  ` : `
+    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.buyerConnections}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Connections' : 'Bağlantı'}</span></div>
+    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.sellerFreeListings + user.sellerListingCredits}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Listing credits' : 'İlan hakkı'}</span></div>
+    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-purple-500">${user.sellerVipCredits}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Verification' : 'Doğrulama'}</span></div>
+    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-amber-500">${user.boostCredits || 0}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Boost' : 'Öne çıkarma'}</span></div>
+  `;
   content.innerHTML = `
     <div class="p-5 sm:p-8 space-y-6 overflow-y-auto">
       <div class="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -1206,12 +1228,8 @@ async function openAccountModal(options = {}) {
         <button id="close-account-modal" aria-label="${isEn ? 'Close' : 'Kapat'}" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="ph-bold ph-x"></i></button>
       </div>
       ${options.notice ? `<div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/30 flex items-start gap-3"><span class="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-check"></i></span><div><strong class="text-sm text-emerald-800 dark:text-emerald-300">${isEn ? 'Listing received' : 'İlanınız alındı'}</strong><p class="mt-1 text-xs leading-5 text-emerald-700/80 dark:text-emerald-300/80">${escapeHtml(options.notice)}</p></div></div>` : ''}
-      <div class="account-credit-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.buyerConnections}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Connections' : 'Bağlantı'}</span></div>
-        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-blue-600">${user.sellerFreeListings + user.sellerListingCredits}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Listing credits' : 'İlan hakkı'}</span></div>
-        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-purple-500">${user.sellerVipCredits}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Verification' : 'Doğrulama'}</span></div>
-        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><strong class="block text-xl text-amber-500">${user.boostCredits || 0}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Boost' : 'Öne çıkarma'}</span></div>
-      </div>
+      ${state.launchFree ? `<div class="rounded-2xl bg-indigo-500/10 border border-indigo-500/20 px-4 py-3 text-xs font-bold text-indigo-700 dark:text-indigo-300"><i class="ph-bold ph-confetti mr-1"></i>${isEn ? 'All core features are free during launch.' : 'Tüm temel özellikler lansman döneminde ücretsiz.'}</div>` : ''}
+      <div class="account-credit-grid grid grid-cols-1 sm:grid-cols-2 gap-3">${accountUsageCards}</div>
       <section class="space-y-3">
         <div class="flex items-center justify-between"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'My listings' : 'İlanlarım'}</h4><button id="account-new-listing" class="text-[11px] font-bold text-blue-600 dark:text-blue-400">+ ${isEn ? 'New listing' : 'Yeni ilan'}</button></div>
         <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -1375,6 +1393,10 @@ function openGuideModal(type) {
 // Package Purchase Modal Checkout Handler
 function openPackagePurchaseModal(packageName, price, packageKey) {
   const isEn = state.lang === 'en';
+  if (state.launchFree) {
+    showToast(isEn ? 'Searya is free during launch. No package purchase is required.' : 'Searya lansman döneminde ücretsiz. Paket satın almanız gerekmiyor.');
+    return;
+  }
   if (state.paymentMode === 'disabled') {
     showToast(isEn ? 'Payment infrastructure is being prepared. Free access remains available.' : 'Ödeme altyapısı hazırlanıyor. Ücretsiz kullanım devam ediyor.');
     return;
@@ -2947,7 +2969,14 @@ function openCreateListingModal(editListing = null) {
         await openAccountModal({ notice: state.lang === 'en' ? 'Your listing is visible below with “Pending review” status. It will appear publicly after approval.' : 'İlanınız aşağıda “Onay bekliyor” durumuyla görünüyor. Yönetici onayından sonra herkese açık yayınlanacak.' });
       }
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'LISTING_CREDIT_REQUIRED') {
+      if (error instanceof ApiError && error.code === 'FREE_LAUNCH_LISTING_LIMIT') {
+        setFormStatus(apiErrorMessage(error), 'error');
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.classList.remove('opacity-70', 'cursor-wait');
+          submitButton.innerHTML = originalButtonHtml;
+        }
+      } else if (error instanceof ApiError && error.code === 'LISTING_CREDIT_REQUIRED') {
         closeModal();
         openPackagePurchaseModal(state.lang === 'en' ? '3 Listing Pack' : '3 İlan Paketi', '$9', 'seller_listings_3');
       } else {
@@ -3016,7 +3045,8 @@ async function openInboxWithMessage(listing) {
     renderInboxDrawerContent();
     el.inboxDrawer()?.classList.remove('translate-x-full');
   } catch (error) {
-    if (error instanceof ApiError && error.code === 'CONNECTION_CREDIT_REQUIRED') openBuyerConnectionPack();
+    if (error instanceof ApiError && error.code === 'FREE_LAUNCH_CONNECTION_LIMIT') showToast(apiErrorMessage(error));
+    else if (error instanceof ApiError && error.code === 'CONNECTION_CREDIT_REQUIRED') openBuyerConnectionPack();
     else showToast(apiErrorMessage(error));
   }
 }
@@ -3044,6 +3074,10 @@ function updateUnreadMessageBadge() {
 }
 
 function openBuyerConnectionPack() {
+  if (state.launchFree) {
+    showToast(state.lang === 'en' ? 'You can start 10 new seller conversations every 30 days. Existing chats remain unlimited.' : 'Her 30 günde 10 yeni satıcı görüşmesi başlatabilirsiniz. Mevcut sohbetler sınırsızdır.');
+    return;
+  }
   const packageName = state.lang === 'en' ? '10 Connection Pack' : '10 Bağlantı Paketi';
   openPackagePurchaseModal(packageName, '$9', 'buyer_connections_10');
 }

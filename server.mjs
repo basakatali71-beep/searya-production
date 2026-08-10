@@ -16,6 +16,9 @@ const APP_ORIGIN = process.env.APP_ORIGIN || `http://${HOST === '0.0.0.0' ? 'loc
 const REQUESTED_PAYMENT_MODE = process.env.PAYMENT_MODE || (NODE_ENV === 'production' ? 'disabled' : 'demo');
 const POLAR_SERVER = String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
 const PAYMENT_MODE = NODE_ENV === 'production' && REQUESTED_PAYMENT_MODE === 'polar' && POLAR_SERVER !== 'production' ? 'disabled' : REQUESTED_PAYMENT_MODE;
+const LAUNCH_FREE_MODE = process.env.LAUNCH_FREE_MODE
+  ? String(process.env.LAUNCH_FREE_MODE).trim().toLowerCase() !== 'false'
+  : NODE_ENV === 'production' && PAYMENT_MODE === 'disabled';
 const DEFAULT_DB_PATH = NODE_ENV === 'production' && existsSync('/var/data') ? '/var/data/searya.sqlite' : './data/searya.sqlite';
 const DB_PATH = resolve(ROOT, process.env.SEARYA_DB_PATH || DEFAULT_DB_PATH);
 const BACKUP_DIR = resolve(process.env.SEARYA_BACKUP_DIR || resolve(DB_PATH, '..', 'backups'));
@@ -25,6 +28,9 @@ const OAUTH_COOKIE = 'searya_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const MAX_JSON_BYTES = 6 * 1024 * 1024;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
+const LAUNCH_FREE_LISTING_LIMIT = 3;
+const LAUNCH_FREE_CONNECTION_LIMIT = 10;
+const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
 
 mkdirSync(resolve(DB_PATH, '..'), { recursive: true });
 const db = new DatabaseSync(DB_PATH, { timeout: 5000 });
@@ -256,8 +262,20 @@ function parseCookies(req) {
   }));
 }
 
+function launchFreeListingSlotsRemaining(userId) {
+  const used = Number(db.prepare("SELECT COUNT(*) AS count FROM listings WHERE user_id=? AND status IN ('pending','approved')").get(userId)?.count || 0);
+  return Math.max(0, LAUNCH_FREE_LISTING_LIMIT - used);
+}
+
+function launchFreeConnectionsRemaining(userId) {
+  const cutoff = new Date(Date.now() - LAUNCH_FREE_CONNECTION_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const used = Number(db.prepare('SELECT COUNT(*) AS count FROM contacted_projects WHERE user_id=? AND created_at>=?').get(userId, cutoff)?.count || 0);
+  return Math.max(0, LAUNCH_FREE_CONNECTION_LIMIT - used);
+}
+
 function publicUser(row) {
   if (!row) return null;
+  const freeLaunchUser = LAUNCH_FREE_MODE && !row.is_admin;
   return {
     id: row.id,
     email: row.email || null,
@@ -266,12 +284,13 @@ function publicUser(row) {
     isAdmin: Boolean(row.is_admin),
     emailVerified: Boolean(row.email_verified),
     isVerified: Boolean(row.is_verified),
-    buyerConnections: row.buyer_connections,
-    sellerFreeListings: row.seller_free_listings,
-    sellerListingCredits: row.seller_listing_credits,
+    buyerConnections: freeLaunchUser ? launchFreeConnectionsRemaining(row.id) : row.buyer_connections,
+    sellerFreeListings: freeLaunchUser ? launchFreeListingSlotsRemaining(row.id) : row.seller_free_listings,
+    sellerListingCredits: freeLaunchUser ? 0 : row.seller_listing_credits,
     sellerVipCredits: row.seller_vip_credits,
     boostCredits: row.boost_credits,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    launchFree: LAUNCH_FREE_MODE
   };
 }
 
@@ -717,7 +736,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google') }, time: nowIso() });
+    return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE, launchLimits: { activeListings: LAUNCH_FREE_LISTING_LIMIT, newConnections: LAUNCH_FREE_CONNECTION_LIMIT, connectionWindowDays: LAUNCH_FREE_CONNECTION_WINDOW_DAYS }, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google') }, time: nowIso() });
   }
 
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
@@ -944,7 +963,10 @@ async function handleApi(req, res, url) {
     const status = user.is_admin ? 'approved' : 'pending';
     db.exec('BEGIN IMMEDIATE');
     try {
-      if (input.type === 'sale') {
+      if (LAUNCH_FREE_MODE && !user.is_admin) {
+        const activeListingCount = Number(db.prepare("SELECT COUNT(*) AS count FROM listings WHERE user_id=? AND status IN ('pending','approved')").get(user.id)?.count || 0);
+        if (activeListingCount >= LAUNCH_FREE_LISTING_LIMIT) throw Object.assign(new Error(`Ücretsiz lansman döneminde en fazla ${LAUNCH_FREE_LISTING_LIMIT} aktif ilan yayınlayabilirsiniz.`), { status: 422, code: 'FREE_LAUNCH_LISTING_LIMIT' });
+      } else if (input.type === 'sale') {
         const freeCredit = db.prepare('UPDATE users SET seller_free_listings=seller_free_listings-1 WHERE id=? AND seller_free_listings>0').run(user.id);
         if (!freeCredit.changes) {
           const paidCredit = db.prepare('UPDATE users SET seller_listing_credits=seller_listing_credits-1 WHERE id=? AND seller_listing_credits>0').run(user.id);
@@ -956,6 +978,7 @@ async function handleApi(req, res, url) {
     } catch (error) {
       db.exec('ROLLBACK');
       if (error.code === 'LISTING_CREDIT_REQUIRED') return fail(res, 402, error.code, error.message);
+      if (error.code === 'FREE_LAUNCH_LISTING_LIMIT') return fail(res, 422, error.code, error.message);
       throw error;
     }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
@@ -1040,6 +1063,8 @@ async function handleApi(req, res, url) {
     const pair = [user.id, listing.user_id].sort();
     if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, listing.user_id, listing.user_id, user.id)) return fail(res, 403, 'USER_BLOCKED', 'Bu kullanıcıyla yeni görüşme başlatılamaz.');
     let thread = db.prepare('SELECT * FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(listing.id, pair[0], pair[1]);
+    let createdThread = false;
+    let initialMessageId = '';
     if (!thread) {
       db.exec('BEGIN IMMEDIATE');
       try {
@@ -1048,23 +1073,34 @@ async function handleApi(req, res, url) {
           if (listing.type === 'sale') {
             const contacted = db.prepare('SELECT 1 FROM contacted_projects WHERE user_id=? AND listing_id=?').get(user.id, listing.id);
             if (!contacted) {
-              const credit = db.prepare('UPDATE users SET buyer_connections=buyer_connections-1 WHERE id=? AND buyer_connections>0').run(user.id);
-              if (!credit.changes) throw Object.assign(new Error('Yeni satıcı bağlantısı için bağlantı paketi gereklidir.'), { status: 402, code: 'CONNECTION_CREDIT_REQUIRED' });
+              if (LAUNCH_FREE_MODE && !user.is_admin) {
+                if (launchFreeConnectionsRemaining(user.id) <= 0) throw Object.assign(new Error(`Son ${LAUNCH_FREE_CONNECTION_WINDOW_DAYS} gün içindeki ${LAUNCH_FREE_CONNECTION_LIMIT} yeni satıcı bağlantısı sınırına ulaştınız. Mevcut görüşmelerinizde mesajlaşmaya devam edebilirsiniz.`), { status: 422, code: 'FREE_LAUNCH_CONNECTION_LIMIT' });
+              } else {
+                const credit = db.prepare('UPDATE users SET buyer_connections=buyer_connections-1 WHERE id=? AND buyer_connections>0').run(user.id);
+                if (!credit.changes) throw Object.assign(new Error('Yeni satıcı bağlantısı için bağlantı paketi gereklidir.'), { status: 402, code: 'CONNECTION_CREDIT_REQUIRED' });
+              }
               db.prepare('INSERT INTO contacted_projects(user_id,listing_id,created_at) VALUES(?,?,?)').run(user.id, listing.id, nowIso());
             }
           }
           const id = randomUUID();
           const createdAt = nowIso();
           db.prepare('INSERT INTO threads(id,listing_id,user_a,user_b,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, listing.id, pair[0], pair[1], createdAt, createdAt);
-          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(randomUUID(), id, user.id, cleanText(body.message || `${listing.title} ilanı hakkında görüşmek istiyorum.`, 1000), createdAt);
+          initialMessageId = randomUUID();
+          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(initialMessageId, id, user.id, cleanText(body.message || `${listing.title} ilanı hakkında görüşmek istiyorum.`, 1000), createdAt);
           thread = db.prepare('SELECT * FROM threads WHERE id=?').get(id);
+          createdThread = true;
         }
         db.exec('COMMIT');
       } catch (error) {
         db.exec('ROLLBACK');
         if (error.code === 'CONNECTION_CREDIT_REQUIRED') return fail(res, 402, error.code, error.message);
+        if (error.code === 'FREE_LAUNCH_CONNECTION_LIMIT') return fail(res, 422, error.code, error.message);
         throw error;
       }
+    }
+    if (createdThread) {
+      const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(listing.user_id);
+      if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni bir görüşme başladı', text: `${user.name}, ${listing.title} ilanınız hakkında sizinle iletişime geçti.`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
     }
     return json(res, 201, { threadId: thread.id, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -1091,20 +1127,22 @@ async function handleApi(req, res, url) {
     if (!text) return fail(res, 422, 'EMPTY_MESSAGE', 'Mesaj boş olamaz.');
     const count = db.prepare('SELECT COUNT(*) AS count FROM messages WHERE thread_id=?').get(thread.id).count;
     if (count < CONTACT_UNLOCK_MESSAGE_COUNT && contactInfoDetected(text)) return fail(res, 422, 'CONTACT_INFO_LOCKED', `İletişim bilgileri ilk ${CONTACT_UNLOCK_MESSAGE_COUNT} mesaj tamamlandıktan sonra paylaşılabilir.`);
+    const recipientId = partnerId;
+    const alreadyUnread = Boolean(db.prepare('SELECT 1 FROM messages WHERE thread_id=? AND sender_id<>? AND read_at IS NULL LIMIT 1').get(thread.id, recipientId));
     const createdAt = nowIso();
     const id = randomUUID();
     db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(id, thread.id, user.id, text, createdAt);
     db.prepare('UPDATE threads SET updated_at=? WHERE id=?').run(createdAt, thread.id);
-    const recipientId = partnerId;
     const recipient = db.prepare('SELECT email,name FROM users WHERE id=?').get(recipientId);
-    if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni mesajınız var', text: `${user.name} size yeni bir mesaj gönderdi: ${text.slice(0, 180)}`, idempotencyKey: `message-${id}` }).catch(console.error);
+    if (!alreadyUnread && recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni mesajınız var', text: `${user.name} size yeni bir mesaj gönderdi: ${text.slice(0, 180)}`, idempotencyKey: `message-${id}` }).catch(console.error);
     return json(res, 201, { message: { id, sender: 'me', text, textEn: text, time: 'Şimdi' } });
   }
 
-  if (method === 'GET' && pathname === '/api/packages') return json(res, 200, { packages: Object.values(packages), mode: PAYMENT_MODE });
+  if (method === 'GET' && pathname === '/api/packages') return json(res, 200, { packages: LAUNCH_FREE_MODE ? [] : Object.values(packages), mode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE });
 
   if (method === 'POST' && pathname === '/api/packages/checkout') {
     const user = requireUser(req, res); if (!user) return;
+    if (LAUNCH_FREE_MODE) return fail(res, 409, 'FREE_LAUNCH_ACTIVE', 'Searya lansman döneminde ücretsizdir; ödeme veya paket satın alma gerekmez.');
     const body = await readJson(req);
     const pack = packages[body.packageKey];
     if (!pack) return fail(res, 404, 'PACKAGE_NOT_FOUND', 'Paket bulunamadı.');
