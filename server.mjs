@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash, createPrivateKey, createPublicKey, randomBytes, randomUUID, scryptSync, sign, timingSafeEqual, verify } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
@@ -460,7 +460,6 @@ async function sendVerificationEmail(user) {
 
 function socialAuthConfigured(provider) {
   if (provider === 'google') return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-  if (provider === 'apple') return Boolean(process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY);
   return false;
 }
 
@@ -473,87 +472,26 @@ function oauthErrorRedirect(provider, reason = 'Giriş işlemi tamamlanamadı.')
   return `${APP_ORIGIN}/?${params}`;
 }
 
-function base64UrlJson(value) {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-function decodeJwt(token) {
-  const parts = String(token || '').split('.');
-  if (parts.length !== 3) throw new Error('Geçersiz kimlik belirteci.');
-  return {
-    header: JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')),
-    payload: JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')),
-    signingInput: `${parts[0]}.${parts[1]}`,
-    signature: Buffer.from(parts[2], 'base64url')
-  };
-}
-
-function appleClientSecret() {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = base64UrlJson({ alg: 'ES256', kid: process.env.APPLE_KEY_ID, typ: 'JWT' });
-  const payload = base64UrlJson({
-    iss: process.env.APPLE_TEAM_ID,
-    iat: issuedAt,
-    exp: issuedAt + 5 * 60,
-    aud: 'https://appleid.apple.com',
-    sub: process.env.APPLE_CLIENT_ID
-  });
-  const signingInput = `${header}.${payload}`;
-  const privateKey = createPrivateKey(String(process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'));
-  const signature = sign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' });
-  return `${signingInput}.${signature.toString('base64url')}`;
-}
-
-async function verifiedAppleClaims(idToken, expectedNonce) {
-  const decoded = decodeJwt(idToken);
-  if (decoded.header.alg !== 'RS256' || !decoded.header.kid) throw new Error('Apple kimlik belirteci doğrulanamadı.');
-  const response = await fetch('https://appleid.apple.com/auth/keys');
-  if (!response.ok) throw new Error('Apple doğrulama anahtarlarına ulaşılamadı.');
-  const jwks = await response.json();
-  const jwk = jwks.keys?.find(key => key.kid === decoded.header.kid && key.alg === 'RS256');
-  if (!jwk) throw new Error('Apple doğrulama anahtarı bulunamadı.');
-  const validSignature = verify('RSA-SHA256', Buffer.from(decoded.signingInput), createPublicKey({ key: jwk, format: 'jwk' }), decoded.signature);
-  const audience = Array.isArray(decoded.payload.aud) ? decoded.payload.aud : [decoded.payload.aud];
-  if (!validSignature || decoded.payload.iss !== 'https://appleid.apple.com' || !audience.includes(process.env.APPLE_CLIENT_ID) || Number(decoded.payload.exp || 0) <= Math.floor(Date.now() / 1000) || decoded.payload.nonce !== expectedNonce) {
-    throw new Error('Apple kimlik belirteci doğrulanamadı.');
-  }
-  return decoded.payload;
-}
-
 function beginOauth(req, res, url, provider) {
-  if (!socialAuthConfigured(provider)) return redirect(res, oauthErrorRedirect(provider, `${provider === 'google' ? 'Google' : 'Apple'} ile giriş henüz yapılandırılmadı.`));
+  if (!socialAuthConfigured(provider)) return redirect(res, oauthErrorRedirect(provider, 'Google ile giriş henüz yapılandırılmadı.'));
   const role = ['buyer', 'seller', 'both'].includes(url.searchParams.get('role')) ? url.searchParams.get('role') : 'buyer';
   const state = randomBytes(32).toString('base64url');
   const nonce = randomBytes(24).toString('base64url');
   const codeVerifier = randomBytes(48).toString('base64url');
   db.prepare('DELETE FROM oauth_states WHERE expires_at<=?').run(nowIso());
   db.prepare('INSERT INTO oauth_states(state_hash,provider,role,code_verifier,nonce,expires_at,created_at) VALUES(?,?,?,?,?,?,?)').run(sha256(state), provider, role, codeVerifier, nonce, new Date(Date.now() + 10 * 60 * 1000).toISOString(), nowIso());
-  let authorizationUrl;
-  if (provider === 'google') {
-    const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      redirect_uri: oauthRedirectUri('google'),
-      response_type: 'code',
-      scope: 'openid email profile',
-      state,
-      nonce,
-      code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
-      code_challenge_method: 'S256',
-      prompt: 'select_account'
-    });
-    authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  } else {
-    const params = new URLSearchParams({
-      client_id: process.env.APPLE_CLIENT_ID,
-      redirect_uri: oauthRedirectUri('apple'),
-      response_type: 'code',
-      response_mode: 'form_post',
-      scope: 'name email',
-      state,
-      nonce
-    });
-    authorizationUrl = `https://appleid.apple.com/auth/authorize?${params}`;
-  }
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: oauthRedirectUri('google'),
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    nonce,
+    code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
+    code_challenge_method: 'S256',
+    prompt: 'select_account'
+  });
+  const authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   return redirect(res, authorizationUrl, [oauthCookie(state)]);
 }
 
@@ -590,33 +528,17 @@ async function completeOauth(req, res, url, provider) {
     if (input.error) throw new Error('Giriş işlemi kullanıcı tarafından iptal edildi.');
     const oauthState = consumeOauthState(req, provider, String(input.state || ''));
     if (!input.code) throw new Error('Yetkilendirme kodu alınamadı.');
-    let identity;
-    if (provider === 'google') {
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ code: input.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: oauthRedirectUri('google'), grant_type: 'authorization_code', code_verifier: oauthState.code_verifier })
-      });
-      const tokens = await tokenResponse.json();
-      if (!tokenResponse.ok || !tokens.access_token) throw new Error('Google oturumu doğrulanamadı.');
-      const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokens.access_token}` } });
-      const profile = await profileResponse.json();
-      if (!profileResponse.ok || profile.email_verified !== true) throw new Error('Google e-posta adresi doğrulanamadı.');
-      identity = { email: profile.email, name: profile.name };
-    } else {
-      const tokenResponse = await fetch('https://appleid.apple.com/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: process.env.APPLE_CLIENT_ID, client_secret: appleClientSecret(), code: input.code, grant_type: 'authorization_code', redirect_uri: oauthRedirectUri('apple') })
-      });
-      const tokens = await tokenResponse.json();
-      if (!tokenResponse.ok || !tokens.id_token) throw new Error('Apple oturumu doğrulanamadı.');
-      const claims = await verifiedAppleClaims(tokens.id_token, oauthState.nonce);
-      if (!(claims.email_verified === true || claims.email_verified === 'true')) throw new Error('Apple e-posta adresi doğrulanamadı.');
-      let suppliedName = '';
-      try { const appleUser = JSON.parse(input.user || '{}'); suppliedName = [appleUser.name?.firstName, appleUser.name?.lastName].filter(Boolean).join(' '); } catch {}
-      identity = { email: claims.email, name: suppliedName || String(claims.email || '').split('@')[0] };
-    }
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code: input.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: oauthRedirectUri('google'), grant_type: 'authorization_code', code_verifier: oauthState.code_verifier })
+    });
+    const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Google oturumu doğrulanamadı.');
+    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || profile.email_verified !== true) throw new Error('Google e-posta adresi doğrulanamadı.');
+    const identity = { email: profile.email, name: profile.name };
     const session = socialUserSession({ ...identity, role: oauthState.role });
     return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [sessionCookie(session.token), oauthCookie('', true)]);
   } catch (error) {
