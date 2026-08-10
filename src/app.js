@@ -1,5 +1,5 @@
 import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260807-3';
-import { translations } from './data/translations.js?v=20260808-7';
+import { translations } from './data/translations.js?v=20260810-8';
 import { ApiError, SearyaApi } from './api.js?v=20260808-5';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
@@ -546,7 +546,7 @@ function setup3DTiltEffect() {
 
 // Update UI Text on Language Change
 function setLanguage(lang) {
-  state.lang = lang;
+  state.lang = lang === 'en' ? 'en' : 'tr';
   persistClientState();
   updateStaticTranslations();
   updateServiceStatus();
@@ -557,6 +557,15 @@ function setLanguage(lang) {
 
 function updateStaticTranslations() {
   const dict = t();
+  const isEn = state.lang === 'en';
+  document.documentElement.lang = state.lang;
+  document.title = isEn
+    ? 'Searya | Where Digital Projects Find Their Next Founders'
+    : 'Searya | Dijital Projelerin Yeni Sahiplerini Bulduğu Yer';
+  const description = document.querySelector('meta[name="description"]');
+  if (description) description.content = isEn
+    ? 'Discover unfinished SaaS products, AI projects, mobile apps and Chrome extensions. Contact owners directly or publish a Looking to Buy request.'
+    : "Yarım kalan SaaS, AI projesi, mobil uygulama ve Chrome Extension'ları keşfedin. İkinci şans bekleyen dijital projelere hemen teklif verin veya 'Proje Arıyorum' ilanı açın.";
   const mainLangSelect = el.langSelect();
   const onboardingLangSelect = document.getElementById('ob-card-lang-select');
   if (mainLangSelect) mainLangSelect.value = state.lang;
@@ -574,6 +583,12 @@ function updateStaticTranslations() {
   if (navPricing) navPricing.textContent = dict.navPricing;
   if (themeLightLabel) themeLightLabel.textContent = dict.themeLight;
   if (themeDarkLabel) themeDarkLabel.textContent = dict.themeDark;
+  document.querySelectorAll('[data-home-link]').forEach(link => link.setAttribute('aria-label', isEn ? 'Searya home page' : 'Searya ana sayfa'));
+  mainLangSelect?.setAttribute('aria-label', isEn ? 'Select language' : 'Dil seçimi');
+  onboardingLangSelect?.setAttribute('aria-label', isEn ? 'Select language' : 'Dil seçimi');
+  el.themeToggleBtn()?.setAttribute('aria-label', isEn ? 'Change theme' : 'Temayı değiştir');
+  document.getElementById('ob-card-theme-btn')?.setAttribute('aria-label', isEn ? 'Change theme' : 'Temayı değiştir');
+  document.getElementById('ob-close-btn')?.setAttribute('aria-label', isEn ? 'Close' : 'Kapat');
 
   // Search Input Placeholder
   const search = el.globalSearch();
@@ -581,6 +596,7 @@ function updateStaticTranslations() {
 
   // Banner & Hero
   const bNew = document.getElementById('t-banner-new');
+  const bFeature = document.getElementById('t-banner-feature');
   const bText = document.getElementById('t-banner-text');
   const bAction = document.getElementById('t-banner-action');
   const vPill = document.getElementById('t-vision-pill');
@@ -589,6 +605,7 @@ function updateStaticTranslations() {
   const hSub = document.getElementById('t-hero-subtitle');
   
   if (bNew) bNew.textContent = dict.bannerNew;
+  if (bFeature) bFeature.textContent = isEn ? '"Looking to Buy"' : '"Looking to Buy" (Proje Arıyorum)';
   if (bText) bText.textContent = dict.bannerText;
   if (bAction) bAction.textContent = dict.bannerAction;
   if (vPill) vPill.textContent = dict.visionPill;
@@ -632,6 +649,19 @@ function updateStaticTranslations() {
   if (fcUsers) fcUsers.textContent = dict.featuredCardUsers;
   if (fcUsersVal) fcUsersVal.textContent = `${dict.featuredCardUsersVal} 👥`;
   if (fcBtn) fcBtn.textContent = dict.featuredCardBtn;
+  const previewTranslations = {
+    't-preview-live': isEn ? 'Live' : 'Canlı',
+    't-preview-overview': isEn ? 'Overview' : 'Genel bakış',
+    't-preview-content': isEn ? 'Content' : 'İçerikler',
+    't-preview-users': isEn ? 'Users' : 'Kullanıcılar',
+    't-preview-visits': isEn ? 'Visits' : 'Ziyaret',
+    't-preview-conversion': isEn ? 'Conversion' : 'Dönüşüm'
+  };
+  Object.entries(previewTranslations).forEach(([id, value]) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  });
+  document.getElementById('featured-preview')?.setAttribute('aria-label', isEn ? 'Representative AI Writer Pro product interface' : 'AI Writer Pro ürün arayüzü temsili');
 
   // Pricing Main Section Titles
   const pMainTitle = document.getElementById('t-pricing-main-title');
@@ -863,11 +893,16 @@ function updateStaticTranslations() {
   const sPop = document.getElementById('t-sort-popular');
 
   if (btnCreate) btnCreate.textContent = dict.btnCreateListing;
+  el.createListingBtn()?.setAttribute('aria-label', dict.btnCreateListing);
   if (sLabel) sLabel.textContent = dict.sortLabel;
   if (sNew) sNew.textContent = dict.sortNewest;
   if (sLow) sLow.textContent = dict.sortPriceLow;
   if (sHigh) sHigh.textContent = dict.sortPriceHigh;
   if (sPop) sPop.textContent = dict.sortPopular;
+  const gridTitle = el.gridTitle();
+  const gridSubtitle = el.gridSubtitle();
+  if (gridTitle) gridTitle.textContent = state.activeTab === 'wtb' ? dict.gridTitleWtb : dict.gridTitleSale;
+  if (gridSubtitle) gridSubtitle.textContent = state.activeTab === 'wtb' ? dict.gridSubtitleWtb : dict.gridSubtitleSale;
 
   // Footer Titles & Links
   const fColMarket = document.getElementById('t-footer-col-marketplace');
@@ -891,14 +926,17 @@ function updateStaticTranslations() {
   if (fLinkContract) fLinkContract.textContent = dict.footerLinkContract;
   const privacyLink = document.getElementById('footer-privacy-link');
   const termsLink = document.getElementById('footer-terms-link');
+  const cookiesLink = document.getElementById('footer-cookies-link');
   if (privacyLink) privacyLink.textContent = state.lang === 'en' ? 'Privacy Policy' : 'Gizlilik Politikası';
   if (termsLink) termsLink.textContent = state.lang === 'en' ? 'Terms of Use' : 'Kullanım Şartları';
+  if (cookiesLink) cookiesLink.textContent = isEn ? 'Cookies' : 'Çerezler';
   if (fColSocial) fColSocial.textContent = dict.footerColSocial;
   if (fCommunitySoon) fCommunitySoon.textContent = dict.footerCommunitySoon;
   if (fTagline) fTagline.textContent = dict.footerTagline;
   if (fRights) fRights.textContent = dict.footerRights;
   const cookieTextMap = { 'cookie-settings-btn': 'cookiePreferences', 'cookie-consent-title': 'cookieTitle', 'cookie-consent-text': 'cookieText', 'cookie-details-link': 'cookieDetails', 'cookie-essential-btn': 'cookieEssential', 'cookie-accept-btn': 'cookieAccept' };
   Object.entries(cookieTextMap).forEach(([id, key]) => { const node = document.getElementById(id); if (node) node.textContent = dict[key]; });
+  document.getElementById('cookie-consent-banner')?.setAttribute('aria-label', isEn ? 'Cookie preferences' : 'Çerez tercihleri');
 
   // Onboarding Full-Screen Page Static Translations
   const obVision = document.getElementById('t-ob-vision-pill');
@@ -926,6 +964,8 @@ function updateStaticTranslations() {
   if (obSkipBtn) obSkipBtn.textContent = dict.obSkipBtn;
   if (obTL) obTL.textContent = dict.themeLight;
   if (obTD) obTD.textContent = dict.themeDark;
+
+  applyAuthenticatedUser(state.currentUser);
 
   // Render auth card in current language
   renderAuthCard();
@@ -3196,6 +3236,10 @@ function renderAuthCard() {
 
   if (!formContainer) return;
   updateSocialAuthAvailability();
+  if (tabLogin) tabLogin.textContent = isEn ? 'Log In' : 'Giriş Yap';
+  if (tabReg) tabReg.textContent = isEn ? 'Sign Up' : 'Kayıt Ol';
+  const divider = document.getElementById('t-ob-divider');
+  if (divider) divider.textContent = isEn ? 'or' : 'veya';
 
   const activeTabStyle = "py-2.5 rounded-xl font-extrabold text-xs transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm";
   const inactiveTabStyle = "py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
@@ -3212,7 +3256,7 @@ function renderAuthCard() {
           <label class="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">${isEn ? 'Email Address' : 'E-posta adresi'}</label>
           <div class="relative">
             <i class="ph-bold ph-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-            <input type="email" id="auth-email" required autocomplete="email" placeholder="ornek@email.com" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
+            <input type="email" id="auth-email" required autocomplete="email" placeholder="${isEn ? 'example@email.com' : 'ornek@email.com'}" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
           </div>
         </div>
 
@@ -3262,7 +3306,7 @@ function renderAuthCard() {
           <label class="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">${isEn ? 'Email Address' : 'E-posta adresi'}</label>
           <div class="relative">
             <i class="ph-bold ph-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-            <input type="email" id="auth-email" required autocomplete="email" placeholder="ornek@email.com" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
+            <input type="email" id="auth-email" required autocomplete="email" placeholder="${isEn ? 'example@email.com' : 'ornek@email.com'}" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
           </div>
         </div>
 

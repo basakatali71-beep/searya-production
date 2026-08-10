@@ -56,7 +56,7 @@
       <!-- Top Brand Header inside Centered Auth Card -->
       <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
         <!-- Logo -->
-        <a href="#" class="brand-logo-group sy-brand-lockup sy-brand-lockup-onboarding" aria-label="Searya ana sayfa">
+        <a href="#" class="brand-logo-group sy-brand-lockup sy-brand-lockup-onboarding" data-home-link aria-label="Searya ana sayfa">
           <img src="./src/assets/searya-logo.png?v=20260807-1" alt="" class="sy-brand-logo-full" width="1250" height="359">
         </a>
 
@@ -67,7 +67,7 @@
             <i class="ph-bold ph-moon text-indigo-400 text-sm hidden"></i>
           </button>
 
-          <select id="ob-card-lang-select" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer">
+          <select id="ob-card-lang-select" aria-label="Dil seçimi" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer">
             <option value="tr">🌐 TR</option>
             <option value="en">🌐 EN</option>
           </select>
@@ -116,7 +116,7 @@
       <!-- Divider -->
       <div class="relative flex items-center justify-center my-1">
         <div class="w-full border-t border-slate-200 dark:border-slate-800"></div>
-        <span class="absolute bg-white dark:bg-[#0D131F] px-3 text-[11px] font-bold text-slate-400">veya</span>
+        <span id="t-ob-divider" class="absolute bg-white dark:bg-[#0D131F] px-3 text-[11px] font-bold text-slate-400">veya</span>
       </div>
 
       <!-- Auth Dynamic Form Fields Container -->
@@ -143,7 +143,7 @@
     <!-- TOP ANNOUNCEMENT BANNER -->
     <div class="sy-announcement bg-gradient-to-r from-emerald-600 via-indigo-600 to-purple-600 text-white border-b border-indigo-500/20 py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs text-center flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 shadow-md">
       <span id="t-banner-new" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white backdrop-blur-md">🔥 YENİ</span>
-      <span><strong>"Looking to Buy" (Proje Arıyorum)</strong> <span id="t-banner-text">özelliği aktif! Bütçenizi yazın, satıcılar size ulaşsın.</span></span>
+      <span><strong id="t-banner-feature">"Looking to Buy" (Proje Arıyorum)</strong> <span id="t-banner-text">özelliği aktif! Bütçenizi yazın, satıcılar size ulaşsın.</span></span>
       <button id="t-banner-action" class="underline hover:text-emerald-100 font-medium ml-1">İlan Oluştur →</button>
     </div>
 
@@ -152,7 +152,7 @@
       <div class="sy-navbar-inner max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
         
         <!-- Brand Logo -->
-        <a href="#" id="main-brand-logo" class="brand-logo-group sy-brand-lockup sy-brand-lockup-main group min-w-0" aria-label="Searya ana sayfa">
+        <a href="#" id="main-brand-logo" data-home-link class="brand-logo-group sy-brand-lockup sy-brand-lockup-main group min-w-0" aria-label="Searya ana sayfa">
           <img src="./src/assets/searya-logo.png?v=20260807-1" alt="" class="sy-brand-logo-full" width="1250" height="359">
           <img src="./src/assets/searya-mark.png?v=20260807-1" alt="" class="sy-brand-logo-mark" width="351" height="342">
         </a>
@@ -276,21 +276,21 @@
                   </span>
                 </div>
 
-                <div class="sy-feature-preview" aria-label="AI Writer Pro ürün arayüzü temsili">
+                <div id="featured-preview" class="sy-feature-preview" aria-label="AI Writer Pro ürün arayüzü temsili">
                   <div class="sy-preview-toolbar">
                     <span><i class="ph-bold ph-sparkle"></i> AI Writer Pro</span>
-                    <span class="sy-preview-live"><i class="ph-fill ph-circle"></i> Canlı</span>
+                    <span class="sy-preview-live"><i class="ph-fill ph-circle"></i> <span id="t-preview-live">Canlı</span></span>
                   </div>
                   <div class="sy-preview-content">
                     <div class="sy-preview-sidebar">
-                      <span class="active"><i class="ph-bold ph-chart-line-up"></i> Genel bakış</span>
-                      <span><i class="ph-bold ph-file-text"></i> İçerikler</span>
-                      <span><i class="ph-bold ph-users"></i> Kullanıcılar</span>
+                      <span class="active"><i class="ph-bold ph-chart-line-up"></i> <span id="t-preview-overview">Genel bakış</span></span>
+                      <span><i class="ph-bold ph-file-text"></i> <span id="t-preview-content">İçerikler</span></span>
+                      <span><i class="ph-bold ph-users"></i> <span id="t-preview-users">Kullanıcılar</span></span>
                     </div>
                     <div class="sy-preview-dashboard">
                       <div class="sy-preview-metrics">
-                        <span>Ziyaret<strong>12.4K</strong></span>
-                        <span>Dönüşüm<strong>%18.6</strong></span>
+                        <span><span id="t-preview-visits">Ziyaret</span><strong>12.4K</strong></span>
+                        <span><span id="t-preview-conversion">Dönüşüm</span><strong>%18.6</strong></span>
                       </div>
                       <div class="sy-preview-chart" aria-hidden="true">
                         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -1082,7 +1082,7 @@
           <div class="flex items-center gap-4">
             <a href="./legal/privacy.html" id="footer-privacy-link" class="hover:underline">Gizlilik Politikası</a>
             <a href="./legal/terms.html" id="footer-terms-link" class="hover:underline">Kullanım Şartları</a>
-            <a href="./legal/cookies.html" class="hover:underline">Çerezler</a>
+            <a href="./legal/cookies.html" id="footer-cookies-link" class="hover:underline">Çerezler</a>
             <button id="cookie-settings-btn" class="hover:underline">Çerez Tercihleri</button>
           </div>
         </div>
@@ -1112,7 +1112,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-27"></script>
+  <script type="module" src="./src/app.js?v=20260810-28"></script>
 
 </body>
 </html>
