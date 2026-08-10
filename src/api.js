@@ -32,6 +32,7 @@ async function request(path, options = {}) {
 export const SearyaApi = {
   health: () => request('/api/health'),
   trackPageView: (path, referrer = '') => request('/api/analytics/pageview', { method: 'POST', body: { path, referrer } }),
+  trackPresence: (sessionId, action = 'heartbeat', path = '/') => request('/api/analytics/presence', { method: 'POST', body: { sessionId, action, path } }),
   revokeAnalytics: () => request('/api/analytics/consent', { method: 'DELETE' }),
   me: () => request('/api/auth/me'),
   register: data => request('/api/auth/register', { method: 'POST', body: data }),

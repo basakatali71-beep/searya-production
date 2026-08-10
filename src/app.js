@@ -1,9 +1,12 @@
 import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260810-4';
 import { translations } from './data/translations.js?v=20260810-10';
-import { ApiError, SearyaApi } from './api.js?v=20260810-6';
+import { ApiError, SearyaApi } from './api.js?v=20260810-7';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
+const PRESENCE_HEARTBEAT_MS = 30_000;
+let presenceTimer = null;
+let presenceSessionId = '';
 
 function readClientState() {
   try {
@@ -212,22 +215,62 @@ async function startApp() {
 function initCookieConsent() {
   const banner = document.getElementById('cookie-consent-banner');
   const preference = localStorage.getItem(COOKIE_CONSENT_KEY);
-  if (preference === 'analytics') SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer).catch(() => {});
+  if (preference === 'analytics') enableAnalyticsTracking();
   else if (!preference) banner?.classList.remove('hidden');
   document.getElementById('cookie-accept-btn')?.addEventListener('click', () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, 'analytics');
     banner?.classList.add('hidden');
-    SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer).catch(() => {});
+    enableAnalyticsTracking();
     showToast(state.lang === 'en' ? 'Analytics cookies enabled.' : 'Analitik çerezleri etkinleştirildi.');
   });
   document.getElementById('cookie-essential-btn')?.addEventListener('click', () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, 'essential');
     banner?.classList.add('hidden');
+    stopPresenceTracking();
     SearyaApi.revokeAnalytics().catch(() => {});
     showToast(state.lang === 'en' ? 'Only essential cookies will be used.' : 'Yalnızca zorunlu çerezler kullanılacak.');
   });
   document.getElementById('cookie-settings-btn')?.addEventListener('click', () => banner?.classList.remove('hidden'));
 }
+
+async function enableAnalyticsTracking() {
+  try {
+    await SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer);
+    startPresenceTracking();
+  } catch {
+    // Analytics must never interrupt the marketplace experience.
+  }
+}
+
+function presencePayload(action) {
+  return { sessionId: presenceSessionId, action, path: `${location.pathname}${location.search}` };
+}
+
+function startPresenceTracking() {
+  if (!presenceSessionId) presenceSessionId = crypto.randomUUID();
+  SearyaApi.trackPresence(presenceSessionId, 'enter', `${location.pathname}${location.search}`).catch(() => {});
+  if (!presenceTimer) {
+    presenceTimer = window.setInterval(() => {
+      if (!document.hidden) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`).catch(() => {});
+    }, PRESENCE_HEARTBEAT_MS);
+  }
+}
+
+function stopPresenceTracking() {
+  if (presenceTimer) window.clearInterval(presenceTimer);
+  presenceTimer = null;
+  presenceSessionId = '';
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && presenceSessionId) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`).catch(() => {});
+});
+
+window.addEventListener('pagehide', event => {
+  if (event.persisted || !presenceSessionId || localStorage.getItem(COOKIE_CONSENT_KEY) !== 'analytics') return;
+  const body = new Blob([JSON.stringify(presencePayload('leave'))], { type: 'application/json' });
+  navigator.sendBeacon('/api/analytics/presence', body);
+});
 
 function applyAuthenticatedUser(user) {
   state.currentUser = user || null;

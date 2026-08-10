@@ -26,6 +26,7 @@ const SESSION_COOKIE = 'searya_session';
 const VISITOR_COOKIE = 'searya_visitor';
 const OAUTH_COOKIE = 'searya_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const PRESENCE_ACTIVE_WINDOW_SECONDS = 120;
 const MAX_JSON_BYTES = 6 * 1024 * 1024;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
@@ -160,6 +161,20 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS page_views_created ON page_views(created_at DESC);
   CREATE INDEX IF NOT EXISTS page_views_visitor_created ON page_views(visitor_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS visitor_sessions (
+    session_id TEXT PRIMARY KEY,
+    visitor_id TEXT NOT NULL,
+    path TEXT NOT NULL DEFAULT '/',
+    started_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    ended_at TEXT,
+    end_reason TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS visitor_sessions_started ON visitor_sessions(started_at DESC);
+  CREATE INDEX IF NOT EXISTS visitor_sessions_last_seen ON visitor_sessions(last_seen_at DESC);
+  CREATE INDEX IF NOT EXISTS visitor_sessions_visitor ON visitor_sessions(visitor_id, started_at DESC);
 
   CREATE TABLE IF NOT EXISTS analytics_events (
     id TEXT PRIMARY KEY,
@@ -825,11 +840,33 @@ async function handleApi(req, res, url) {
     return json(res, 201, { ok: true }, existingId ? {} : { 'Set-Cookie': visitorCookie(visitorId) });
   }
 
+  if (method === 'POST' && pathname === '/api/analytics/presence') {
+    if (rateLimited(req, 'presence', 6000, 60 * 60 * 1000)) return json(res, 202, { ok: true });
+    const visitorId = analyticsVisitorId(req);
+    if (!visitorId) return json(res, 202, { ok: true, tracked: false });
+    const body = await readJson(req);
+    const sessionId = String(body.sessionId || '');
+    if (!/^[a-f0-9-]{20,50}$/i.test(sessionId)) return fail(res, 422, 'INVALID_PRESENCE_SESSION', 'Ziyaret oturumu doğrulanamadı.');
+    const action = ['enter', 'heartbeat', 'leave'].includes(body.action) ? body.action : 'heartbeat';
+    const path = cleanText(body.path || '/', 500);
+    const now = nowIso();
+    if (action === 'leave') {
+      db.prepare(`UPDATE visitor_sessions SET path=?,last_seen_at=?,ended_at=?,end_reason='leave' WHERE session_id=? AND visitor_id=?`).run(path, now, now, sessionId, visitorId);
+    } else {
+      db.prepare(`INSERT INTO visitor_sessions(session_id,visitor_id,path,started_at,last_seen_at,ended_at,end_reason)
+        VALUES(?,?,?,?,?,NULL,'')
+        ON CONFLICT(session_id) DO UPDATE SET path=excluded.path,last_seen_at=excluded.last_seen_at,ended_at=NULL,end_reason=''
+        WHERE visitor_sessions.visitor_id=excluded.visitor_id`).run(sessionId, visitorId, path, now, now);
+    }
+    return json(res, action === 'enter' ? 201 : 200, { ok: true, tracked: true });
+  }
+
   if (method === 'DELETE' && pathname === '/api/analytics/consent') {
     const visitorId = String(parseCookies(req)[VISITOR_COOKIE] || '');
     if (visitorId) {
       db.prepare('DELETE FROM page_views WHERE visitor_id=?').run(visitorId);
       db.prepare('DELETE FROM analytics_events WHERE visitor_id=?').run(visitorId);
+      db.prepare('DELETE FROM visitor_sessions WHERE visitor_id=?').run(visitorId);
     }
     return json(res, 200, { ok: true }, { 'Set-Cookie': visitorCookie('', true) });
   }
@@ -1314,6 +1351,9 @@ async function handleApi(req, res, url) {
     const todayIso = today.toISOString();
     const sevenDaysIso = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000); sevenDaysIso.setHours(0, 0, 0, 0);
     const thirtyDaysIso = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000); thirtyDaysIso.setHours(0, 0, 0, 0);
+    const presenceCutoff = new Date(Date.now() - PRESENCE_ACTIVE_WINDOW_SECONDS * 1000).toISOString();
+    db.prepare(`UPDATE visitor_sessions SET ended_at=last_seen_at,end_reason='timeout' WHERE ended_at IS NULL AND last_seen_at<?`).run(presenceCutoff);
+    db.prepare('DELETE FROM visitor_sessions WHERE started_at<?').run(new Date(Date.now() - 90 * 86400000).toISOString());
     const dailyRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS views,COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE created_at>=? GROUP BY day`).all(sevenDaysIso.toISOString());
     const signupRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS signups FROM users WHERE created_at>=? AND email IS NOT NULL AND is_admin=0 GROUP BY day`).all(sevenDaysIso.toISOString());
     const dailyMap = new Map(dailyRows.map(row => [row.day, row]));
@@ -1357,6 +1397,13 @@ async function handleApi(req, res, url) {
       daily,
       analytics: {
         windowDays: 30,
+        presence: {
+          activeNow: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE ended_at IS NULL AND last_seen_at>=?').get(presenceCutoff).count,
+          enteredToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE started_at>=?').get(todayIso).count,
+          exitedToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE ended_at>=?').get(todayIso).count,
+          activeWindowSeconds: PRESENCE_ACTIVE_WINDOW_SECONDS,
+          updatedAt: nowIso()
+        },
         funnel: {
           visitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(thirtyDaysIso.toISOString()).count,
           signups: measuredEventCount('signup_completed'),

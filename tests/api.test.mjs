@@ -218,6 +218,14 @@ test('administrator can review and approve a pending listing', async () => {
     body: JSON.stringify({ path: '/' })
   });
   assert.equal(pageView.status, 201);
+  const visitorCookie = pageView.headers.getSetCookie()[0].split(';')[0];
+  const presenceSessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const presenceEnter = await fetch(`${baseUrl}/api/analytics/presence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+    body: JSON.stringify({ sessionId: presenceSessionId, action: 'enter', path: '/' })
+  });
+  assert.equal(presenceEnter.status, 201);
 
   const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
@@ -229,6 +237,9 @@ test('administrator can review and approve a pending listing', async () => {
   const overview = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
   assert.ok(overview.counts.pendingListings >= 1);
   assert.equal(overview.counts.visitorsToday, 1);
+  assert.equal(overview.analytics.presence.activeNow, 1);
+  assert.equal(overview.analytics.presence.enteredToday, 1);
+  assert.equal(overview.analytics.presence.exitedToday, 0);
   assert.equal(overview.daily.length, 7);
   assert.ok(overview.users.length >= 1);
   const pending = overview.pendingListings[0];
@@ -240,6 +251,16 @@ test('administrator can review and approve a pending listing', async () => {
   });
   assert.equal(moderation.status, 200);
   assert.equal((await moderation.json()).listing.status, 'Aktif');
+
+  const presenceLeave = await fetch(`${baseUrl}/api/analytics/presence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+    body: JSON.stringify({ sessionId: presenceSessionId, action: 'leave', path: '/' })
+  });
+  assert.equal(presenceLeave.status, 200);
+  const overviewAfterLeave = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
+  assert.equal(overviewAfterLeave.analytics.presence.activeNow, 0);
+  assert.equal(overviewAfterLeave.analytics.presence.exitedToday, 1);
 
   const targetUser = overview.users.find(user => !user.isAdmin);
   const suspend = await fetch(`${baseUrl}/api/admin/users/${targetUser.id}/status`, {

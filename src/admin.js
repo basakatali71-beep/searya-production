@@ -1,4 +1,4 @@
-import { SearyaApi } from './api.js?v=20260810-6';
+import { SearyaApi } from './api.js?v=20260810-7';
 
 const $=selector=>document.querySelector(selector);
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -6,6 +6,7 @@ const date=value=>value?new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeS
 const money=(cents,currency='USD')=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:String(currency).toUpperCase()}).format(Number(cents||0)/100);
 const empty=message=>`<p class="empty">${message}</p>`;
 let data;
+let loading=false;
 
 document.querySelectorAll('nav button').forEach(button=>button.addEventListener('click',()=>{
   document.querySelectorAll('nav button,.panel').forEach(item=>item.classList.remove('active'));
@@ -27,6 +28,9 @@ function actions(id,status,type){
 
 function render(){
   const c=data.counts;
+  const presence=data.analytics?.presence||{activeNow:0,enteredToday:0,exitedToday:0,updatedAt:null};
+  $('#live-metrics').innerHTML=[['Şu anda aktif',presence.activeNow,'Son 2 dakika'],['Bugün giriş',presence.enteredToday,'Tekil ziyaretçi'],['Bugün ayrılan',presence.exitedToday,'Çıkış veya zaman aşımı']].map(([label,value,note],index)=>`<article class="metric ${index===0?'metric-live':''}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+  $('#live-updated').textContent=presence.updatedAt?`Son güncelleme ${new Intl.DateTimeFormat('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(presence.updatedAt))}`:'—';
   $('#pending-badge').textContent=c.pendingListings; $('#report-badge').textContent=c.openReports;
   $('#metrics').innerHTML=[['Bugünkü ziyaretçi',c.visitorsToday,'Tekil'],['Son 7 gün',c.visitors7d,`${c.pageViews7d} görüntüleme`],['Toplam üye',c.users,`Bugün +${c.usersToday}`],['Toplam ilan',c.listings,`${c.pendingListings} onay bekliyor`],['Paket satışı',c.paidPurchases,'Başarılı ödeme'],['Toplam gelir',money(c.revenueCents),'Komisyonsuz'],['Açık şikâyet',c.openReports,'İnceleme bekliyor']].map(([label,value,note])=>`<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
   const max=Math.max(1,...data.daily.flatMap(item=>[item.visitors,item.signups]));
@@ -43,10 +47,13 @@ function render(){
   $('#report-table').innerHTML=data.reports.map(item=>`<tr><td>${esc(item.reporterName)}<small>${esc(item.reporterEmail||'')}</small></td><td>${esc(item.targetLabel)}<small>${esc(item.targetType)}</small></td><td>${esc(item.reason)}</td><td><span class="badge ${item.status}">${esc(item.status)}</span></td><td>${actions(item.id,item.status,'report')}</td></tr>`).join('')||`<tr><td colspan="5">${empty('Şikâyet yok.')}</td></tr>`;
 }
 
-async function load(){
-  $('#notice').className='notice'; $('#notice').textContent='Veriler yükleniyor…';
+async function load({silent=false}={}){
+  if(loading)return;
+  loading=true;
+  if(!silent){$('#notice').className='notice';$('#notice').textContent='Veriler yükleniyor…';}
   try{data=await SearyaApi.adminOverview();render();$('#notice').classList.add('hidden');}
-  catch(error){$('#notice').className='notice error';$('#notice').innerHTML=`Yönetici oturumu gerekli. <a href="/">Ana sayfada giriş yap</a>`;}
+  catch(error){if(!silent){$('#notice').className='notice error';$('#notice').innerHTML=`Yönetici oturumu gerekli. <a href="/">Ana sayfada giriş yap</a>`;}}
+  finally{loading=false;}
 }
 
 document.addEventListener('click',async event=>{
@@ -61,3 +68,4 @@ document.addEventListener('click',async event=>{
 });
 $('#refresh-btn').addEventListener('click',load);
 load();
+window.setInterval(()=>{if(!document.hidden)load({silent:true});},15000);
