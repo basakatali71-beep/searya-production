@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="tr" class="dark">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Searya Yönetim Merkezi</title>
+  <title>Searya Admin Center</title>
   <link rel="icon" href="/public/searya-logo.png">
   <link rel="stylesheet" href="/src/styles/admin.css?v=20260810-2">
   <style>.utm-example{margin:-4px 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#080d16;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.utm-example code{color:#a9bfff}.funnel{margin-bottom:0}.live-card{border-color:rgba(50,210,150,.3);background:linear-gradient(145deg,rgba(20,49,47,.92),rgba(11,17,28,.98))}.live-card h2{display:flex;align-items:center;gap:8px}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(50,210,150,.12);animation:livePulse 1.8s ease-in-out infinite}.live-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0}.live-metrics .metric{background:rgba(8,12,20,.44)}.metric-live strong{color:#5ee0ad}@keyframes livePulse{50%{opacity:.5;box-shadow:0 0 0 8px rgba(50,210,150,0)}}@media(max-width:620px){.live-metrics{grid-template-columns:1fr}.live-card .card-head>span{display:none}}</style>
@@ -12,35 +12,35 @@
 <body>
   <aside>
     <a class="brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya"></a>
-    <p class="eyebrow">YÖNETİM MERKEZİ</p>
+    <p class="eyebrow">ADMIN CENTER</p>
     <nav>
-      <button class="active" data-section="dashboard">Genel Bakış</button>
-      <button data-section="analytics">Reklam Ölçümü</button>
-      <button data-section="listings">İlanlar <span id="pending-badge">0</span></button>
-      <button data-section="users">Kullanıcılar</button>
-      <button data-section="purchases">Paket Satışları</button>
-      <button data-section="reports">Şikâyetler <span id="report-badge">0</span></button>
+      <button class="active" data-section="dashboard">Overview</button>
+      <button data-section="analytics">Ad Analytics</button>
+      <button data-section="listings">Listings <span id="pending-badge">0</span></button>
+      <button data-section="users">Users</button>
+      <button data-section="purchases">Plan Sales</button>
+      <button data-section="reports">Reports <span id="report-badge">0</span></button>
     </nav>
-    <a class="back" href="/">← Siteye dön</a>
+    <a class="back" href="/">← Back to site</a>
   </aside>
   <main>
-    <header><div><p class="eyebrow">SEARYA</p><h1 id="page-title">Genel Bakış</h1></div><button id="refresh-btn">Verileri yenile</button></header>
-    <div id="notice" class="notice">Veriler yükleniyor…</div>
+    <header><div><p class="eyebrow">SEARYA</p><h1 id="page-title">Overview</h1></div><button id="refresh-btn">Refresh data</button></header>
+    <div id="notice" class="notice">Loading data…</div>
     <section id="dashboard" class="panel active">
-      <article class="card live-card"><div class="card-head"><div><h2><i class="live-dot"></i> Canlı ziyaretçi takibi</h2><span>Analitik izni veren ziyaretçiler · 15 saniyede bir yenilenir</span></div><span id="live-updated">—</span></div><div id="live-metrics" class="metrics live-metrics"></div></article>
+      <article class="card live-card"><div class="card-head"><div><h2><i class="live-dot"></i> Live visitor tracking</h2><span>Visitors who consented to analytics · Refreshes every 15 seconds</span></div><span id="live-updated">—</span></div><div id="live-metrics" class="metrics live-metrics"></div></article>
       <div id="metrics" class="metrics"></div>
-      <article class="card chart-card"><div class="card-head"><h2>Son 7 gün</h2><span>Ziyaret ve üyelik</span></div><div id="chart" class="chart"></div></article>
-      <div class="split"><article class="card"><div class="card-head"><h2>Onay bekleyen ilanlar</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Açık şikâyetler</h2></div><div id="report-preview"></div></article></div>
+      <article class="card chart-card"><div class="card-head"><h2>Last 7 days</h2><span>Visits and sign-ups</span></div><div id="chart" class="chart"></div></article>
+      <div class="split"><article class="card"><div class="card-head"><h2>Listings pending approval</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Open reports</h2></div><div id="report-preview"></div></article></div>
     </section>
     <section id="analytics" class="panel">
-      <div class="card"><div class="card-head"><div><h2>30 günlük dönüşüm hunisi</h2><span>Yalnızca analitik izni veren ziyaretçiler</span></div></div><div id="funnel-metrics" class="metrics funnel"></div></div>
-      <div class="card"><div class="card-head"><div><h2>Kampanya performansı</h2><span>X reklam bağlantılarında UTM kullanın</span></div></div><div class="utm-example">Örnek: <code>https://searya.com/?utm_source=x&amp;utm_medium=paid&amp;utm_campaign=seller_launch</code></div><div class="table-wrap"><table><thead><tr><th>Kaynak</th><th>Tür</th><th>Kampanya</th><th>Ziyaretçi</th><th>Kayıt</th><th>İlan</th><th>Görüşme</th></tr></thead><tbody id="campaign-table"></tbody></table></div></div>
+      <div class="card"><div class="card-head"><div><h2>30-day conversion funnel</h2><span>Visitors who consented to analytics only</span></div></div><div id="funnel-metrics" class="metrics funnel"></div></div>
+      <div class="card"><div class="card-head"><div><h2>Campaign performance</h2><span>Use UTM parameters in X ad links</span></div></div><div class="utm-example">Example: <code>https://searya.com/?utm_source=x&amp;utm_medium=paid&amp;utm_campaign=seller_launch</code></div><div class="table-wrap"><table><thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Visitors</th><th>Sign-ups</th><th>Listings</th><th>Conversations</th></tr></thead><tbody id="campaign-table"></tbody></table></div></div>
     </section>
-    <section id="listings" class="panel"><div class="card"><div class="card-head"><h2>Tüm ilanlar</h2><input data-search="listing-table" placeholder="İlan ara…"></div><div class="table-wrap"><table><thead><tr><th>İlan</th><th>Sahibi</th><th>Fiyat</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="listing-table"></tbody></table></div></div></section>
-    <section id="users" class="panel"><div class="card"><div class="card-head"><h2>Kullanıcılar</h2><input data-search="user-table" placeholder="Kullanıcı ara…"></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Rol</th><th>Haklar</th><th>Son görülme</th><th>İşlem</th></tr></thead><tbody id="user-table"></tbody></table></div></div></section>
-    <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Paket satışları</h2></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
-    <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Şikâyetler</h2></div><div class="table-wrap"><table><thead><tr><th>Şikâyet eden</th><th>Hedef</th><th>Neden</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
+    <section id="listings" class="panel"><div class="card"><div class="card-head"><h2>All listings</h2><input data-search="listing-table" placeholder="Search listings…"></div><div class="table-wrap"><table><thead><tr><th>Listing</th><th>Owner</th><th>Price</th><th>Status</th><th>Action</th></tr></thead><tbody id="listing-table"></tbody></table></div></div></section>
+    <section id="users" class="panel"><div class="card"><div class="card-head"><h2>Users</h2><input data-search="user-table" placeholder="Search users…"></div><div class="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Credits</th><th>Last seen</th><th>Action</th></tr></thead><tbody id="user-table"></tbody></table></div></div></section>
+    <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Plan sales</h2></div><div class="table-wrap"><table><thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
+    <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Reports</h2></div><div class="table-wrap"><table><thead><tr><th>Reporter</th><th>Target</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
   </main>
-  <script type="module" src="/src/admin.js?v=20260810-5"></script>
+  <script type="module" src="/src/admin.js?v=20260812-6"></script>
 </body>
 </html>

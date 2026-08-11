@@ -1,6 +1,6 @@
-import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260810-4';
-import { translations } from './data/translations.js?v=20260810-10';
-import { ApiError, SearyaApi } from './api.js?v=20260810-7';
+import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-5';
+import { translations } from './data/translations.js?v=20260812-11';
+import { ApiError, SearyaApi } from './api.js?v=20260812-8';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
@@ -518,7 +518,7 @@ function openResetPasswordModal(token) {
   if (!backdrop || !content) return;
   content.innerHTML = `
     <form id="reset-password-form" class="p-6 sm:p-8 space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Set a new password' : 'Yeni şifre belirleyin'}</h3><p class="text-xs text-slate-500 mt-1">${isEn ? 'Use at least 8 characters.' : 'En az 8 karakter kullanın.'}</p></div><button type="button" id="close-reset-modal" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Set a new password' : 'Yeni şifre belirleyin'}</h3><p class="text-xs text-slate-500 mt-1">${isEn ? 'Use at least 8 characters.' : 'En az 8 karakter kullanın.'}</p></div><button type="button" id="close-reset-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
       <input id="reset-password-input" type="password" minlength="8" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" placeholder="${isEn ? 'New password' : 'Yeni şifre'}">
       <button type="submit" class="w-full py-3 rounded-xl bg-blue-600 text-white font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button>
     </form>`;
@@ -1210,7 +1210,7 @@ async function openAccountModal(options = {}) {
   let listings = [];
   try { listings = (await SearyaApi.myListings()).listings || []; }
   catch (error) { showToast(apiErrorMessage(error)); }
-  const statusLabel = value => ({ pending: isEn ? 'Pending review' : 'Onay bekliyor', rejected: isEn ? 'Rejected' : 'Reddedildi', Aktif: isEn ? 'Active' : 'Aktif', Doğrulanmış: isEn ? 'Verified' : 'Doğrulanmış' }[value] || value);
+  const statusLabel = value => ({ pending: 'Pending review', rejected: 'Rejected', Active: 'Active', Verified: 'Verified', Aktif: 'Active', Doğrulanmış: 'Verified' }[value] || value);
   const accountUsageCards = state.launchFree ? `
     <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20"><strong class="block text-xl text-emerald-600">${user.buyerConnections}</strong><span class="text-[10px] text-slate-500">${isEn ? 'New connections left / 30 days' : '30 günlük yeni bağlantı hakkı'}</span></div>
     <div class="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-500/20"><strong class="block text-xl text-purple-600">${user.sellerFreeListings}</strong><span class="text-[10px] text-slate-500">${isEn ? 'Active listing slots left' : 'Kalan aktif ilan alanı'}</span></div>
@@ -1235,7 +1235,7 @@ async function openAccountModal(options = {}) {
       <section class="space-y-3">
         <div class="flex items-center justify-between"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'My listings' : 'İlanlarım'}</h4><button id="account-new-listing" class="text-[11px] font-bold text-blue-600 dark:text-blue-400">+ ${isEn ? 'New listing' : 'Yeni ilan'}</button></div>
         <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
-          ${listings.length ? listings.map(item => `<article class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(item.title)}</strong><span class="inline-flex mt-1 text-[10px] font-bold px-2 py-1 rounded-full ${item.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : item.status === 'rejected' ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}">${escapeHtml(statusLabel(item.status))}</span></div><strong class="text-xs text-slate-700 dark:text-slate-300">$${Number(item.askingPrice || item.budget).toLocaleString('tr-TR')}</strong></div><div class="flex flex-wrap gap-2">${item.type === 'sale' && !item.isVerified && user.sellerVipCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="verification" class="px-3 py-2 rounded-lg bg-purple-500/10 text-purple-500 text-[10px] font-bold" title="${isEn ? 'Use verification review' : 'Doğrulama hakkını kullan'}"><i class="ph-bold ph-shield-check mr-1"></i>${isEn ? 'Verify' : 'Doğrula'}</button>` : ''}${item.type === 'sale' && ['Aktif', 'Doğrulanmış'].includes(item.status) && user.boostCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="boost" class="px-3 py-2 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold"><i class="ph-bold ph-trend-up mr-1"></i>${isEn ? 'Boost' : 'Öne çıkar'}</button>` : ''}<button data-edit-listing="${item.id}" class="px-3 py-2 rounded-lg bg-blue-500/10 text-blue-500 text-[10px] font-bold"><i class="ph-bold ph-pencil-simple mr-1"></i>${isEn ? 'Edit' : 'Düzenle'}</button><button data-delete-listing="${item.id}" class="px-3 py-2 rounded-lg bg-red-500/10 text-red-500 text-[10px] font-bold"><i class="ph-bold ph-trash mr-1"></i>${isEn ? 'Delete' : 'Sil'}</button></div></article>`).join('') : `<p class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 text-center">${isEn ? 'You have no listings yet.' : 'Henüz ilanınız yok.'}</p>`}
+          ${listings.length ? listings.map(item => `<article class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(item.title)}</strong><span class="inline-flex mt-1 text-[10px] font-bold px-2 py-1 rounded-full ${item.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : item.status === 'rejected' ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'}">${escapeHtml(statusLabel(item.status))}</span></div><strong class="text-xs text-slate-700 dark:text-slate-300">$${Number(item.askingPrice || item.budget).toLocaleString('en-US')}</strong></div><div class="flex flex-wrap gap-2">${item.type === 'sale' && !item.isVerified && user.sellerVipCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="verification" class="px-3 py-2 rounded-lg bg-purple-500/10 text-purple-500 text-[10px] font-bold" title="${isEn ? 'Use verification review' : 'Doğrulama hakkını kullan'}"><i class="ph-bold ph-shield-check mr-1"></i>${isEn ? 'Verify' : 'Doğrula'}</button>` : ''}${item.type === 'sale' && ['Aktif', 'Doğrulanmış', 'Active', 'Verified'].includes(item.status) && user.boostCredits > 0 ? `<button data-addon-listing="${item.id}" data-addon="boost" class="px-3 py-2 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold"><i class="ph-bold ph-trend-up mr-1"></i>${isEn ? 'Boost' : 'Öne çıkar'}</button>` : ''}<button data-edit-listing="${item.id}" class="px-3 py-2 rounded-lg bg-blue-500/10 text-blue-500 text-[10px] font-bold"><i class="ph-bold ph-pencil-simple mr-1"></i>${isEn ? 'Edit' : 'Düzenle'}</button><button data-delete-listing="${item.id}" class="px-3 py-2 rounded-lg bg-red-500/10 text-red-500 text-[10px] font-bold"><i class="ph-bold ph-trash mr-1"></i>${isEn ? 'Delete' : 'Sil'}</button></div></article>`).join('') : `<p class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 text-center">${isEn ? 'You have no listings yet.' : 'Henüz ilanınız yok.'}</p>`}
         </div>
       </section>
       <div class="grid ${user.isAdmin ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
@@ -1291,7 +1291,7 @@ function openAccountSettingsModal() {
   const backdrop = el.modalBackdrop();
   if (!content || !backdrop) return;
   content.innerHTML = `<div class="p-5 sm:p-8 space-y-6 overflow-y-auto">
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Account settings' : 'Hesap ayarları'}</h3><p class="text-xs text-slate-500">${escapeHtml(user.email || '')}</p></div><button id="close-settings-modal" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Account settings' : 'Hesap ayarları'}</h3><p class="text-xs text-slate-500">${escapeHtml(user.email || '')}</p></div><button id="close-settings-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
     <form id="change-password-form" class="space-y-3"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Change password' : 'Şifre değiştir'}</h4><input id="settings-current-password" type="password" required placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><input id="settings-new-password" type="password" required minlength="8" placeholder="${isEn ? 'New password — at least 8 characters' : 'Yeni şifre — en az 8 karakter'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><button class="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button></form>
     <section class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Your data' : 'Verileriniz'}</h4><p class="text-[11px] text-slate-500 mt-1 mb-3">${isEn ? 'Download a JSON copy of your account, listings, purchases and messages.' : 'Hesap, ilan, paket ve mesaj verilerinizin JSON kopyasını indirin.'}</p><button id="export-account-btn" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"><i class="ph-bold ph-download-simple mr-1"></i>${isEn ? 'Download my data' : 'Verilerimi indir'}</button></section>
     <section class="p-4 rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/30"><h4 class="text-sm font-black text-red-700 dark:text-red-400">${isEn ? 'Delete account' : 'Hesabı sil'}</h4>${user.isAdmin ? `<p class="text-[11px] text-red-600/80 mt-1">${isEn ? 'The primary administrator cannot be deleted here.' : 'Birincil yönetici hesabı bu ekrandan silinemez.'}</p>` : `<p class="text-[11px] text-red-600/80 mt-1 mb-3">${isEn ? 'This permanently removes your listings and personal account data.' : 'Bu işlem ilanlarınızı ve kişisel hesap verilerinizi kalıcı olarak kaldırır.'}</p><input id="delete-account-password" type="password" placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-2"><input id="delete-account-confirmation" type="text" placeholder="${isEn ? 'DELETE MY ACCOUNT' : 'HESABIMI SİL'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-3"><button id="delete-account-btn" class="w-full py-3 rounded-xl bg-red-600 text-white text-sm font-bold">${isEn ? 'Permanently delete account' : 'Hesabı kalıcı olarak sil'}</button>`}</section>
@@ -1366,7 +1366,7 @@ function openGuideModal(type) {
     privacy: {
       title: isEn ? 'Privacy Policy Summary' : 'Gizlilik Politikası Özeti',
       intro: isEn ? 'Searya should collect only the data needed for accounts, listings, messaging and transaction safety.' : 'Searya yalnızca hesap, ilan, mesajlaşma ve işlem güvenliği için gerekli verileri toplamalıdır.',
-      items: isEn ? ['Do not sell personal data', 'Protect private listing and message data', 'Allow account data export and deletion', 'Publish retention and cookie rules before launch'] : ['Kişisel verileri satmayın', 'Özel ilan ve mesaj verilerini koruyun', 'Veri dışa aktarma ve hesap silme imkânı sağlayın', 'Yayından önce saklama ve çerez kurallarını yayınlayın']
+      items: isEn ? ['Do not sell personal data', 'Protect private listing and message data', 'Allow account data export and deletion', 'Publish and maintain clear retention and cookie rules'] : ['Kişisel verileri satmayın', 'Özel ilan ve mesaj verilerini koruyun', 'Veri dışa aktarma ve hesap silme imkânı sağlayın', 'Yayından önce saklama ve çerez kurallarını yayınlayın']
     },
     terms: {
       title: isEn ? 'Terms of Use Summary' : 'Kullanım Şartları Özeti',
@@ -1420,7 +1420,7 @@ function openPackagePurchaseModal(packageName, price, packageKey) {
             <span class="text-xs text-slate-500">${isEn ? 'Package Purchase Checkout' : 'Paket Satın Alma Paneli'}</span>
           </div>
         </div>
-        <button id="close-package-modal" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center">
+        <button id="close-package-modal" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center">
           <i class="ph-bold ph-x"></i>
         </button>
       </div>
@@ -1597,9 +1597,9 @@ function openValuationModal() {
     const minVal = Math.round(arr * (baseMult - 0.4));
     const maxVal = Math.round(arr * (baseMult + 0.4));
 
-    if (rangeEl) rangeEl.textContent = `$${minVal.toLocaleString()} – $${maxVal.toLocaleString()}`;
+    if (rangeEl) rangeEl.textContent = `$${minVal.toLocaleString('en-US')} – $${maxVal.toLocaleString('en-US')}`;
     if (multipleEl) multipleEl.textContent = `${baseMult.toFixed(1)}x ARR (${Math.round(baseMult * 12)}x MRR)`;
-    if (arrEl) arrEl.textContent = `$${arr.toLocaleString()}`;
+    if (arrEl) arrEl.textContent = `$${arr.toLocaleString('en-US')}`;
   }
 
   mrrInput?.addEventListener('input', updateValuation);
@@ -1683,11 +1683,11 @@ function openProjectBattlesModal() {
               <div class="grid grid-cols-2 gap-2 text-xs p-3 rounded-xl bg-black/40 border border-white/5">
                 <div>
                   <span class="text-[10px] text-slate-400 block font-semibold">Fiyat</span>
-                  <strong class="text-sm font-black text-purple-400">$${(projA.askingPrice || 0).toLocaleString()}</strong>
+                  <strong class="text-sm font-black text-purple-400">$${(projA.askingPrice || 0).toLocaleString('en-US')}</strong>
                 </div>
                 <div>
                   <span class="text-[10px] text-slate-400 block font-semibold">Aylık MRR</span>
-                  <strong class="text-sm font-black text-emerald-400">$${(projA.mrr || 0).toLocaleString()} /ay</strong>
+                  <strong class="text-sm font-black text-emerald-400">$${(projA.mrr || 0).toLocaleString('en-US')} /mo</strong>
                 </div>
               </div>
             </div>
@@ -1735,11 +1735,11 @@ function openProjectBattlesModal() {
               <div class="grid grid-cols-2 gap-2 text-xs p-3 rounded-xl bg-black/40 border border-white/5">
                 <div>
                   <span class="text-[10px] text-slate-400 block font-semibold">Fiyat</span>
-                  <strong class="text-sm font-black text-purple-400">$${(projB.askingPrice || 0).toLocaleString()}</strong>
+                  <strong class="text-sm font-black text-purple-400">$${(projB.askingPrice || 0).toLocaleString('en-US')}</strong>
                 </div>
                 <div>
                   <span class="text-[10px] text-slate-400 block font-semibold">Aylık MRR</span>
-                  <strong class="text-sm font-black text-emerald-400">$${(projB.mrr || 0).toLocaleString()} /ay</strong>
+                  <strong class="text-sm font-black text-emerald-400">$${(projB.mrr || 0).toLocaleString('en-US')} /mo</strong>
                 </div>
               </div>
             </div>
@@ -1963,8 +1963,8 @@ function renderWeeklyPicks() {
             </div>
             <h3 class="font-black text-sm text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">${escapeHtml(title)}</h3>
             <div class="flex items-center justify-between gap-2 text-[11px]">
-              <strong class="text-emerald-600 dark:text-emerald-400">$${Number(project.askingPrice || 0).toLocaleString()}</strong>
-              <span class="text-slate-400 flex items-center gap-1"><i class="ph-bold ph-eye"></i>${Number(project.views || 0).toLocaleString()}</span>
+              <strong class="text-emerald-600 dark:text-emerald-400">$${Number(project.askingPrice || 0).toLocaleString('en-US')}</strong>
+              <span class="text-slate-400 flex items-center gap-1"><i class="ph-bold ph-eye"></i>${Number(project.views || 0).toLocaleString('en-US')}</span>
             </div>
           </div>
         </div>
@@ -2005,7 +2005,7 @@ function openProjectAlertModal(options = {}) {
     return `
       <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <div class="min-w-0">
-          <strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(categoryLabels[alert.category] || categoryLabels.all)} · $${alert.minPrice.toLocaleString()}–$${alert.maxPrice.toLocaleString()}</strong>
+          <strong class="text-xs text-slate-900 dark:text-white block truncate">${escapeHtml(categoryLabels[alert.category] || categoryLabels.all)} · $${alert.minPrice.toLocaleString('en-US')}–$${alert.maxPrice.toLocaleString('en-US')}</strong>
           <span class="text-[10px] text-slate-500">${alert.tech ? `${escapeHtml(alert.tech)} · ` : ''}${frequencyLabel} · ${getAlertMatches(alert).length} ${isEn ? 'matches' : 'eşleşme'}</span>
         </div>
         <button type="button" data-delete-alert-id="${escapeHtml(alert.id)}" aria-label="${isEn ? 'Delete alert' : 'Alarmı sil'}" class="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-trash"></i></button>
@@ -2185,7 +2185,7 @@ function renderSaleSquareCard(p) {
   const title = state.lang === 'en' ? (p.titleEn || p.title) : p.title;
   const desc = state.lang === 'en' ? (p.shortDescEn || p.shortDesc) : p.shortDesc;
   const categoryLabel = state.lang === 'en' ? (p.categoryEn || p.category) : p.category;
-  const formattedPrice = p.askingPrice ? `$${p.askingPrice.toLocaleString()}` : '$450';
+  const formattedPrice = p.askingPrice ? `$${p.askingPrice.toLocaleString('en-US')}` : '$450';
   const safeTitle = escapeHtml(title);
   const safeDesc = escapeHtml(desc);
   const safeCategory = escapeHtml(String(categoryLabel || '').toUpperCase());
@@ -2255,7 +2255,7 @@ function renderSaleSquareCard(p) {
 
       <!-- Action Buttons -->
       <div class="p-4 pt-0 flex items-center justify-between gap-2">
-        <span class="text-[10px] text-slate-400 flex items-center gap-1" title="${state.lang === 'en' ? 'Views' : 'Görüntülenme'}"><i class="ph-bold ph-eye"></i>${(p.views || 0).toLocaleString()}</span>
+        <span class="text-[10px] text-slate-400 flex items-center gap-1" title="${state.lang === 'en' ? 'Views' : 'Görüntülenme'}"><i class="ph-bold ph-eye"></i>${(p.views || 0).toLocaleString('en-US')}</span>
         <button data-id="${p.id}" class="share-btn p-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-white hover:bg-emerald-50 text-xs font-semibold flex items-center gap-1 border border-slate-200 dark:border-slate-700/60 transition-all" title="${dict.btnShareCard}">
           <i class="ph-bold ph-share-network text-emerald-500 text-sm"></i>
         </button>
@@ -2274,7 +2274,7 @@ function renderWtbSquareCard(w) {
   const dict = t();
   const title = state.lang === 'en' ? (w.titleEn || w.title) : w.title;
   const desc = state.lang === 'en' ? (w.descriptionEn || w.description) : w.description;
-  const formattedBudget = w.budget ? `$${w.budget.toLocaleString()}` : '$500 - $1,000';
+  const formattedBudget = w.budget ? `$${w.budget.toLocaleString('en-US')}` : '$500 - $1,000';
   const safeTitle = escapeHtml(title);
   const safeDesc = escapeHtml(desc);
   const buyerName = escapeHtml(w.buyer?.name || 'Verified Buyer');
@@ -2313,7 +2313,7 @@ function renderWtbSquareCard(w) {
       </div>
 
       <div class="flex items-center justify-between gap-2 pt-2">
-        <span class="text-[10px] text-slate-400 flex items-center gap-1" title="${state.lang === 'en' ? 'Views' : 'Görüntülenme'}"><i class="ph-bold ph-eye"></i>${(w.views || 0).toLocaleString()}</span>
+        <span class="text-[10px] text-slate-400 flex items-center gap-1" title="${state.lang === 'en' ? 'Views' : 'Görüntülenme'}"><i class="ph-bold ph-eye"></i>${(w.views || 0).toLocaleString('en-US')}</span>
         <button data-id="${w.id}" class="share-btn px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700/60 transition-all">
           <i class="ph-bold ph-share-network text-indigo-500"></i>
           <span>${dict.btnShareCard}</span>
@@ -2353,7 +2353,7 @@ function openProjectDetailModal(p) {
     <div class="relative h-64 sm:h-80 w-full overflow-hidden bg-slate-900 flex-shrink-0">
       <img src="${safeImageUrl(p.coverImage)}" alt="${safeTitle}" class="w-full h-full object-cover">
       <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
-      <button id="close-modal-btn" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-slate-800 transition-all backdrop-blur-md">
+      <button id="close-modal-btn" aria-label="Close" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-slate-800 transition-all backdrop-blur-md">
         <i class="ph-bold ph-x text-lg"></i>
       </button>
       
@@ -2371,7 +2371,7 @@ function openProjectDetailModal(p) {
         </div>
         <div class="text-right">
           <span class="text-xs text-slate-400 block font-medium">${isSale ? (state.lang === 'en' ? 'Asking Price' : 'İstenen Fiyat') : (state.lang === 'en' ? 'Budget' : 'Bütçe')}</span>
-          <span class="text-3xl font-extrabold text-emerald-400">$${(p.askingPrice || p.budget || 0).toLocaleString()}</span>
+          <span class="text-3xl font-extrabold text-emerald-400">$${(p.askingPrice || p.budget || 0).toLocaleString('en-US')}</span>
         </div>
       </div>
     </div>
@@ -2407,7 +2407,7 @@ function openProjectDetailModal(p) {
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
             <div class="p-3 rounded-xl bg-white/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
               <span class="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">💳 ${state.lang === 'en' ? 'Stripe Monthly Revenue' : 'Stripe Aylık Gelir'}</span>
-              <strong class="text-sm font-black text-emerald-600 dark:text-emerald-400 block mt-0.5">$${(p.mrr || 0).toLocaleString()} / ${state.lang === 'en' ? 'mo' : 'ay'}</strong>
+              <strong class="text-sm font-black text-emerald-600 dark:text-emerald-400 block mt-0.5">$${(p.mrr || 0).toLocaleString('en-US')} / ${state.lang === 'en' ? 'mo' : 'ay'}</strong>
               <span class="text-[9px] text-emerald-600 font-bold">✓ ${state.lang === 'en' ? 'Live Revenue Verified' : 'Canlı Gelir Onaylı'}</span>
             </div>
 
@@ -2428,13 +2428,13 @@ function openProjectDetailModal(p) {
           <div class="space-y-1.5 pt-1">
             <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
               <span>Son 4 Ay Stripe Gelir Trendi ($)</span>
-              <span class="text-emerald-600 dark:text-emerald-400">+%34 Artış</span>
+              <span class="text-emerald-600 dark:text-emerald-400">+34% Growth</span>
             </div>
             <div class="h-10 flex items-end gap-2 p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <div class="flex-1 bg-purple-500/40 hover:bg-purple-500 rounded-md h-[45%] transition-all relative group cursor-pointer" title="Ocak: $1,200">
                 <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$1.2k</span>
               </div>
-              <div class="flex-1 bg-purple-500/60 hover:bg-purple-500 rounded-md h-[65%] transition-all relative group cursor-pointer" title="Şubat: $1,650">
+              <div class="flex-1 bg-purple-500/60 hover:bg-purple-500 rounded-md h-[65%] transition-all relative group cursor-pointer" title="February: $1,650">
                 <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$1.65k</span>
               </div>
               <div class="flex-1 bg-emerald-500/80 hover:bg-emerald-500 rounded-md h-[80%] transition-all relative group cursor-pointer" title="Mart: $2,100">
@@ -2559,7 +2559,7 @@ function openReportModal(listing) {
   state.openListingSlug = '';
   content.innerHTML = `
     <form id="report-form" class="p-6 sm:p-8 space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Report listing' : 'İlanı şikâyet et'}</h3><p class="text-xs text-slate-500 mt-1">${escapeHtml(listing.title)}</p></div><button type="button" id="close-report-modal" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Report listing' : 'İlanı şikâyet et'}</h3><p class="text-xs text-slate-500 mt-1">${escapeHtml(listing.title)}</p></div><button type="button" id="close-report-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
       <div><label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">${isEn ? 'Reason' : 'Şikâyet nedeni'}</label><textarea id="report-reason" minlength="10" maxlength="500" required rows="4" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm" placeholder="${isEn ? 'Describe the misleading or unsafe content…' : 'Yanıltıcı veya güvensiz içeriği açıklayın…'}"></textarea></div>
       <button type="submit" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm">${isEn ? 'Send report' : 'Şikâyeti gönder'}</button>
     </form>`;
@@ -2586,7 +2586,7 @@ function openShareCardModal(p) {
 
   const updateCardPreview = () => {
     const cardTitle = p.title || "AI SaaS Platform";
-    const priceText = isSale ? `$${(p.askingPrice || 450).toLocaleString()}` : `$${(p.budget || 500).toLocaleString()} – $1,000`;
+    const priceText = isSale ? `$${(p.askingPrice || 450).toLocaleString('en-US')}` : `$${(p.budget || 500).toLocaleString('en-US')} – $1,000`;
     const techPills = (p.techStack || ['Next.js', 'Tailwind CSS', 'Supabase', 'Stripe']).slice(0, 4);
 
     const isPurple = isSale;
@@ -2615,7 +2615,7 @@ function openShareCardModal(p) {
             </div>
           </div>
 
-          <button id="close-share-modal" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white flex items-center justify-center transition-all">
+          <button id="close-share-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white flex items-center justify-center transition-all">
             <i class="ph-bold ph-x text-lg"></i>
           </button>
         </div>
@@ -2767,7 +2767,7 @@ function openCreateListingModal(editListing = null) {
         <h3 class="text-xl font-bold text-slate-900 dark:text-white">${editListing ? (state.lang === 'en' ? 'Edit listing' : 'İlanı düzenle') : dict.btnCreateListing}</h3>
         <p class="text-xs text-slate-500 dark:text-slate-400">${editListing ? (state.lang === 'en' ? 'Changes are reviewed again before publishing.' : 'Değişiklikler yayınlanmadan önce yeniden incelenir.') : (state.lang === 'en' ? 'Post your digital project or specify your buying criteria.' : 'Projenizi yeni sahipleriyle buluşturun veya ne satın almak istediğinizi yazın.')}</p>
       </div>
-      <button id="close-create-modal" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white flex items-center justify-center">
+      <button id="close-create-modal" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white flex items-center justify-center">
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
@@ -3057,12 +3057,15 @@ function updateBuyerCreditBadge() {
   persistClientState();
   const badge = document.getElementById('buyer-credit-count');
   if (!badge) return;
+  const signedIn = Boolean(state.currentUser);
+  badge.classList.toggle('hidden', !signedIn);
+  badge.classList.toggle('flex', signedIn);
   badge.textContent = state.buyerConnections > 99 ? '99+' : String(state.buyerConnections);
   const label = state.lang === 'en'
     ? `${state.buyerConnections} new seller connections remaining`
     : `${state.buyerConnections} yeni satıcı bağlantısı kaldı`;
   badge.setAttribute('aria-label', label);
-  el.inboxBtn()?.setAttribute('title', label);
+  el.inboxBtn()?.setAttribute('title', signedIn ? label : 'Messages');
 }
 
 function updateUnreadMessageBadge() {
@@ -3093,7 +3096,7 @@ function renderInboxDrawerContent() {
 
   if (!activeThread) {
     drawer.innerHTML = `
-      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-[#0D131F]"><div><h3 class="text-sm font-extrabold text-slate-900 dark:text-white">${dict.inboxTitle}</h3><p class="text-[10px] text-slate-500">${state.lang === 'en' ? 'Your conversations will appear here.' : 'Görüşmeleriniz burada görünecek.'}</p></div><button id="close-inbox-btn" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"><i class="ph-bold ph-x"></i></button></div>
+      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-[#0D131F]"><div><h3 class="text-sm font-extrabold text-slate-900 dark:text-white">${dict.inboxTitle}</h3><p class="text-[10px] text-slate-500">${state.lang === 'en' ? 'Your conversations will appear here.' : 'Görüşmeleriniz burada görünecek.'}</p></div><button id="close-inbox-btn" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"><i class="ph-bold ph-x"></i></button></div>
       <div class="flex-1 flex flex-col items-center justify-center p-8 text-center"><i class="ph-bold ph-chats-circle text-4xl text-blue-500"></i><h4 class="mt-3 text-sm font-black text-slate-900 dark:text-white">${state.lang === 'en' ? 'No conversations yet' : 'Henüz görüşme yok'}</h4><p class="mt-1 text-xs text-slate-500">${state.lang === 'en' ? 'Open a listing and contact its owner.' : 'Bir ilanı açıp ilan sahibiyle iletişime geçin.'}</p></div>`;
     document.getElementById('close-inbox-btn')?.addEventListener('click', toggleInboxDrawer);
     return;
@@ -3112,7 +3115,7 @@ function renderInboxDrawerContent() {
         </div>
       </div>
 
-      <button id="close-inbox-btn" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all">
+      <button id="close-inbox-btn" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all">
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
@@ -3367,7 +3370,7 @@ function renderAuthCard() {
         </div>
 
         <button type="submit" id="auth-submit-btn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/25 transition-all transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
-          <span>${isEn ? 'Sign Up & Get 2 Free Connections 🎉' : 'Kayıt Ol & 2 Ücretsiz Bağlantı Kazan 🎉'}</span>
+          <span>${isEn ? 'Sign Up for Free 🎉' : 'Kayıt Ol & Ücretsiz Başla 🎉'}</span>
         </button>
         <p id="auth-form-status" class="hidden rounded-xl px-3 py-2.5 text-xs font-bold" role="status" aria-live="polite"></p>
       </form>

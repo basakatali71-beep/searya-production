@@ -24,7 +24,7 @@ async function request(path, options = {}) {
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload?.error || {};
-    throw new ApiError(error.message || `İstek başarısız (${response.status}).`, response.status, error.code || 'API_ERROR', payload);
+    throw new ApiError(error.message || `Request failed (${response.status}).`, response.status, error.code || 'API_ERROR', payload);
   }
   return payload;
 }

@@ -379,7 +379,7 @@ export const translations = {
     
     onboardingSuccessTitle: "Welcome Aboard! 🎉",
     onboardingSuccessSub: "Unlaunched and promising projects await you on Searya.",
-    onboardingGiftNotice: "🎁 2 Free Contact Credits Added To Your Account!",
+    onboardingGiftNotice: "🎁 10 New Contact Credits Added To Your Account!",
     btnStartExploring: "Start Exploring Projects →",
 
     // Featured 3D Hero Card

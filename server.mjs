@@ -486,6 +486,9 @@ function listingFromRow(row) {
     titleEn: content.titleEn || row.title,
     slug: row.slug,
     category: row.category,
+    techPreferenceEn: String(content.techPreferenceEn || content.techPreference || '')
+      .replace(/\s+veya\s+/gi, ' or ')
+      .replace(/\s+ve\s+/gi, ' and '),
     askingPrice: row.price_cents / 100,
     budget: row.price_cents / 100,
     status: row.status === 'approved' ? (row.is_verified ? 'Verified' : 'Active') : row.status,
