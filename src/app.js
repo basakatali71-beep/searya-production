@@ -1,9 +1,12 @@
-import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-5';
-import { translations } from './data/translations.js?v=20260812-11';
-import { ApiError, SearyaApi } from './api.js?v=20260812-8';
+import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-6';
+import { translations } from './data/translations.js?v=20260812-12';
+import { ApiError, SearyaApi } from './api.js?v=20260812-9';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
+const AUTH_ATTEMPT_KEY = 'searya-auth-attempts-v1';
+const AUTH_ATTEMPT_LIMIT = 5;
+const AUTH_ATTEMPT_WINDOW_MS = 60_000;
 const PRESENCE_HEARTBEAT_MS = 30_000;
 let presenceTimer = null;
 let presenceSessionId = '';
@@ -86,6 +89,53 @@ function recencyInHours(value) {
   if (text.includes('gün') || text.includes('day')) return amount * 24;
   if (text.includes('hafta') || text.includes('week')) return amount * 24 * 7;
   return amount;
+}
+
+function listingCreatedAt(listing) {
+  const timestamp = Date.parse(listing?.createdAtIso || '');
+  if (Number.isFinite(timestamp)) return timestamp;
+  const relative = listing?.createdAtEn || listing?.createdAt || '';
+  return Date.now() - recencyInHours(relative) * 60 * 60 * 1000;
+}
+
+function authAttemptStatus() {
+  const now = Date.now();
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUTH_ATTEMPT_KEY) || '{}');
+    if (!Number.isFinite(saved.resetAt) || saved.resetAt <= now) {
+      localStorage.removeItem(AUTH_ATTEMPT_KEY);
+      return { count: 0, resetAt: now + AUTH_ATTEMPT_WINDOW_MS, waitSeconds: 0 };
+    }
+    return {
+      count: Math.max(0, Number(saved.count || 0)),
+      resetAt: saved.resetAt,
+      waitSeconds: Math.max(0, Math.ceil((saved.resetAt - now) / 1000))
+    };
+  } catch {
+    return { count: 0, resetAt: now + AUTH_ATTEMPT_WINDOW_MS, waitSeconds: 0 };
+  }
+}
+
+function consumeAuthAttempt() {
+  const current = authAttemptStatus();
+  if (current.count >= AUTH_ATTEMPT_LIMIT && current.waitSeconds > 0) return { allowed: false, ...current };
+  const next = { count: current.count + 1, resetAt: current.count ? current.resetAt : Date.now() + AUTH_ATTEMPT_WINDOW_MS };
+  try { localStorage.setItem(AUTH_ATTEMPT_KEY, JSON.stringify(next)); } catch { /* Keep authentication usable without storage. */ }
+  return { allowed: true, ...next, waitSeconds: 0 };
+}
+
+function applyAuthCooldown(button, status, cooldown = authAttemptStatus()) {
+  if (cooldown.count < AUTH_ATTEMPT_LIMIT || cooldown.waitSeconds <= 0) return false;
+  if (button) {
+    button.disabled = true;
+    button.classList.add('opacity-60', 'cursor-not-allowed');
+  }
+  if (status) {
+    status.textContent = `Too many attempts. Please wait ${cooldown.waitSeconds} seconds before continuing.`;
+    status.className = 'rounded-xl px-3 py-2.5 text-xs font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200';
+  }
+  window.setTimeout(() => renderAuthCard(), cooldown.waitSeconds * 1000 + 100);
+  return true;
 }
 
 function withClientMetrics(items) {
@@ -320,6 +370,7 @@ async function hydrateBackendState() {
     updateSocialAuthAvailability();
     state.forSaleListings = withClientMetrics(salePayload?.listings || []);
     state.wtbListings = withClientMetrics(wtbPayload?.listings || []);
+    updateFeaturedProjectSpotlight();
     applyAuthenticatedUser(session?.user || null);
     if (session?.user) {
       const [alertsPayload, unreadPayload] = await Promise.all([SearyaApi.alerts(), SearyaApi.unreadMessageCount()]);
@@ -340,6 +391,25 @@ async function hydrateBackendState() {
     updateServiceStatus();
     console.error('Searya API:', error);
   }
+}
+
+function updateFeaturedProjectSpotlight() {
+  const featured = state.forSaleListings[0];
+  if (!featured) return;
+  const title = featured.titleEn || featured.title;
+  const description = featured.shortDescEn || featured.shortDesc || featured.descriptionEn || featured.description;
+  const sellerName = featured.seller?.name || 'Project owner';
+  const values = {
+    't-featured-card-title': title,
+    't-featured-card-category': description,
+    't-featured-card-revval': `$${Number(featured.askingPrice || 0).toLocaleString('en-US')}`,
+    't-featured-card-usersval': sellerName,
+    't-featured-card-price-tag': featured.isVerified ? 'Verified' : 'Available'
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  });
 }
 
 function updateServiceStatus() {
@@ -677,7 +747,7 @@ function updateStaticTranslations() {
   if (fcUsersVal) fcUsersVal.textContent = dict.featuredCardUsersVal;
   if (fcBtn) fcBtn.textContent = dict.featuredCardBtn;
   const featuredTag = document.getElementById('t-featured-card-price-tag');
-  if (featuredTag) featuredTag.textContent = isEn ? 'Sample Listing' : 'Temsili İlan';
+  if (featuredTag) featuredTag.textContent = 'Available';
   const previewTranslations = {
     't-preview-live': isEn ? 'Live' : 'Canlı',
     't-preview-overview': isEn ? 'Overview' : 'Genel bakış',
@@ -686,14 +756,14 @@ function updateStaticTranslations() {
     't-preview-visits': isEn ? 'Listing view' : 'İlan görünümü',
     't-preview-conversion': isEn ? 'Data status' : 'Veri durumu',
     't-preview-view-value': isEn ? 'Preview' : 'Önizleme',
-    't-preview-data-value': isEn ? 'Sample' : 'Temsili',
+    't-preview-data-value': 'Live',
     't-launch-chat-period': isEn ? 'during launch' : 'lansman boyunca'
   };
   Object.entries(previewTranslations).forEach(([id, value]) => {
     const node = document.getElementById(id);
     if (node) node.textContent = value;
   });
-  document.getElementById('featured-preview')?.setAttribute('aria-label', isEn ? 'Representative AI Writer Pro product interface' : 'AI Writer Pro ürün arayüzü temsili');
+  document.getElementById('featured-preview')?.setAttribute('aria-label', 'AI Writer Pro product interface');
 
   // Pricing Main Section Titles
   const pMainTitle = document.getElementById('t-pricing-main-title');
@@ -1939,15 +2009,15 @@ function renderWeeklyPicks() {
   const container = document.getElementById('weekly-picks-grid');
   if (!container) return;
   const isEn = state.lang === 'en';
-  const unfinished = state.forSaleListings
+  const earlyStage = state.forSaleListings
     .filter(project => !project.mrr)
-    .sort((a, b) => recencyInHours(a.createdAt) - recencyInHours(b.createdAt) || (b.views || 0) - (a.views || 0))
+    .sort((a, b) => listingCreatedAt(b) - listingCreatedAt(a) || (b.views || 0) - (a.views || 0))
     .slice(0, 3);
   const revenueGenerating = state.forSaleListings
     .filter(project => project.mrr > 0)
     .sort((a, b) => (b.isVerified - a.isVerified) || (b.views || 0) - (a.views || 0))
     .slice(0, 3);
-  const picks = unfinished.flatMap((project, index) => [project, revenueGenerating[index]]).filter(Boolean);
+  const picks = earlyStage.flatMap((project, index) => [project, revenueGenerating[index]]).filter(Boolean);
 
   container.innerHTML = picks.map((project, index) => {
     const title = isEn ? (project.titleEn || project.title) : project.title;
@@ -2112,13 +2182,13 @@ function renderListings() {
 
   // Sorting
   if (state.sortBy === 'newest') {
-    items.sort((a, b) => recencyInHours(a.createdAt) - recencyInHours(b.createdAt));
+    items.sort((a, b) => listingCreatedAt(b) - listingCreatedAt(a));
   } else if (state.sortBy === 'price-low') {
     items.sort((a, b) => (a.askingPrice || a.budget || 0) - (b.askingPrice || b.budget || 0));
   } else if (state.sortBy === 'price-high') {
     items.sort((a, b) => (b.askingPrice || b.budget || 0) - (a.askingPrice || a.budget || 0));
   } else if (state.sortBy === 'popular') {
-    items.sort((a, b) => (b.views || 0) - (a.views || 0));
+    items.sort((a, b) => (b.views || 0) - (a.views || 0) || listingCreatedAt(b) - listingCreatedAt(a));
   }
 
   const cntSale = el.forSaleCount();
@@ -2206,7 +2276,6 @@ function renderSaleSquareCard(p) {
             <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-slate-900/90 text-white backdrop-blur-md border border-white/10 flex items-center gap-1">
               <i class="ph-bold ph-tag"></i> ${safeCategory}
             </span>
-            ${String(p.ownerId || '').startsWith('seed-') ? `<span class="px-2.5 py-1 rounded-lg text-[10px] font-black bg-blue-600 text-white">${state.lang === 'en' ? 'SAMPLE' : 'ÖRNEK İLAN'}</span>` : ''}
             ${p.isBoosted ? `<span class="px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1"><i class="ph-bold ph-trend-up"></i>${state.lang === 'en' ? 'BOOSTED' : 'ÖNE ÇIKAN'}</span>` : ''}
             ${p.isAnonymous ? `
               <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/90 text-slate-950 backdrop-blur-md flex items-center gap-1 shadow-sm">
@@ -2285,7 +2354,7 @@ function renderWtbSquareCard(w) {
     <div data-id="${w.id}" class="project-card glass-card glass-card-hover rounded-3xl p-5 cursor-pointer flex flex-col justify-between space-y-4 border-2 border-indigo-500/30 bg-gradient-to-br from-white via-indigo-50/20 to-white dark:from-[#0D131F] dark:via-indigo-950/20 dark:to-[#0D131F] shadow-sm transition-all duration-300">
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1.5"><span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-indigo-600 text-white flex items-center gap-1 shadow-sm"><i class="ph-bold ph-target"></i> ${dict.wtbBadge}</span>${String(w.ownerId || '').startsWith('seed-') ? `<span class="px-2 py-1 rounded-lg text-[9px] font-black bg-blue-600 text-white">${state.lang === 'en' ? 'SAMPLE' : 'ÖRNEK İLAN'}</span>` : ''}</div>
+          <div class="flex items-center gap-1.5"><span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-indigo-600 text-white flex items-center gap-1 shadow-sm"><i class="ph-bold ph-target"></i> ${dict.wtbBadge}</span></div>
           <span class="px-3 py-1 rounded-xl text-xs font-black bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/40">
             ${formattedBudget}
           </span>
@@ -2339,6 +2408,10 @@ function openProjectDetailModal(p) {
   const safeDesc = escapeHtml(desc);
   const profile = p.seller || p.buyer || {};
   p.views = (p.views || 0) + 1;
+  if (!p.viewRecorded && p.id) {
+    p.viewRecorded = true;
+    SearyaApi.recordListingView(p.id).then(result => { p.views = Number(result.views || p.views); }).catch(() => {});
+  }
   const backdrop = el.modalBackdrop();
   const content = el.modalContent();
   if (!backdrop || !content) return;
@@ -2394,58 +2467,9 @@ function openProjectDetailModal(p) {
           </div>
         </div>
 
-        <!-- STRIPE & GITHUB VERIFIED TRUST BOX -->
-        <div class="${isVerified ? '' : 'hidden'} p-5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-indigo-500/10 border border-emerald-500/30 dark:border-emerald-500/40 space-y-4">
-          
-          <div class="flex items-center justify-between">
-            <span class="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500 text-slate-950 flex items-center gap-1.5 shadow-sm">
-              <i class="ph-bold ph-shield-check text-xs"></i> ${state.lang === 'en' ? '100% VERIFIED DATA' : '%100 DOĞRULANMIŞ VERİLER'}
-            </span>
-            <span class="text-[11px] text-slate-400 font-medium">Stripe & GitHub Entegre</span>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-            <div class="p-3 rounded-xl bg-white/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
-              <span class="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">💳 ${state.lang === 'en' ? 'Stripe Monthly Revenue' : 'Stripe Aylık Gelir'}</span>
-              <strong class="text-sm font-black text-emerald-600 dark:text-emerald-400 block mt-0.5">$${(p.mrr || 0).toLocaleString('en-US')} / ${state.lang === 'en' ? 'mo' : 'ay'}</strong>
-              <span class="text-[9px] text-emerald-600 font-bold">✓ ${state.lang === 'en' ? 'Live Revenue Verified' : 'Canlı Gelir Onaylı'}</span>
-            </div>
-
-            <div class="p-3 rounded-xl bg-white/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
-              <span class="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">🐙 ${state.lang === 'en' ? 'GitHub Repo Health' : 'GitHub Repo Sağlığı'}</span>
-              <strong class="text-sm font-black text-purple-600 dark:text-purple-400 block mt-0.5">450+ Commit</strong>
-              <span class="text-[9px] text-purple-600 font-bold">✓ ${state.lang === 'en' ? 'Repository Verified' : 'Kod Reposu Onaylı'}</span>
-            </div>
-
-            <div class="p-3 rounded-xl bg-white/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1">
-              <span class="text-[10px] text-slate-500 dark:text-slate-400 block font-semibold">🛡️ ${state.lang === 'en' ? 'Escrow Assets' : 'Escrow Varlıkları'}</span>
-              <strong class="text-sm font-black text-indigo-600 dark:text-indigo-400 block mt-0.5">${state.lang === 'en' ? 'Domain & Code' : 'Alan Adı & Kod'}</strong>
-              <span class="text-[9px] text-indigo-600 font-bold">✓ ${state.lang === 'en' ? 'Transfer Ready' : 'Güvenli Devre Hazır'}</span>
-            </div>
-          </div>
-
-          <!-- Monthly Revenue Trend Bar Chart Visualization -->
-          <div class="space-y-1.5 pt-1">
-            <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
-              <span>Son 4 Ay Stripe Gelir Trendi ($)</span>
-              <span class="text-emerald-600 dark:text-emerald-400">+34% Growth</span>
-            </div>
-            <div class="h-10 flex items-end gap-2 p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <div class="flex-1 bg-purple-500/40 hover:bg-purple-500 rounded-md h-[45%] transition-all relative group cursor-pointer" title="Ocak: $1,200">
-                <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$1.2k</span>
-              </div>
-              <div class="flex-1 bg-purple-500/60 hover:bg-purple-500 rounded-md h-[65%] transition-all relative group cursor-pointer" title="February: $1,650">
-                <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$1.65k</span>
-              </div>
-              <div class="flex-1 bg-emerald-500/80 hover:bg-emerald-500 rounded-md h-[80%] transition-all relative group cursor-pointer" title="Mart: $2,100">
-                <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$2.1k</span>
-              </div>
-              <div class="flex-1 bg-emerald-500 hover:bg-emerald-400 rounded-md h-[100%] transition-all relative group cursor-pointer" title="${state.lang === 'en' ? 'Sample trend' : 'Temsili eğilim'}">
-                <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">$2.45k</span>
-              </div>
-            </div>
-          </div>
-
+        <div class="${isVerified ? '' : 'hidden'} p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/30 text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-3">
+          <i class="ph-bold ph-shield-check text-xl text-emerald-600 dark:text-emerald-400 mt-0.5"></i>
+          <div><strong class="block mb-1">Verification review completed</strong><span>Searya reviewed the evidence supplied for this listing. Buyers should still complete their own legal, technical and financial due diligence before payment.</span></div>
         </div>
 
         <div class="${isSale && !isVerified ? '' : 'hidden'} p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
@@ -2754,6 +2778,11 @@ function openShareCardModal(p) {
 // Create Listing Modal
 function openCreateListingModal(editListing = null) {
   if (editListing instanceof Event) editListing = null;
+  if (!state.currentUser) {
+    showToast('Create a free account or log in before posting a listing.');
+    showOnboardingPage('register');
+    return;
+  }
   const dict = t();
   let uploadedImageData = editListing?.coverImage || '';
   const backdrop = el.modalBackdrop();
@@ -3405,6 +3434,7 @@ function renderAuthCard() {
   });
 
   // Form Submit Listener (Enter Key)
+  applyAuthCooldown(document.getElementById('auth-submit-btn'), document.getElementById('auth-form-status'));
   document.getElementById('auth-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!e.currentTarget.checkValidity()) {
@@ -3415,6 +3445,11 @@ function renderAuthCard() {
     const status = document.getElementById('auth-form-status');
     const email = document.getElementById('auth-email')?.value || '';
     const password = document.getElementById('auth-password')?.value || '';
+    const attempt = consumeAuthAttempt();
+    if (!attempt.allowed) {
+      applyAuthCooldown(submitButton, status, attempt);
+      return;
+    }
     if (submitButton) {
       submitButton.disabled = true;
       submitButton.classList.add('opacity-70', 'cursor-wait');
@@ -3447,8 +3482,8 @@ function renderAuthCard() {
       showToast(message);
     } finally {
       if (submitButton) {
-        submitButton.disabled = false;
         submitButton.classList.remove('opacity-70', 'cursor-wait');
+        if (!applyAuthCooldown(submitButton, status)) submitButton.disabled = false;
       }
     }
   });

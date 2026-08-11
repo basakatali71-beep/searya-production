@@ -329,7 +329,7 @@ export const translations = {
     visionPill: "A secure, direct-transfer marketplace for digital products",
     heroTitleLine1: "Where Digital Projects",
     heroTitleLine2: "Find Their Next Founders",
-    heroSubtitle: "Connect abandoned or ready-to-launch SaaS, mobile apps, AI tools & Chrome Extensions with new owners.",
+    heroSubtitle: "Discover and transfer SaaS products, mobile apps, AI tools and Chrome extensions directly between founders.",
     statListingsVal: "Curated",
     statListings: "Project Discovery",
     statDealsVal: "Direct",
@@ -342,13 +342,13 @@ export const translations = {
 
     // Onboarding Full-Screen Page Translations
     obSkipBtn: "Not now, explore listings →",
-    obHeroLine1: "Give Unfinished Projects",
-    obHeroLine2: "A Second Chance",
+    obHeroLine1: "Buy and Sell",
+    obHeroLine2: "Digital Projects",
     obHeroSub: "Acquire or sell SaaS tools, AI apps, Chrome extensions & mobile apps directly from founders. Zero commissions or platform markups.",
     obStat1: "Active Projects",
     obStat2: "Volume Traded",
     obStat3: "Platform Fee",
-    obQuote: "Connect unfinished projects with the right buyer instead of shelving them.",
+    obQuote: "Connect quality digital products with the right buyers and builders.",
     obQuoteAuthor: "— Searya",
     obOrSocial: "or sign up with 1-click",
 
@@ -356,7 +356,7 @@ export const translations = {
     onboardingTitleStep1: "Welcome to Searya! 👋",
     onboardingSubStep1: "What is your primary goal on the platform?",
     roleBuyerTitle: "🟢 Project Buyer",
-    roleBuyerDesc: "I want to acquire abandoned or ready SaaS, AI tools & mobile apps.",
+    roleBuyerDesc: "I want to acquire SaaS products, AI tools and mobile apps.",
     roleSellerTitle: "🟣 Project Seller",
     roleSellerDesc: "I want to list and sell my digital assets & projects.",
     roleBothTitle: "⚡ Both Buyer & Seller",
@@ -378,12 +378,12 @@ export const translations = {
     btnCompleteRegistration: "Complete Signup 🚀",
     
     onboardingSuccessTitle: "Welcome Aboard! 🎉",
-    onboardingSuccessSub: "Unlaunched and promising projects await you on Searya.",
+    onboardingSuccessSub: "Promising digital projects await you on Searya.",
     onboardingGiftNotice: "🎁 10 New Contact Credits Added To Your Account!",
     btnStartExploring: "Start Exploring Projects →",
 
     // Featured 3D Hero Card
-    featuredCardBadge: "Sample Project Preview",
+    featuredCardBadge: "Featured Project",
     featuredCardTitle: "AI Writer Pro",
     featuredCardCategory: "See how a digital project listing is presented on the marketplace.",
     featuredCardRevenue: "Listing Type",
@@ -606,7 +606,7 @@ export const translations = {
     cookieDetails: "View details",
     cookieEssential: "Essential only",
     cookieAccept: "Allow analytics",
-    footerTagline: "An independent marketplace where abandoned digital projects find their next founders.",
+    footerTagline: "An independent marketplace where digital projects meet their next founders.",
     footerRights: "© 2026 Searya. All rights reserved.",
 
     // Toasts

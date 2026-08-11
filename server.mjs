@@ -793,6 +793,29 @@ function seedData() {
   }
 }
 
+function syncSeedContent() {
+  const update = db.prepare(`UPDATE listings SET type=?,title=?,category=?,price_cents=?,content_json=?,is_verified=? WHERE id=? AND user_id LIKE 'seed-%'`);
+  const all = [...initialForSaleListings.filter(item => !item.isAnonymous), ...initialWtbListings.filter(item => !item.isAnonymous)];
+  db.exec('BEGIN');
+  try {
+    for (const item of all) {
+      update.run(
+        item.type === 'wtb' ? 'wtb' : 'sale',
+        item.title,
+        item.category || 'saas',
+        Math.round(Number(item.askingPrice || item.budget || 1) * 100),
+        JSON.stringify(item),
+        item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0,
+        item.id
+      );
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 function bootstrapAdmin() {
   const email = String(process.env.SEARYA_ADMIN_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.SEARYA_ADMIN_PASSWORD || '');
@@ -810,6 +833,7 @@ function bootstrapAdmin() {
 }
 
 seedData();
+syncSeedContent();
 bootstrapAdmin();
 
 async function handleApi(req, res, url) {
@@ -1065,12 +1089,19 @@ async function handleApi(req, res, url) {
   }
 
   const listingMatch = pathname.match(/^\/api\/listings\/([^/]+)$/);
+  const listingViewMatch = pathname.match(/^\/api\/listings\/([^/]+)\/view$/);
+  if (method === 'POST' && listingViewMatch) {
+    const id = decodeURIComponent(listingViewMatch[1]);
+    const row = db.prepare(`SELECT id,views FROM listings WHERE (id=? OR slug=?) AND status='approved'`).get(id, id);
+    if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
+    if (!rateLimited(req, `listing-view:${row.id}`, 1, 10 * 60 * 1000)) db.prepare('UPDATE listings SET views=views+1 WHERE id=?').run(row.id);
+    return json(res, 200, { views: db.prepare('SELECT views FROM listings WHERE id=?').get(row.id).views });
+  }
+
   if (method === 'GET' && listingMatch) {
     const slug = decodeURIComponent(listingMatch[1]);
     const row = db.prepare(`SELECT * FROM listings WHERE (slug=? OR id=?) AND status='approved'`).get(slug, slug);
     if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
-    db.prepare('UPDATE listings SET views=views+1 WHERE id=?').run(row.id);
-    row.views += 1;
     return json(res, 200, { listing: listingFromRow(row) });
   }
 
@@ -1460,8 +1491,16 @@ async function handleApi(req, res, url) {
     else db.prepare(`UPDATE listings SET status='approved',is_verified=?,priority_review=0,updated_at=? WHERE id=?`).run(action === 'verify' ? 1 : 0, nowIso(), id);
     const updatedListing = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     const owner = db.prepare('SELECT email,name FROM users WHERE id=?').get(updatedListing.user_id);
-    if (owner?.email) sendEmail({ to: owner.email, subject: 'Your Searya listing review result', text: `Your ${updatedListing.title} listing was ${action === 'reject' ? 'rejected' : action === 'verify' ? 'verified and published' : 'approved and published'}.`, idempotencyKey: `moderation-${id}-${updatedListing.updated_at}` }).catch(console.error);
-    return json(res, 200, { listing: listingFromRow(updatedListing) });
+    let notificationSent = false;
+    if (owner?.email) {
+      try {
+        const notification = await sendEmail({ to: owner.email, subject: 'Your Searya listing review result', text: `Hi ${owner.name},\n\nYour “${updatedListing.title}” listing was ${action === 'reject' ? 'rejected after review' : action === 'verify' ? 'verified and published' : 'approved and published'}.\n\nYou can review its current status in My Account on Searya.`, idempotencyKey: `moderation-${id}-${updatedListing.updated_at}` });
+        notificationSent = Boolean(notification.configured);
+      } catch (error) {
+        console.error('Moderation email error:', error);
+      }
+    }
+    return json(res, 200, { listing: listingFromRow(updatedListing), notificationSent });
   }
 
   return fail(res, 404, 'API_NOT_FOUND', 'API route not found.');

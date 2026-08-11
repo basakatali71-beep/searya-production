@@ -48,6 +48,7 @@ export const SearyaApi = {
   deleteAccount: data => request('/api/account', { method: 'DELETE', body: data }),
   listings: type => request(`/api/listings${type ? `?type=${encodeURIComponent(type)}` : ''}`),
   listing: slug => request(`/api/listings/${encodeURIComponent(slug)}`),
+  recordListingView: id => request(`/api/listings/${encodeURIComponent(id)}/view`, { method: 'POST' }),
   createListing: data => request('/api/listings', { method: 'POST', body: data }),
   updateListing: (id, data) => request(`/api/listings/${encodeURIComponent(id)}`, { method: 'PATCH', body: data }),
   deleteListing: id => request(`/api/listings/${encodeURIComponent(id)}`, { method: 'DELETE' }),

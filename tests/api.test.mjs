@@ -40,6 +40,25 @@ test('health and seeded listings are available', async () => {
   assert.equal(listings.listings.every(item => item.type === 'sale'), true);
 });
 
+test('anonymous visitors cannot create listings', async () => {
+  const response = await fetch(`${baseUrl}/api/listings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Anonymous listing attempt' })
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, 'AUTH_REQUIRED');
+});
+
+test('listing views are counted once per short client window', async () => {
+  const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
+  const listing = listings.listings[0];
+  const first = await fetch(`${baseUrl}/api/listings/${listing.id}/view`, { method: 'POST', headers: { 'X-Forwarded-For': '203.0.113.45' } }).then(response => response.json());
+  const second = await fetch(`${baseUrl}/api/listings/${listing.id}/view`, { method: 'POST', headers: { 'X-Forwarded-For': '203.0.113.45' } }).then(response => response.json());
+  assert.equal(first.views, listing.views + 1);
+  assert.equal(second.views, first.views);
+});
+
 test('unconfigured social sign-in fails safely instead of showing a dead action', async () => {
   const response = await fetch(`${baseUrl}/api/auth/oauth/google/start?role=both`, { redirect: 'manual' });
   assert.equal(response.status, 302);

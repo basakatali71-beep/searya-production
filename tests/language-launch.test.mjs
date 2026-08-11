@@ -7,6 +7,7 @@ const pageSource = await readFile(new URL('../index.html', import.meta.url), 'ut
 const adminPageSource = await readFile(new URL('../admin.html', import.meta.url), 'utf8');
 const adminSource = await readFile(new URL('../src/admin.js', import.meta.url), 'utf8');
 const apiSource = await readFile(new URL('../src/api.js', import.meta.url), 'utf8');
+const serverSource = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
 const privacySource = await readFile(new URL('../legal/privacy.html', import.meta.url), 'utf8');
 const campaignSource = await readFile(new URL('../marketing/x-seller-launch-en.md', import.meta.url), 'utf8');
 
@@ -52,11 +53,37 @@ test('Social sharing metadata uses an absolute English preview card', () => {
   assert.match(pageSource, /property="og:image:height" content="630"/);
 });
 
-test('English mode translates the remaining launch preview labels', () => {
+test('Featured project preview and listing cards contain no sample labels', () => {
   for (const id of ['t-preview-view-value', 't-preview-data-value', 't-launch-chat-period']) {
     assert.match(pageSource, new RegExp(`id=["']${id}["']`));
   }
   assert.match(appSource, /'t-preview-view-value': isEn \? 'Preview'/);
-  assert.match(appSource, /'t-preview-data-value': isEn \? 'Sample'/);
+  assert.match(appSource, /'t-preview-data-value': 'Live'/);
   assert.match(appSource, /'t-launch-chat-period': isEn \? 'during launch'/);
+  assert.doesNotMatch(pageSource, /sample/i);
+  assert.doesNotMatch(appSource, />SAMPLE</);
+  assert.match(pageSource, /Launch showcase profiles illustrate the listing experience/);
+});
+
+test('Listing creation requires a signed-in user before rendering the form', () => {
+  assert.match(appSource, /function openCreateListingModal[\s\S]*if \(!state\.currentUser\)[\s\S]*showOnboardingPage\('register'\);[\s\S]*return;/);
+});
+
+test('Authentication submissions are limited to five attempts per minute', () => {
+  assert.match(appSource, /const AUTH_ATTEMPT_LIMIT = 5;/);
+  assert.match(appSource, /const AUTH_ATTEMPT_WINDOW_MS = 60_000;/);
+  assert.match(appSource, /Too many attempts\. Please wait/);
+});
+
+test('Listing sorting uses timestamps, prices and view counts', () => {
+  assert.match(appSource, /listingCreatedAt\(b\) - listingCreatedAt\(a\)/);
+  assert.match(appSource, /state\.sortBy === 'price-low'/);
+  assert.match(appSource, /state\.sortBy === 'price-high'/);
+  assert.match(appSource, /state\.sortBy === 'popular'/);
+});
+
+test('Moderation approval and rejection notify the listing owner by email', () => {
+  assert.match(serverSource, /subject: 'Your Searya listing review result'/);
+  assert.match(serverSource, /action === 'reject' \? 'rejected after review' : action === 'verify' \? 'verified and published' : 'approved and published'/);
+  assert.match(serverSource, /notificationSent = Boolean\(notification\.configured\)/);
 });
