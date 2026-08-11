@@ -254,9 +254,9 @@ for (const [column, definition] of [
 }
 
 const packages = Object.freeze({
-  buyer_connections_10: { key: 'buyer_connections_10', name: '10 Bağlantı Paketi', amountCents: 900, buyerConnections: 10 },
-  seller_listings_3: { key: 'seller_listings_3', name: '3 İlan Paketi', amountCents: 900, sellerListingCredits: 3 },
-  seller_vip_10: { key: 'seller_vip_10', name: 'Satıcı Pro Lansman Paketi', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 }
+  buyer_connections_10: { key: 'buyer_connections_10', name: '10 Buyer Connections', amountCents: 900, buyerConnections: 10 },
+  seller_listings_3: { key: 'seller_listings_3', name: '3 Seller Listings', amountCents: 900, sellerListingCredits: 3 },
+  seller_vip_10: { key: 'seller_vip_10', name: 'Seller Pro Launch Pack', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 }
 });
 
 const polarProductEnvironments = Object.freeze({
@@ -452,7 +452,7 @@ async function readBody(req, maxBytes = MAX_JSON_BYTES) {
   let total = 0;
   for await (const chunk of req) {
     total += chunk.length;
-    if (total > maxBytes) throw Object.assign(new Error('İstek çok büyük.'), { status: 413 });
+    if (total > maxBytes) throw Object.assign(new Error('Request is too large.'), { status: 413 });
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
@@ -461,7 +461,7 @@ async function readBody(req, maxBytes = MAX_JSON_BYTES) {
 async function readJson(req) {
   const raw = await readBody(req);
   if (!raw.length) return {};
-  try { return JSON.parse(raw.toString('utf8')); } catch { throw Object.assign(new Error('Geçersiz JSON.'), { status: 400 }); }
+  try { return JSON.parse(raw.toString('utf8')); } catch { throw Object.assign(new Error('Invalid JSON.'), { status: 400 }); }
 }
 
 async function readForm(req) {
@@ -471,8 +471,8 @@ async function readForm(req) {
 
 function requireUser(req, res, admin = false) {
   const user = getUser(req);
-  if (!user) { fail(res, 401, 'AUTH_REQUIRED', 'Bu işlem için giriş yapmalısınız.'); return null; }
-  if (admin && !user.is_admin) { fail(res, 403, 'ADMIN_REQUIRED', 'Bu işlem için yönetici yetkisi gerekir.'); return null; }
+  if (!user) { fail(res, 401, 'AUTH_REQUIRED', 'You must sign in to continue.'); return null; }
+  if (admin && !user.is_admin) { fail(res, 403, 'ADMIN_REQUIRED', 'Administrator access is required.'); return null; }
   return user;
 }
 
@@ -488,7 +488,7 @@ function listingFromRow(row) {
     category: row.category,
     askingPrice: row.price_cents / 100,
     budget: row.price_cents / 100,
-    status: row.status === 'approved' ? (row.is_verified ? 'Doğrulanmış' : 'Aktif') : row.status,
+    status: row.status === 'approved' ? (row.is_verified ? 'Verified' : 'Active') : row.status,
     statusEn: row.status === 'approved' ? (row.is_verified ? 'Verified' : 'Active') : row.status,
     isVerified: Boolean(row.is_verified),
     priorityReview: Boolean(row.priority_review),
@@ -515,8 +515,8 @@ function mapListingInput(body, user) {
   const description = cleanText(body.description, 2000);
   const techStack = Array.isArray(body.techStack) ? body.techStack.map(item => cleanText(item, 40)).filter(Boolean).slice(0, 8) : [];
   const coverImage = type === 'sale' ? safeImageData(body.coverImage) : '';
-  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || description.length < 20 || !techStack.length) throw Object.assign(new Error('İlan alanlarını eksiksiz ve doğru doldurun.'), { status: 422 });
-  if (type === 'sale' && !coverImage) throw Object.assign(new Error('Gerçek bir proje görseli ekleyin.'), { status: 422 });
+  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || description.length < 20 || !techStack.length) throw Object.assign(new Error('Complete all listing fields with valid information.'), { status: 422 });
+  if (type === 'sale' && !coverImage) throw Object.assign(new Error('Add a real image of your project.'), { status: 422 });
   const seller = { name: user.name, handle: `@${slugify(user.name).replaceAll('-', '_')}`, avatar: '', githubVerified: Boolean(user.is_verified) };
   return { title, type, category, price, content: { titleEn: title, categoryEn: category.toUpperCase(), shortDesc: description, shortDescEn: description, description, descriptionEn: description, fullDesc: description, fullDescEn: description, coverImage, techStack, techPreference: techStack.join(', '), seller, buyer: { name: user.name, avatar: '' }, mrr: 0, isAnonymous: false } };
 }
@@ -551,7 +551,7 @@ async function sendEmail({ to, subject, text, idempotencyKey }) {
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey || randomUUID() },
     body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [to], subject, text })
   });
-  if (!response.ok) throw new Error(`E-posta sağlayıcısı ${response.status} döndürdü.`);
+  if (!response.ok) throw new Error(`Email provider returned status ${response.status}.`);
   return { configured: true, data: await response.json() };
 }
 
@@ -561,7 +561,7 @@ async function sendVerificationEmail(user) {
   db.prepare('DELETE FROM email_verifications WHERE user_id=? AND used_at IS NULL').run(user.id);
   db.prepare('INSERT INTO email_verifications(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(verificationToken), user.id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), createdAt);
   const verifyUrl = `${APP_ORIGIN}/?verify_token=${encodeURIComponent(verificationToken)}`;
-  await sendEmail({ to: user.email, subject: 'Searya e-posta doğrulama', text: `Merhaba ${user.name}, e-posta adresinizi 24 saat içinde doğrulayın: ${verifyUrl}`, idempotencyKey: `verify-${user.id}-${sha256(verificationToken).slice(0, 16)}` });
+  await sendEmail({ to: user.email, subject: 'Verify your Searya email', text: `Hi ${user.name}, verify your email address within 24 hours: ${verifyUrl}`, idempotencyKey: `verify-${user.id}-${sha256(verificationToken).slice(0, 16)}` });
 }
 
 function socialAuthConfigured(provider) {
@@ -573,13 +573,13 @@ function oauthRedirectUri(provider) {
   return `${APP_ORIGIN}/api/auth/oauth/${provider}/callback`;
 }
 
-function oauthErrorRedirect(provider, reason = 'Giriş işlemi tamamlanamadı.') {
+function oauthErrorRedirect(provider, reason = 'Sign-in could not be completed.') {
   const params = new URLSearchParams({ oauth: 'error', provider, reason });
   return `${APP_ORIGIN}/?${params}`;
 }
 
 function beginOauth(req, res, url, provider) {
-  if (!socialAuthConfigured(provider)) return redirect(res, oauthErrorRedirect(provider, 'Google ile giriş henüz yapılandırılmadı.'));
+  if (!socialAuthConfigured(provider)) return redirect(res, oauthErrorRedirect(provider, 'Google sign-in has not been configured yet.'));
   const role = ['buyer', 'seller', 'both'].includes(url.searchParams.get('role')) ? url.searchParams.get('role') : 'buyer';
   const state = randomBytes(32).toString('base64url');
   const nonce = randomBytes(24).toString('base64url');
@@ -603,25 +603,25 @@ function beginOauth(req, res, url, provider) {
 
 function consumeOauthState(req, provider, state) {
   const cookieState = String(parseCookies(req)[OAUTH_COOKIE] || '');
-  if (!state || !cookieState || state.length !== cookieState.length || !timingSafeEqual(Buffer.from(state), Buffer.from(cookieState))) throw new Error('Giriş oturumu geçersiz veya süresi dolmuş.');
+  if (!state || !cookieState || state.length !== cookieState.length || !timingSafeEqual(Buffer.from(state), Buffer.from(cookieState))) throw new Error('The sign-in session is invalid or has expired.');
   const row = db.prepare('SELECT * FROM oauth_states WHERE state_hash=? AND provider=? AND expires_at>?').get(sha256(state), provider, nowIso());
   db.prepare('DELETE FROM oauth_states WHERE state_hash=?').run(sha256(state));
-  if (!row) throw new Error('Giriş oturumu geçersiz veya süresi dolmuş.');
+  if (!row) throw new Error('The sign-in session is invalid or has expired.');
   return row;
 }
 
 function socialUserSession({ email, name, role }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('Sağlayıcıdan geçerli e-posta alınamadı.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('A valid email address was not received from the provider.');
   let user = db.prepare('SELECT * FROM users WHERE email=?').get(normalizedEmail);
-  if (user && user.status !== 'active') throw new Error('Bu hesap kullanıma kapalı.');
+  if (user && user.status !== 'active') throw new Error('This account has been disabled.');
   const created = !user;
   if (!user) {
     const id = randomUUID();
     const createdAt = nowIso();
     db.prepare(`INSERT INTO users(id,email,password_hash,name,role,status,is_admin,email_verified,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at) VALUES(?,?,NULL,?,?, 'active',0,1,0,2,1,0,0,?,?)`).run(id, normalizedEmail, cleanText(name || normalizedEmail.split('@')[0], 80), role, createdAt, createdAt);
     user = db.prepare('SELECT * FROM users WHERE id=?').get(id);
-    sendEmail({ to: normalizedEmail, subject: 'Searya hesabınız hazır', text: `Merhaba ${user.name}, Searya hesabınız sosyal giriş ile oluşturuldu.`, idempotencyKey: `social-welcome-${id}` }).catch(console.error);
+    sendEmail({ to: normalizedEmail, subject: 'Your Searya account is ready', text: `Hi ${user.name}, your Searya account was created with social sign-in.`, idempotencyKey: `social-welcome-${id}` }).catch(console.error);
   } else if (!user.email_verified) {
     db.prepare('UPDATE users SET email_verified=1,last_seen_at=? WHERE id=?').run(nowIso(), user.id);
     user = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
@@ -632,25 +632,25 @@ function socialUserSession({ email, name, role }) {
 async function completeOauth(req, res, url, provider) {
   try {
     const input = req.method === 'POST' ? await readForm(req) : Object.fromEntries(url.searchParams);
-    if (input.error) throw new Error('Giriş işlemi kullanıcı tarafından iptal edildi.');
+    if (input.error) throw new Error('Sign-in was cancelled.');
     const oauthState = consumeOauthState(req, provider, String(input.state || ''));
-    if (!input.code) throw new Error('Yetkilendirme kodu alınamadı.');
+    if (!input.code) throw new Error('Authorization code was not received.');
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code: input.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: oauthRedirectUri('google'), grant_type: 'authorization_code', code_verifier: oauthState.code_verifier })
     });
     const tokens = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Google oturumu doğrulanamadı.');
+    if (!tokenResponse.ok || !tokens.access_token) throw new Error('Google sign-in could not be verified.');
     const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokens.access_token}` } });
     const profile = await profileResponse.json();
-    if (!profileResponse.ok || profile.email_verified !== true) throw new Error('Google e-posta adresi doğrulanamadı.');
+    if (!profileResponse.ok || profile.email_verified !== true) throw new Error('The Google email address could not be verified.');
     const identity = { email: profile.email, name: profile.name };
     const session = socialUserSession({ ...identity, role: oauthState.role });
     if (session.created) recordAnalyticsEvent(req, 'signup_completed', { method: provider, role: oauthState.role });
     return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [sessionCookie(session.token), oauthCookie('', true)]);
   } catch (error) {
-    return redirect(res, oauthErrorRedirect(provider, error.message || 'Giriş işlemi tamamlanamadı.'), [oauthCookie('', true)]);
+    return redirect(res, oauthErrorRedirect(provider, error.message || 'Sign-in could not be completed.'), [oauthCookie('', true)]);
   }
 }
 
@@ -667,7 +667,7 @@ async function sendDueProjectAlerts() {
     if (matches.length) {
       const lines = matches.map(item => `• ${item.title} — $${(item.price_cents / 100).toLocaleString('en-US')}\n  ${APP_ORIGIN}/?listing=${encodeURIComponent(item.slug)}`).join('\n');
       try {
-        await sendEmail({ to: alert.email, subject: `Searya’da ${matches.length} yeni proje eşleşmesi`, text: `Merhaba ${alert.name},\n\nProje alarmınıza uyan yeni ilanlar:\n\n${lines}\n\nAlarmınızı Searya hesabınızdan yönetebilirsiniz.`, idempotencyKey: `alert-${alert.id}-${sha256(lastSentAt).slice(0, 16)}` });
+        await sendEmail({ to: alert.email, subject: `${matches.length} new project matches on Searya`, text: `Hi ${alert.name},\n\nNew listings match your project alert:\n\n${lines}\n\nYou can manage this alert from your Searya account.`, idempotencyKey: `alert-${alert.id}-${sha256(lastSentAt).slice(0, 16)}` });
       } catch (error) {
         console.error('Project alert email error:', error?.message || error);
         continue;
@@ -681,7 +681,7 @@ async function createDatabaseBackup() {
   mkdirSync(BACKUP_DIR, { recursive: true });
   const stamp = nowIso().replace(/[:.]/g, '-');
   const destination = resolve(BACKUP_DIR, `searya-${stamp}.sqlite`);
-  if (!destination.startsWith(`${BACKUP_DIR}/`)) throw new Error('Geçersiz yedekleme yolu.');
+  if (!destination.startsWith(`${BACKUP_DIR}/`)) throw new Error('Invalid backup path.');
   await backup(db, destination);
   const backups = readdirSync(BACKUP_DIR).filter(name => /^searya-.*\.sqlite$/.test(name)).sort().reverse();
   for (const filename of backups.slice(7)) {
@@ -718,7 +718,7 @@ function polarServer() {
 function polarErrorDiagnostic(error) {
   const statusCode = Number(error?.statusCode || error?.rawResponse?.status || 0) || null;
   const rawBody = typeof error?.body === 'string' ? error.body : '';
-  let detail = cleanText(error?.message || 'Polar isteği başarısız oldu.', 600);
+  let detail = cleanText(error?.message || 'Polar request failed.', 600);
   if (rawBody) {
     try {
       const parsed = JSON.parse(rawBody);
@@ -732,12 +732,12 @@ function polarErrorDiagnostic(error) {
 
 function polarCheckoutErrorMessage(error) {
   const diagnostic = polarErrorDiagnostic(error);
-  if (diagnostic.statusCode === 401) return 'Polar erişim anahtarı geçersiz veya yanlış ortama ait. Lütfen ödeme ayarlarını kontrol edin.';
-  if (diagnostic.statusCode === 403) return 'Polar anahtarında ödeme oturumu oluşturma yetkisi bulunmuyor.';
-  if (diagnostic.statusCode === 404) return 'Seçilen paket Polar ortamında bulunamadı. Ürün kimliğini kontrol edin.';
-  if (diagnostic.type === 'OrganizationNotReadyForPayments') return 'Polar hesabı henüz ödeme almaya hazır değil.';
-  if (diagnostic.statusCode === 422) return 'Polar paket ayarlarını doğrulayamadı. Ürün ve fiyat bilgilerini kontrol edin.';
-  return 'Ödeme oturumu oluşturulamadı. Lütfen tekrar deneyin.';
+  if (diagnostic.statusCode === 401) return 'The Polar access token is invalid or belongs to a different environment. Check the payment settings.';
+  if (diagnostic.statusCode === 403) return 'The Polar token does not have permission to create a checkout session.';
+  if (diagnostic.statusCode === 404) return 'The selected plan was not found in Polar. Check the product ID.';
+  if (diagnostic.type === 'OrganizationNotReadyForPayments') return 'The Polar account is not ready to accept payments yet.';
+  if (diagnostic.statusCode === 422) return 'Polar could not validate the plan settings. Check the product and price details.';
+  return 'The checkout session could not be created. Please try again.';
 }
 
 function fulfillPolarOrder(order) {
@@ -776,7 +776,7 @@ function seedData() {
   db.exec('BEGIN');
   try {
     for (const item of all) {
-      const person = item.seller || item.buyer || { name: 'Searya Kullanıcısı' };
+      const person = item.seller || item.buyer || { name: 'Searya User' };
       const userId = `seed-${slugify(person.name)}`;
       const createdAt = new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
       insertUser.run(userId, null, null, person.name, item.type === 'wtb' ? 'buyer' : 'seller', person.githubVerified ? 1 : 0, createdAt, createdAt);
@@ -821,7 +821,7 @@ async function handleApi(req, res, url) {
     const origin = req.headers.origin;
     const requestHost = String(req.headers.host || '');
     const sameHostOrigins = new Set([APP_ORIGIN, `http://${requestHost}`, `https://${requestHost}`]);
-    if (origin && !sameHostOrigins.has(origin)) return fail(res, 403, 'BAD_ORIGIN', 'İstek kaynağı doğrulanamadı.');
+    if (origin && !sameHostOrigins.has(origin)) return fail(res, 403, 'BAD_ORIGIN', 'The request origin could not be verified.');
   }
 
   if (method === 'GET' && pathname === '/api/health') {
@@ -846,7 +846,7 @@ async function handleApi(req, res, url) {
     if (!visitorId) return json(res, 202, { ok: true, tracked: false });
     const body = await readJson(req);
     const sessionId = String(body.sessionId || '');
-    if (!/^[a-f0-9-]{20,50}$/i.test(sessionId)) return fail(res, 422, 'INVALID_PRESENCE_SESSION', 'Ziyaret oturumu doğrulanamadı.');
+    if (!/^[a-f0-9-]{20,50}$/i.test(sessionId)) return fail(res, 422, 'INVALID_PRESENCE_SESSION', 'The visitor session could not be verified.');
     const action = ['enter', 'heartbeat', 'leave'].includes(body.action) ? body.action : 'heartbeat';
     const path = cleanText(body.path || '/', 500);
     const now = nowIso();
@@ -872,13 +872,13 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/polar/webhook') {
-    if (!process.env.POLAR_WEBHOOK_SECRET) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Ödeme webhook anahtarı yapılandırılmadı.');
+    if (!process.env.POLAR_WEBHOOK_SECRET) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'The payment webhook secret is not configured.');
     const raw = await readBody(req, 2 * 1024 * 1024);
     let event;
     try {
       event = validateEvent(raw, req.headers, process.env.POLAR_WEBHOOK_SECRET);
     } catch (error) {
-      if (error instanceof WebhookVerificationError) return fail(res, 403, 'INVALID_SIGNATURE', 'Webhook imzası geçersiz.');
+      if (error instanceof WebhookVerificationError) return fail(res, 403, 'INVALID_SIGNATURE', 'The webhook signature is invalid.');
       throw error;
     }
     if (event.type === 'order.paid') {
@@ -888,22 +888,22 @@ async function handleApi(req, res, url) {
       } else if (result.granted) {
         const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(result.userId);
         const pack = packages[result.packageKey];
-        if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya paketiniz aktifleştirildi', text: `${pack.name} hesabınıza tanımlandı.`, idempotencyKey: `purchase-${result.purchaseId}` }).catch(console.error);
+        if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Your Searya plan is active', text: `${pack.name} has been added to your account.`, idempotencyKey: `purchase-${result.purchaseId}` }).catch(console.error);
       }
     }
     return json(res, 202, { received: true });
   }
 
   if (method === 'POST' && pathname === '/api/auth/register') {
-    if (rateLimited(req, 'register', 8, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Çok fazla kayıt denemesi.');
-    if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'Kayıt e-postası servisi yapılandırılmadı.');
+    if (rateLimited(req, 'register', 8, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many registration attempts. Please try again later.');
+    if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'The registration email service is not configured.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     const name = cleanText(body.name, 80);
     const role = ['buyer', 'seller', 'both'].includes(body.role) ? body.role : 'buyer';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || name.length < 2) return fail(res, 422, 'INVALID_INPUT', 'Ad, geçerli e-posta ve en az 8 karakterli şifre gereklidir.');
-    if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) return fail(res, 409, 'EMAIL_EXISTS', 'Bu e-posta ile kayıtlı bir hesap var.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || name.length < 2) return fail(res, 422, 'INVALID_INPUT', 'A name, valid email and password of at least 8 characters are required.');
+    if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) return fail(res, 409, 'EMAIL_EXISTS', 'An account already exists with this email address.');
     const id = randomUUID();
     const now = nowIso();
     const verificationRequired = NODE_ENV === 'production';
@@ -921,17 +921,17 @@ async function handleApi(req, res, url) {
     }
     const token = createSession(id);
     recordAnalyticsEvent(req, 'signup_completed', { method: 'email', role });
-    sendEmail({ to: email, subject: 'Searya hesabınız hazır', text: `Merhaba ${name}, Searya hesabınız oluşturuldu.`, idempotencyKey: `welcome-${id}` }).catch(console.error);
+    sendEmail({ to: email, subject: 'Your Searya account is ready', text: `Hi ${name}, your Searya account has been created.`, idempotencyKey: `welcome-${id}` }).catch(console.error);
     return json(res, 201, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)), verificationRequired: false }, { 'Set-Cookie': sessionCookie(token) });
   }
 
   if (method === 'POST' && pathname === '/api/auth/login') {
-    if (rateLimited(req, 'login', 20, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Çok fazla giriş denemesi.');
+    if (rateLimited(req, 'login', 20, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
-    if (!user || !verifyPassword(body.password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'E-posta veya şifre hatalı.');
-    if (!user.email_verified) return fail(res, 403, 'EMAIL_NOT_VERIFIED', 'Giriş yapmadan önce e-posta adresinizi doğrulayın.');
+    if (!user || !verifyPassword(body.password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
+    if (!user.email_verified) return fail(res, 403, 'EMAIL_NOT_VERIFIED', 'Verify your email address before signing in.');
     const token = createSession(user.id);
     return json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(token) });
   }
@@ -957,8 +957,8 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const currentPassword = String(body.currentPassword || '');
     const newPassword = String(body.newPassword || '');
-    if (!verifyPassword(currentPassword, user.password_hash)) return fail(res, 422, 'INVALID_PASSWORD', 'Mevcut şifre hatalı.');
-    if (newPassword.length < 8) return fail(res, 422, 'WEAK_PASSWORD', 'Yeni şifre en az 8 karakter olmalıdır.');
+    if (!verifyPassword(currentPassword, user.password_hash)) return fail(res, 422, 'INVALID_PASSWORD', 'The current password is incorrect.');
+    if (newPassword.length < 8) return fail(res, 422, 'WEAK_PASSWORD', 'The new password must be at least 8 characters.');
     db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(newPassword), user.id);
     const currentTokenHash = sha256(parseCookies(req)[SESSION_COOKIE] || '');
     db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(user.id, currentTokenHash);
@@ -977,8 +977,8 @@ async function handleApi(req, res, url) {
   if (method === 'DELETE' && pathname === '/api/account') {
     const user = requireUser(req, res); if (!user) return;
     const body = await readJson(req);
-    if (user.is_admin) return fail(res, 422, 'ADMIN_ACCOUNT', 'Birincil yönetici hesabı bu ekrandan silinemez.');
-    if (!verifyPassword(String(body.password || ''), user.password_hash) || body.confirmation !== 'HESABIMI SİL') return fail(res, 422, 'INVALID_CONFIRMATION', 'Şifre veya silme onayı hatalı.');
+    if (user.is_admin) return fail(res, 422, 'ADMIN_ACCOUNT', 'The primary administrator account cannot be deleted here.');
+    if (!verifyPassword(String(body.password || ''), user.password_hash) || !['DELETE MY ACCOUNT', 'HESABIMI SİL'].includes(body.confirmation)) return fail(res, 422, 'INVALID_CONFIRMATION', 'The password or deletion confirmation is incorrect.');
     db.exec('BEGIN');
     try {
       db.prepare(`DELETE FROM reports WHERE target_type='user' AND target_id=?`).run(user.id);
@@ -990,7 +990,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/auth/forgot-password') {
-    if (rateLimited(req, 'forgot', 6, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Bir süre sonra yeniden deneyin.');
+    if (rateLimited(req, 'forgot', 6, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
@@ -1000,20 +1000,20 @@ async function handleApi(req, res, url) {
       const createdAt = nowIso();
       db.prepare('INSERT INTO password_resets(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(sha256(token), user.id, new Date(Date.now() + 30 * 60 * 1000).toISOString(), createdAt);
       const resetUrl = `${APP_ORIGIN}/?reset_token=${encodeURIComponent(token)}`;
-      const mail = await sendEmail({ to: email, subject: 'Searya şifre sıfırlama', text: `Şifrenizi 30 dakika içinde sıfırlayın: ${resetUrl}`, idempotencyKey: `reset-${sha256(token).slice(0, 24)}` }).catch(() => ({ configured: false }));
+      const mail = await sendEmail({ to: email, subject: 'Reset your Searya password', text: `Reset your password within 30 minutes: ${resetUrl}`, idempotencyKey: `reset-${sha256(token).slice(0, 24)}` }).catch(() => ({ configured: false }));
       if (!mail.configured && NODE_ENV !== 'production') previewToken = token;
     }
-    return json(res, 200, { ok: true, message: 'Hesap varsa sıfırlama talimatı gönderildi.', ...(previewToken ? { previewToken } : {}) });
+    return json(res, 200, { ok: true, message: 'If the account exists, reset instructions have been sent.', ...(previewToken ? { previewToken } : {}) });
   }
 
   if (method === 'POST' && pathname === '/api/auth/resend-verification') {
-    if (rateLimited(req, 'resend-verification', 5, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Bir süre sonra yeniden deneyin.');
-    if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'E-posta servisi yapılandırılmadı.');
+    if (rateLimited(req, 'resend-verification', 5, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
+    if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'The email service is not configured.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const user = db.prepare(`SELECT id,email,name,email_verified FROM users WHERE email=? AND status='active'`).get(email);
     if (user && !user.email_verified) await sendVerificationEmail(user);
-    return json(res, 200, { ok: true, message: 'Hesap doğrulanmamışsa yeni bağlantı gönderildi.' });
+    return json(res, 200, { ok: true, message: 'If the account is unverified, a new link has been sent.' });
   }
 
   if (method === 'POST' && pathname === '/api/auth/reset-password') {
@@ -1021,7 +1021,7 @@ async function handleApi(req, res, url) {
     const password = String(body.password || '');
     const tokenHash = sha256(String(body.token || ''));
     const reset = db.prepare('SELECT * FROM password_resets WHERE token_hash=? AND expires_at>? AND used_at IS NULL').get(tokenHash, nowIso());
-    if (!reset || password.length < 8) return fail(res, 422, 'INVALID_RESET', 'Bağlantı geçersiz veya süresi dolmuş.');
+    if (!reset || password.length < 8) return fail(res, 422, 'INVALID_RESET', 'The link is invalid or has expired.');
     db.exec('BEGIN');
     try {
       db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(password), reset.user_id);
@@ -1036,7 +1036,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const tokenHash = sha256(String(body.token || ''));
     const verification = db.prepare('SELECT * FROM email_verifications WHERE token_hash=? AND expires_at>? AND used_at IS NULL').get(tokenHash, nowIso());
-    if (!verification) return fail(res, 422, 'INVALID_VERIFICATION', 'Doğrulama bağlantısı geçersiz veya süresi dolmuş.');
+    if (!verification) return fail(res, 422, 'INVALID_VERIFICATION', 'The verification link is invalid or has expired.');
     db.exec('BEGIN');
     try {
       db.prepare('UPDATE users SET email_verified=1 WHERE id=?').run(verification.user_id);
@@ -1065,7 +1065,7 @@ async function handleApi(req, res, url) {
   if (method === 'GET' && listingMatch) {
     const slug = decodeURIComponent(listingMatch[1]);
     const row = db.prepare(`SELECT * FROM listings WHERE (slug=? OR id=?) AND status='approved'`).get(slug, slug);
-    if (!row) return fail(res, 404, 'NOT_FOUND', 'İlan bulunamadı.');
+    if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
     db.prepare('UPDATE listings SET views=views+1 WHERE id=?').run(row.id);
     row.views += 1;
     return json(res, 200, { listing: listingFromRow(row) });
@@ -1073,7 +1073,7 @@ async function handleApi(req, res, url) {
 
   if (method === 'POST' && pathname === '/api/listings') {
     const user = requireUser(req, res); if (!user) return;
-    if (rateLimited(req, `listing:${user.id}`, 10, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Saatlik ilan sınırına ulaştınız.');
+    if (rateLimited(req, `listing:${user.id}`, 10, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'You have reached the hourly listing limit.');
     const input = mapListingInput(await readJson(req), user);
     const priorityReview = 0;
     const id = randomUUID();
@@ -1083,12 +1083,12 @@ async function handleApi(req, res, url) {
     try {
       if (LAUNCH_FREE_MODE && !user.is_admin) {
         const activeListingCount = Number(db.prepare("SELECT COUNT(*) AS count FROM listings WHERE user_id=? AND status IN ('pending','approved')").get(user.id)?.count || 0);
-        if (activeListingCount >= LAUNCH_FREE_LISTING_LIMIT) throw Object.assign(new Error(`Ücretsiz lansman döneminde en fazla ${LAUNCH_FREE_LISTING_LIMIT} aktif ilan yayınlayabilirsiniz.`), { status: 422, code: 'FREE_LAUNCH_LISTING_LIMIT' });
+        if (activeListingCount >= LAUNCH_FREE_LISTING_LIMIT) throw Object.assign(new Error(`You can publish up to ${LAUNCH_FREE_LISTING_LIMIT} active listings during the free launch.`), { status: 422, code: 'FREE_LAUNCH_LISTING_LIMIT' });
       } else if (input.type === 'sale') {
         const freeCredit = db.prepare('UPDATE users SET seller_free_listings=seller_free_listings-1 WHERE id=? AND seller_free_listings>0').run(user.id);
         if (!freeCredit.changes) {
           const paidCredit = db.prepare('UPDATE users SET seller_listing_credits=seller_listing_credits-1 WHERE id=? AND seller_listing_credits>0').run(user.id);
-          if (!paidCredit.changes) throw Object.assign(new Error('Yeni bir satıcı ilan paketi gereklidir.'), { status: 402, code: 'LISTING_CREDIT_REQUIRED' });
+          if (!paidCredit.changes) throw Object.assign(new Error('A new seller listing pack is required.'), { status: 402, code: 'LISTING_CREDIT_REQUIRED' });
         }
       }
       db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,0,?,0,?,?)`).run(id, user.id, input.type, input.title, uniqueSlug(input.title), input.category, Math.round(input.price * 100), JSON.stringify(input.content), status, priorityReview, createdAt, createdAt);
@@ -1101,7 +1101,7 @@ async function handleApi(req, res, url) {
     }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     recordAnalyticsEvent(req, 'listing_created', { type: input.type });
-    if (user.email) sendEmail({ to: user.email, subject: 'Searya ilanınız alındı', text: `${input.title} ilanınız ${status === 'pending' ? 'güvenlik incelemesine alındı' : 'yayınlandı'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
+    if (user.email) sendEmail({ to: user.email, subject: 'We received your Searya listing', text: `Your ${input.title} listing ${status === 'pending' ? 'is under security review' : 'has been published'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
     return json(res, 201, { listing: listingFromRow(row), moderation: status === 'pending' ? 'pending' : 'approved', user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
 
@@ -1110,14 +1110,14 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res); if (!user) return;
     const id = decodeURIComponent(listingAddonMatch[1]);
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
-    if (!row) return fail(res, 404, 'NOT_FOUND', 'İlan bulunamadı.');
-    if (row.user_id !== user.id && !user.is_admin) return fail(res, 403, 'FORBIDDEN', 'Bu ilana hak uygulayamazsınız.');
-    if (row.type !== 'sale') return fail(res, 422, 'SALE_LISTING_REQUIRED', 'Bu hak yalnızca satılık proje ilanlarında kullanılabilir.');
+    if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
+    if (row.user_id !== user.id && !user.is_admin) return fail(res, 403, 'FORBIDDEN', 'You cannot apply this credit to the listing.');
+    if (row.type !== 'sale') return fail(res, 422, 'SALE_LISTING_REQUIRED', 'This credit can only be used on projects for sale.');
     const body = await readJson(req);
     if (body.addon === 'verification') {
-      if (row.is_verified) return fail(res, 422, 'ALREADY_VERIFIED', 'Bu ilan zaten doğrulanmış.');
+      if (row.is_verified) return fail(res, 422, 'ALREADY_VERIFIED', 'This listing is already verified.');
       const freshUser = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
-      if (freshUser.seller_vip_credits <= 0) return fail(res, 402, 'VERIFICATION_CREDIT_REQUIRED', 'Doğrulama inceleme hakkınız bulunmuyor.');
+      if (freshUser.seller_vip_credits <= 0) return fail(res, 402, 'VERIFICATION_CREDIT_REQUIRED', 'You do not have a verification review credit.');
       db.exec('BEGIN');
       try {
         db.prepare('UPDATE users SET seller_vip_credits=seller_vip_credits-1 WHERE id=?').run(user.id);
@@ -1125,9 +1125,9 @@ async function handleApi(req, res, url) {
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
     } else if (body.addon === 'boost') {
-      if (row.status !== 'approved') return fail(res, 422, 'APPROVED_LISTING_REQUIRED', 'Yalnızca yayındaki ilanlar öne çıkarılabilir.');
+      if (row.status !== 'approved') return fail(res, 422, 'APPROVED_LISTING_REQUIRED', 'Only published listings can be boosted.');
       const freshUser = db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
-      if (freshUser.boost_credits <= 0) return fail(res, 402, 'BOOST_CREDIT_REQUIRED', 'Öne çıkarma hakkınız bulunmuyor.');
+      if (freshUser.boost_credits <= 0) return fail(res, 402, 'BOOST_CREDIT_REQUIRED', 'You do not have a listing boost credit.');
       const currentEnd = row.boosted_until && new Date(row.boosted_until).getTime() > Date.now() ? new Date(row.boosted_until).getTime() : Date.now();
       const boostedUntil = new Date(currentEnd + 7 * 24 * 60 * 60 * 1000).toISOString();
       db.exec('BEGIN');
@@ -1136,7 +1136,7 @@ async function handleApi(req, res, url) {
         db.prepare('UPDATE listings SET boosted_until=?,updated_at=? WHERE id=?').run(boostedUntil, nowIso(), id);
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
-    } else return fail(res, 422, 'INVALID_ADDON', 'Geçersiz ilan hakkı.');
+    } else return fail(res, 422, 'INVALID_ADDON', 'Invalid listing credit.');
     return json(res, 200, {
       listing: listingFromRow(db.prepare('SELECT * FROM listings WHERE id=?').get(id)),
       user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))
@@ -1147,8 +1147,8 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res); if (!user) return;
     const id = decodeURIComponent(listingMatch[1]);
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
-    if (!row) return fail(res, 404, 'NOT_FOUND', 'İlan bulunamadı.');
-    if (row.user_id !== user.id && !user.is_admin) return fail(res, 403, 'FORBIDDEN', 'Bu ilanı değiştiremezsiniz.');
+    if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
+    if (row.user_id !== user.id && !user.is_admin) return fail(res, 403, 'FORBIDDEN', 'You cannot edit this listing.');
     if (method === 'DELETE') { db.prepare('DELETE FROM listings WHERE id=?').run(id); return json(res, 200, { ok: true }); }
     const input = mapListingInput(await readJson(req), user);
     db.prepare(`UPDATE listings SET type=?,title=?,slug=?,category=?,price_cents=?,content_json=?,status=?,is_verified=0,updated_at=? WHERE id=?`).run(input.type, input.title, uniqueSlug(input.title, id), input.category, Math.round(input.price * 100), JSON.stringify(input.content), user.is_admin ? row.status : 'pending', nowIso(), id);
@@ -1177,10 +1177,10 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res); if (!user) return;
     const body = await readJson(req);
     const listing = db.prepare(`SELECT l.*,u.name AS owner_name FROM listings l JOIN users u ON u.id=l.user_id WHERE l.id=? AND l.status='approved'`).get(String(body.listingId || ''));
-    if (!listing) return fail(res, 404, 'NOT_FOUND', 'İlan bulunamadı.');
-    if (listing.user_id === user.id) return fail(res, 422, 'OWN_LISTING', 'Kendi ilanınıza mesaj gönderemezsiniz.');
+    if (!listing) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
+    if (listing.user_id === user.id) return fail(res, 422, 'OWN_LISTING', 'You cannot message your own listing.');
     const pair = [user.id, listing.user_id].sort();
-    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, listing.user_id, listing.user_id, user.id)) return fail(res, 403, 'USER_BLOCKED', 'Bu kullanıcıyla yeni görüşme başlatılamaz.');
+    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, listing.user_id, listing.user_id, user.id)) return fail(res, 403, 'USER_BLOCKED', 'A new conversation cannot be started with this user.');
     let thread = db.prepare('SELECT * FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(listing.id, pair[0], pair[1]);
     let createdThread = false;
     let initialMessageId = '';
@@ -1193,10 +1193,10 @@ async function handleApi(req, res, url) {
             const contacted = db.prepare('SELECT 1 FROM contacted_projects WHERE user_id=? AND listing_id=?').get(user.id, listing.id);
             if (!contacted) {
               if (LAUNCH_FREE_MODE && !user.is_admin) {
-                if (launchFreeConnectionsRemaining(user.id) <= 0) throw Object.assign(new Error(`Son ${LAUNCH_FREE_CONNECTION_WINDOW_DAYS} gün içindeki ${LAUNCH_FREE_CONNECTION_LIMIT} yeni satıcı bağlantısı sınırına ulaştınız. Mevcut görüşmelerinizde mesajlaşmaya devam edebilirsiniz.`), { status: 422, code: 'FREE_LAUNCH_CONNECTION_LIMIT' });
+                if (launchFreeConnectionsRemaining(user.id) <= 0) throw Object.assign(new Error(`You have reached the limit of ${LAUNCH_FREE_CONNECTION_LIMIT} new seller connections in ${LAUNCH_FREE_CONNECTION_WINDOW_DAYS} days. You can keep messaging in existing conversations.`), { status: 422, code: 'FREE_LAUNCH_CONNECTION_LIMIT' });
               } else {
                 const credit = db.prepare('UPDATE users SET buyer_connections=buyer_connections-1 WHERE id=? AND buyer_connections>0').run(user.id);
-                if (!credit.changes) throw Object.assign(new Error('Yeni satıcı bağlantısı için bağlantı paketi gereklidir.'), { status: 402, code: 'CONNECTION_CREDIT_REQUIRED' });
+                if (!credit.changes) throw Object.assign(new Error('A connection pack is required to contact a new seller.'), { status: 402, code: 'CONNECTION_CREDIT_REQUIRED' });
               }
               db.prepare('INSERT INTO contacted_projects(user_id,listing_id,created_at) VALUES(?,?,?)').run(user.id, listing.id, nowIso());
             }
@@ -1205,7 +1205,7 @@ async function handleApi(req, res, url) {
           const createdAt = nowIso();
           db.prepare('INSERT INTO threads(id,listing_id,user_a,user_b,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, listing.id, pair[0], pair[1], createdAt, createdAt);
           initialMessageId = randomUUID();
-          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(initialMessageId, id, user.id, cleanText(body.message || `${listing.title} ilanı hakkında görüşmek istiyorum.`, 1000), createdAt);
+          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(initialMessageId, id, user.id, cleanText(body.message || `I'd like to discuss the ${listing.title} listing.`, 1000), createdAt);
           thread = db.prepare('SELECT * FROM threads WHERE id=?').get(id);
           createdThread = true;
         }
@@ -1220,7 +1220,7 @@ async function handleApi(req, res, url) {
     if (createdThread) {
       recordAnalyticsEvent(req, 'conversation_started');
       const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(listing.user_id);
-      if (recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni bir görüşme başladı', text: `${user.name}, ${listing.title} ilanınız hakkında sizinle iletişime geçti.`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
+      if (recipient?.email) sendEmail({ to: recipient.email, subject: 'A new conversation started on Searya', text: `${user.name} contacted you about your ${listing.title} listing.`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
     }
     return json(res, 201, { threadId: thread.id, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -1230,23 +1230,23 @@ async function handleApi(req, res, url) {
   if (method === 'POST' && threadReadMatch) {
     const user = requireUser(req, res); if (!user) return;
     const thread = db.prepare('SELECT id FROM threads WHERE id=? AND (user_a=? OR user_b=?)').get(decodeURIComponent(threadReadMatch[1]), user.id, user.id);
-    if (!thread) return fail(res, 404, 'NOT_FOUND', 'Görüşme bulunamadı.');
+    if (!thread) return fail(res, 404, 'NOT_FOUND', 'Conversation not found.');
     db.prepare('UPDATE messages SET read_at=? WHERE thread_id=? AND sender_id<>? AND read_at IS NULL').run(nowIso(), thread.id, user.id);
     return json(res, 200, { ok: true, unreadCount: unreadMessageCount(user.id) });
   }
 
   if (method === 'POST' && messageMatch) {
     const user = requireUser(req, res); if (!user) return;
-    if (rateLimited(req, `message:${user.id}`, 60, 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Çok hızlı mesaj gönderiyorsunuz.');
+    if (rateLimited(req, `message:${user.id}`, 60, 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'You are sending messages too quickly.');
     const thread = db.prepare('SELECT * FROM threads WHERE id=? AND (user_a=? OR user_b=?)').get(decodeURIComponent(messageMatch[1]), user.id, user.id);
-    if (!thread) return fail(res, 404, 'NOT_FOUND', 'Görüşme bulunamadı.');
+    if (!thread) return fail(res, 404, 'NOT_FOUND', 'Conversation not found.');
     const partnerId = thread.user_a === user.id ? thread.user_b : thread.user_a;
-    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, partnerId, partnerId, user.id)) return fail(res, 403, 'USER_BLOCKED', 'Engellenen kullanıcıyla mesajlaşılamaz.');
+    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, partnerId, partnerId, user.id)) return fail(res, 403, 'USER_BLOCKED', 'You cannot message a blocked user.');
     const body = await readJson(req);
     const text = cleanText(body.message, 1000);
-    if (!text) return fail(res, 422, 'EMPTY_MESSAGE', 'Mesaj boş olamaz.');
+    if (!text) return fail(res, 422, 'EMPTY_MESSAGE', 'Message cannot be empty.');
     const count = db.prepare('SELECT COUNT(*) AS count FROM messages WHERE thread_id=?').get(thread.id).count;
-    if (count < CONTACT_UNLOCK_MESSAGE_COUNT && contactInfoDetected(text)) return fail(res, 422, 'CONTACT_INFO_LOCKED', `İletişim bilgileri ilk ${CONTACT_UNLOCK_MESSAGE_COUNT} mesaj tamamlandıktan sonra paylaşılabilir.`);
+    if (count < CONTACT_UNLOCK_MESSAGE_COUNT && contactInfoDetected(text)) return fail(res, 422, 'CONTACT_INFO_LOCKED', `Contact details can be shared after the first ${CONTACT_UNLOCK_MESSAGE_COUNT} messages.`);
     const recipientId = partnerId;
     const alreadyUnread = Boolean(db.prepare('SELECT 1 FROM messages WHERE thread_id=? AND sender_id<>? AND read_at IS NULL LIMIT 1').get(thread.id, recipientId));
     const createdAt = nowIso();
@@ -1254,18 +1254,18 @@ async function handleApi(req, res, url) {
     db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(id, thread.id, user.id, text, createdAt);
     db.prepare('UPDATE threads SET updated_at=? WHERE id=?').run(createdAt, thread.id);
     const recipient = db.prepare('SELECT email,name FROM users WHERE id=?').get(recipientId);
-    if (!alreadyUnread && recipient?.email) sendEmail({ to: recipient.email, subject: 'Searya’da yeni mesajınız var', text: `${user.name} size yeni bir mesaj gönderdi: ${text.slice(0, 180)}`, idempotencyKey: `message-${id}` }).catch(console.error);
-    return json(res, 201, { message: { id, sender: 'me', text, textEn: text, time: 'Şimdi' } });
+    if (!alreadyUnread && recipient?.email) sendEmail({ to: recipient.email, subject: 'You have a new message on Searya', text: `${user.name} sent you a new message: ${text.slice(0, 180)}`, idempotencyKey: `message-${id}` }).catch(console.error);
+    return json(res, 201, { message: { id, sender: 'me', text, textEn: text, time: 'Now' } });
   }
 
   if (method === 'GET' && pathname === '/api/packages') return json(res, 200, { packages: LAUNCH_FREE_MODE ? [] : Object.values(packages), mode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE });
 
   if (method === 'POST' && pathname === '/api/packages/checkout') {
     const user = requireUser(req, res); if (!user) return;
-    if (LAUNCH_FREE_MODE) return fail(res, 409, 'FREE_LAUNCH_ACTIVE', 'Searya lansman döneminde ücretsizdir; ödeme veya paket satın alma gerekmez.');
+    if (LAUNCH_FREE_MODE) return fail(res, 409, 'FREE_LAUNCH_ACTIVE', 'Searya is free during launch; no payment or plan purchase is required.');
     const body = await readJson(req);
     const pack = packages[body.packageKey];
-    if (!pack) return fail(res, 404, 'PACKAGE_NOT_FOUND', 'Paket bulunamadı.');
+    if (!pack) return fail(res, 404, 'PACKAGE_NOT_FOUND', 'Plan not found.');
     const purchaseId = randomUUID();
     const createdAt = nowIso();
     db.prepare('INSERT INTO purchases(id,user_id,package_key,amount_cents,currency,status,created_at,updated_at) VALUES(?,?,?,?,\'usd\',\'pending\',?,?)').run(purchaseId, user.id, pack.key, pack.amountCents, createdAt, createdAt);
@@ -1276,11 +1276,11 @@ async function handleApi(req, res, url) {
         grantPackage(user.id, pack.key);
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
-      if (user.email) sendEmail({ to: user.email, subject: 'Searya paketiniz aktifleştirildi', text: `${pack.name} hesabınıza tanımlandı.`, idempotencyKey: `purchase-${purchaseId}` }).catch(console.error);
+      if (user.email) sendEmail({ to: user.email, subject: 'Your Searya plan is active', text: `${pack.name} has been added to your account.`, idempotencyKey: `purchase-${purchaseId}` }).catch(console.error);
       return json(res, 200, { mode: 'demo', paid: true, packageKey: pack.key, amountCents: pack.amountCents, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
     }
     const productId = polarProductId(pack.key);
-    if (PAYMENT_MODE !== 'polar' || !process.env.POLAR_ACCESS_TOKEN || !productId) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'Canlı ödeme sağlayıcısı henüz yapılandırılmadı.');
+    if (PAYMENT_MODE !== 'polar' || !process.env.POLAR_ACCESS_TOKEN || !productId) return fail(res, 503, 'PAYMENT_NOT_CONFIGURED', 'The live payment provider has not been configured yet.');
     const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN, server: polarServer() });
     try {
       const checkout = await polar.checkouts.create({
@@ -1311,7 +1311,7 @@ async function handleApi(req, res, url) {
     const targetType = ['listing', 'user', 'message'].includes(body.targetType) ? body.targetType : 'listing';
     const targetId = cleanText(body.targetId, 100);
     const reason = cleanText(body.reason, 500);
-    if (!targetId || reason.length < 10) return fail(res, 422, 'INVALID_REPORT', 'Şikâyet nedenini açıklayın.');
+    if (!targetId || reason.length < 10) return fail(res, 422, 'INVALID_REPORT', 'Please explain the reason for your report.');
     db.prepare('INSERT INTO reports(id,reporter_id,target_type,target_id,reason,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(), user.id, targetType, targetId, reason, nowIso());
     return json(res, 201, { ok: true });
   }
@@ -1320,7 +1320,7 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res); if (!user) return;
     const body = await readJson(req);
     const blockedId = cleanText(body.userId, 100);
-    if (!blockedId || blockedId === user.id || !db.prepare('SELECT 1 FROM users WHERE id=?').get(blockedId)) return fail(res, 422, 'INVALID_USER', 'Kullanıcı bulunamadı.');
+    if (!blockedId || blockedId === user.id || !db.prepare('SELECT 1 FROM users WHERE id=?').get(blockedId)) return fail(res, 422, 'INVALID_USER', 'User not found.');
     db.prepare('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,created_at) VALUES(?,?,?)').run(user.id, blockedId, nowIso());
     return json(res, 201, { ok: true });
   }
@@ -1427,8 +1427,8 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const status = ['active', 'suspended'].includes(body.status) ? body.status : '';
     const target = db.prepare('SELECT id,is_admin FROM users WHERE id=?').get(targetId);
-    if (!target) return fail(res, 404, 'NOT_FOUND', 'Kullanıcı bulunamadı.');
-    if (!status || target.id === user.id || target.is_admin) return fail(res, 422, 'INVALID_ACTION', 'Bu kullanıcı durumu değiştirilemez.');
+    if (!target) return fail(res, 404, 'NOT_FOUND', 'User not found.');
+    if (!status || target.id === user.id || target.is_admin) return fail(res, 422, 'INVALID_ACTION', 'This user status cannot be changed.');
     db.prepare('UPDATE users SET status=? WHERE id=?').run(status, targetId);
     if (status === 'suspended') db.prepare('DELETE FROM sessions WHERE user_id=?').run(targetId);
     return json(res, 200, { ok: true, status });
@@ -1439,9 +1439,9 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, true); if (!user) return;
     const body = await readJson(req);
     const status = ['resolved', 'dismissed', 'open'].includes(body.status) ? body.status : '';
-    if (!status) return fail(res, 422, 'INVALID_ACTION', 'Geçersiz şikâyet işlemi.');
+    if (!status) return fail(res, 422, 'INVALID_ACTION', 'Invalid report action.');
     const result = db.prepare('UPDATE reports SET status=? WHERE id=?').run(status, decodeURIComponent(adminReportMatch[1]));
-    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Şikâyet bulunamadı.');
+    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Report not found.');
     return json(res, 200, { ok: true, status });
   }
 
@@ -1450,18 +1450,18 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, true); if (!user) return;
     const body = await readJson(req);
     const action = ['approve', 'reject', 'verify'].includes(body.action) ? body.action : '';
-    if (!action) return fail(res, 422, 'INVALID_ACTION', 'Geçersiz yönetim işlemi.');
+    if (!action) return fail(res, 422, 'INVALID_ACTION', 'Invalid moderation action.');
     const id = decodeURIComponent(moderateMatch[1]);
-    if (!db.prepare('SELECT 1 FROM listings WHERE id=?').get(id)) return fail(res, 404, 'NOT_FOUND', 'İlan bulunamadı.');
+    if (!db.prepare('SELECT 1 FROM listings WHERE id=?').get(id)) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
     if (action === 'reject') db.prepare(`UPDATE listings SET status='rejected',is_verified=0,priority_review=0,updated_at=? WHERE id=?`).run(nowIso(), id);
     else db.prepare(`UPDATE listings SET status='approved',is_verified=?,priority_review=0,updated_at=? WHERE id=?`).run(action === 'verify' ? 1 : 0, nowIso(), id);
     const updatedListing = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     const owner = db.prepare('SELECT email,name FROM users WHERE id=?').get(updatedListing.user_id);
-    if (owner?.email) sendEmail({ to: owner.email, subject: 'Searya ilan inceleme sonucu', text: `${updatedListing.title} ilanınız ${action === 'reject' ? 'reddedildi' : action === 'verify' ? 'doğrulandı ve yayınlandı' : 'onaylandı ve yayınlandı'}.`, idempotencyKey: `moderation-${id}-${updatedListing.updated_at}` }).catch(console.error);
+    if (owner?.email) sendEmail({ to: owner.email, subject: 'Your Searya listing review result', text: `Your ${updatedListing.title} listing was ${action === 'reject' ? 'rejected' : action === 'verify' ? 'verified and published' : 'approved and published'}.`, idempotencyKey: `moderation-${id}-${updatedListing.updated_at}` }).catch(console.error);
     return json(res, 200, { listing: listingFromRow(updatedListing) });
   }
 
-  return fail(res, 404, 'API_NOT_FOUND', 'API yolu bulunamadı.');
+  return fail(res, 404, 'API_NOT_FOUND', 'API route not found.');
 }
 
 const mimeTypes = {
@@ -1488,7 +1488,7 @@ function serveStatic(req, res, url) {
       if (req.method === 'HEAD') res.end(); else res.end(body);
       return;
     }
-    return fail(res, 404, 'PAGE_NOT_FOUND', 'Sayfa bulunamadı.');
+    return fail(res, 404, 'PAGE_NOT_FOUND', 'Page not found.');
   }
   const body = readFileSync(candidate);
   const immutable = /[?&]v=/.test(req.url || '');
@@ -1525,7 +1525,7 @@ const server = createServer(async (req, res) => {
     return serveStatic(req, res, url);
   } catch (error) {
     console.error(error);
-    if (!res.headersSent) return fail(res, error.status || 500, 'SERVER_ERROR', error.status ? error.message : 'Beklenmeyen bir sunucu hatası oluştu.');
+    if (!res.headersSent) return fail(res, error.status || 500, 'SERVER_ERROR', error.status ? error.message : 'An unexpected server error occurred.');
     res.end();
   }
 });

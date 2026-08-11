@@ -96,7 +96,6 @@ function withClientMetrics(items) {
 }
 
 const savedClientState = readClientState();
-const requestedLanguage = new URLSearchParams(window.location.search).get('lang');
 
 // Application State
 let state = {
@@ -109,9 +108,7 @@ let state = {
   messages: [...initialMessages],
   activeThreadId: 'thread-1',
   theme: savedClientState.theme === 'light' ? 'light' : 'dark',
-  lang: requestedLanguage === 'en' || requestedLanguage === 'tr'
-    ? requestedLanguage
-    : (savedClientState.lang === 'en' ? 'en' : 'tr'),
+  lang: 'en',
   pricingTab: 'seller', // 'buyer' | 'seller'
   inboxOpen: false,
   buyerConnections: Number.isInteger(savedClientState.buyerConnections) && savedClientState.buyerConnections >= 0
@@ -147,7 +144,6 @@ function persistClientState() {
   try {
     localStorage.setItem(CLIENT_STATE_KEY, JSON.stringify({
       theme: state.theme,
-      lang: state.lang,
       buyerConnections: state.buyerConnections,
       contactedProjects: state.contactedProjects,
       sellerFreeListings: state.sellerFreeListings,
@@ -181,7 +177,6 @@ const el = {
   btnHeroSell: () => document.getElementById('btn-hero-sell'),
   featuredInspectBtn: () => document.getElementById('featured-inspect-btn'),
   themeToggleBtn: () => document.getElementById('theme-toggle-btn'),
-  langSelect: () => document.getElementById('lang-select'),
   pricingToggleBuyer: () => document.getElementById('pricing-toggle-buyer'),
   pricingToggleSeller: () => document.getElementById('pricing-toggle-seller'),
   toastContainer: () => document.getElementById('toast-container'),
@@ -190,7 +185,7 @@ const el = {
 
 // Get active translation dictionary
 function t() {
-  return translations[state.lang] || translations.tr;
+  return translations.en;
 }
 
 // Initialize Application when DOM ready
@@ -341,7 +336,7 @@ async function hydrateBackendState() {
     await handleUrlState();
   } catch (error) {
     state.backendReady = false;
-    state.backendMessage = error?.message || 'API bağlantısı kurulamadı.';
+    state.backendMessage = error?.message || 'Could not connect to the service.';
     updateServiceStatus();
     console.error('Searya API:', error);
   }
@@ -357,7 +352,7 @@ function updateServiceStatus() {
   }
   banner.textContent = state.lang === 'en'
     ? 'The service is temporarily unavailable. Listings may be out of date.'
-    : 'Hizmete şu anda ulaşılamıyor. İlanlar güncel olmayabilir.';
+    : 'The service is currently unavailable. Listings may not be up to date.';
   banner.classList.remove('hidden');
 }
 
@@ -595,35 +590,13 @@ function setup3DTiltEffect() {
   });
 }
 
-// Update UI Text on Language Change
-function setLanguage(lang) {
-  state.lang = lang === 'en' ? 'en' : 'tr';
-  const url = new URL(window.location.href);
-  url.searchParams.set('lang', state.lang);
-  history.replaceState({}, '', url);
-  persistClientState();
-  updateStaticTranslations();
-  updateServiceStatus();
-  renderListings();
-  if (state.inboxOpen) renderInboxDrawerContent();
-  showToast(t().toastLangChanged);
-}
-
 function updateStaticTranslations() {
   const dict = t();
-  const isEn = state.lang === 'en';
-  document.documentElement.lang = state.lang;
-  document.title = isEn
-    ? 'Searya | Where Digital Projects Find Their Next Founders'
-    : 'Searya | Dijital Projelerin Yeni Sahiplerini Bulduğu Yer';
+  const isEn = true;
+  document.documentElement.lang = 'en';
+  document.title = 'Searya | Buy & Sell Digital Projects';
   const description = document.querySelector('meta[name="description"]');
-  if (description) description.content = isEn
-    ? 'Discover unfinished SaaS products, AI projects, mobile apps and Chrome extensions. Contact owners directly or publish a Looking to Buy request.'
-    : "Yarım kalan SaaS, AI projesi, mobil uygulama ve Chrome Extension'ları keşfedin. İkinci şans bekleyen dijital projelere hemen teklif verin veya 'Proje Arıyorum' ilanı açın.";
-  const mainLangSelect = el.langSelect();
-  const onboardingLangSelect = document.getElementById('ob-card-lang-select');
-  if (mainLangSelect) mainLangSelect.value = state.lang;
-  if (onboardingLangSelect) onboardingLangSelect.value = state.lang;
+  if (description) description.content = 'Buy and sell SaaS products, AI projects, mobile apps and browser extensions. Discover promising digital projects or list your own.';
   
   // Navigation & Theme Toggle Bar
   const navListings = document.getElementById('t-nav-listings');
@@ -637,9 +610,7 @@ function updateStaticTranslations() {
   if (navPricing) navPricing.textContent = dict.navPricing;
   if (themeLightLabel) themeLightLabel.textContent = dict.themeLight;
   if (themeDarkLabel) themeDarkLabel.textContent = dict.themeDark;
-  document.querySelectorAll('[data-home-link]').forEach(link => link.setAttribute('aria-label', isEn ? 'Searya home page' : 'Searya ana sayfa'));
-  mainLangSelect?.setAttribute('aria-label', isEn ? 'Select language' : 'Dil seçimi');
-  onboardingLangSelect?.setAttribute('aria-label', isEn ? 'Select language' : 'Dil seçimi');
+  document.querySelectorAll('[data-home-link]').forEach(link => link.setAttribute('aria-label', 'Searya home page'));
   el.themeToggleBtn()?.setAttribute('aria-label', isEn ? 'Change theme' : 'Temayı değiştir');
   document.getElementById('ob-card-theme-btn')?.setAttribute('aria-label', isEn ? 'Change theme' : 'Temayı değiştir');
   document.getElementById('ob-close-btn')?.setAttribute('aria-label', isEn ? 'Close' : 'Kapat');
@@ -1041,36 +1012,11 @@ function setupEventListeners() {
   const tBtn = el.themeToggleBtn();
   const obTBtn = document.getElementById('ob-theme-toggle-btn');
   const cardTBtn = document.getElementById('ob-card-theme-btn');
-  const lSel = el.langSelect();
-  const obLSel = document.getElementById('ob-lang-select');
-  const cardLSel = document.getElementById('ob-card-lang-select');
 
   if (tBtn) tBtn.addEventListener('click', toggleTheme);
   if (obTBtn) obTBtn.addEventListener('click', toggleTheme);
   if (cardTBtn) cardTBtn.addEventListener('click', toggleTheme);
   
-  if (lSel) {
-    lSel.addEventListener('change', (e) => {
-      setLanguage(e.target.value);
-      if (obLSel) obLSel.value = e.target.value;
-      if (cardLSel) cardLSel.value = e.target.value;
-    });
-  }
-  if (obLSel) {
-    obLSel.addEventListener('change', (e) => {
-      setLanguage(e.target.value);
-      if (lSel) lSel.value = e.target.value;
-      if (cardLSel) cardLSel.value = e.target.value;
-    });
-  }
-  if (cardLSel) {
-    cardLSel.addEventListener('change', (e) => {
-      setLanguage(e.target.value);
-      if (lSel) lSel.value = e.target.value;
-      if (obLSel) obLSel.value = e.target.value;
-    });
-  }
-
   // Auth Card Segmented Tabs (Giriş Yap vs Kayıt Ol)
   document.getElementById('ob-tab-login')?.addEventListener('click', () => {
     authMode = 'login';
@@ -1210,11 +1156,11 @@ function setupEventListeners() {
 
   // Package Purchase Buttons (Alıcı & Satıcı Paket Butonları)
   document.getElementById('t-buyer-free-btn')?.addEventListener('click', () => showOnboardingPage('register'));
-  document.getElementById('t-buyer-pack-btn')?.addEventListener('click', () => openPackagePurchaseModal('10 Bağlantı Paketi', '$9', 'buyer_connections_10'));
+  document.getElementById('t-buyer-pack-btn')?.addEventListener('click', () => openPackagePurchaseModal('10 Buyer Connections', '$9', 'buyer_connections_10'));
   document.getElementById('t-seller-free-btn')?.addEventListener('click', openCreateListingModal);
-  document.getElementById('t-seller-extra-btn')?.addEventListener('click', () => openPackagePurchaseModal('3 İlan Paketi', '$9', 'seller_listings_3'));
-  document.getElementById('t-seller-feat-btn')?.addEventListener('click', () => openPackagePurchaseModal('VIP Doğrulama İncelemesi + 10 İlan', '$19.99', 'seller_vip_10'));
-  document.getElementById('t-seller-pro-btn')?.addEventListener('click', () => openPackagePurchaseModal('VIP Doğrulama İncelemesi + 10 İlan', '$19.99', 'seller_vip_10'));
+  document.getElementById('t-seller-extra-btn')?.addEventListener('click', () => openPackagePurchaseModal('3 Seller Listings', '$9', 'seller_listings_3'));
+  document.getElementById('t-seller-feat-btn')?.addEventListener('click', () => openPackagePurchaseModal('VIP Verification Review + 10 Listings', '$19.99', 'seller_vip_10'));
+  document.getElementById('t-seller-pro-btn')?.addEventListener('click', () => openPackagePurchaseModal('VIP Verification Review + 10 Listings', '$19.99', 'seller_vip_10'));
 
   // Simplified pricing actions
   document.getElementById('simple-buyer-btn')?.addEventListener('click', () => showOnboardingPage('register'));
@@ -1348,7 +1294,7 @@ function openAccountSettingsModal() {
     <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Account settings' : 'Hesap ayarları'}</h3><p class="text-xs text-slate-500">${escapeHtml(user.email || '')}</p></div><button id="close-settings-modal" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
     <form id="change-password-form" class="space-y-3"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Change password' : 'Şifre değiştir'}</h4><input id="settings-current-password" type="password" required placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><input id="settings-new-password" type="password" required minlength="8" placeholder="${isEn ? 'New password — at least 8 characters' : 'Yeni şifre — en az 8 karakter'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><button class="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button></form>
     <section class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Your data' : 'Verileriniz'}</h4><p class="text-[11px] text-slate-500 mt-1 mb-3">${isEn ? 'Download a JSON copy of your account, listings, purchases and messages.' : 'Hesap, ilan, paket ve mesaj verilerinizin JSON kopyasını indirin.'}</p><button id="export-account-btn" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"><i class="ph-bold ph-download-simple mr-1"></i>${isEn ? 'Download my data' : 'Verilerimi indir'}</button></section>
-    <section class="p-4 rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/30"><h4 class="text-sm font-black text-red-700 dark:text-red-400">${isEn ? 'Delete account' : 'Hesabı sil'}</h4>${user.isAdmin ? `<p class="text-[11px] text-red-600/80 mt-1">${isEn ? 'The primary administrator cannot be deleted here.' : 'Birincil yönetici hesabı bu ekrandan silinemez.'}</p>` : `<p class="text-[11px] text-red-600/80 mt-1 mb-3">${isEn ? 'This permanently removes your listings and personal account data.' : 'Bu işlem ilanlarınızı ve kişisel hesap verilerinizi kalıcı olarak kaldırır.'}</p><input id="delete-account-password" type="password" placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-2"><input id="delete-account-confirmation" type="text" placeholder="HESABIMI SİL" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-3"><button id="delete-account-btn" class="w-full py-3 rounded-xl bg-red-600 text-white text-sm font-bold">${isEn ? 'Permanently delete account' : 'Hesabı kalıcı olarak sil'}</button>`}</section>
+    <section class="p-4 rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/30"><h4 class="text-sm font-black text-red-700 dark:text-red-400">${isEn ? 'Delete account' : 'Hesabı sil'}</h4>${user.isAdmin ? `<p class="text-[11px] text-red-600/80 mt-1">${isEn ? 'The primary administrator cannot be deleted here.' : 'Birincil yönetici hesabı bu ekrandan silinemez.'}</p>` : `<p class="text-[11px] text-red-600/80 mt-1 mb-3">${isEn ? 'This permanently removes your listings and personal account data.' : 'Bu işlem ilanlarınızı ve kişisel hesap verilerinizi kalıcı olarak kaldırır.'}</p><input id="delete-account-password" type="password" placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-2"><input id="delete-account-confirmation" type="text" placeholder="${isEn ? 'DELETE MY ACCOUNT' : 'HESABIMI SİL'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-3"><button id="delete-account-btn" class="w-full py-3 rounded-xl bg-red-600 text-white text-sm font-bold">${isEn ? 'Permanently delete account' : 'Hesabı kalıcı olarak sil'}</button>`}</section>
   </div>`;
   backdrop.classList.remove('hidden');
   document.getElementById('close-settings-modal')?.addEventListener('click', openAccountModal);

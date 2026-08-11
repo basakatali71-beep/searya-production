@@ -201,7 +201,7 @@ test('an approved listing can consume a seven-day boost', async () => {
     body: JSON.stringify({ type: 'sale', title: 'Öne Çıkarma Test Projesi', category: 'ai', price: 900, description: 'Yedi günlük öne çıkarma hakkının çalışmasını doğrulayan yeterli açıklama.', techStack: ['AI'], coverImage: 'data:image/png;base64,iVBORw0KGgo=' })
   });
   const listing = (await listingResponse.json()).listing;
-  assert.equal(listing.status, 'Aktif');
+  assert.equal(listing.status, 'Active');
   const boostResponse = await fetch(`${baseUrl}/api/listings/${listing.id}/addon`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminCookie }, body: JSON.stringify({ addon: 'boost' })
   });
@@ -250,7 +250,7 @@ test('administrator can review and approve a pending listing', async () => {
     body: JSON.stringify({ action: 'approve' })
   });
   assert.equal(moderation.status, 200);
-  assert.equal((await moderation.json()).listing.status, 'Aktif');
+  assert.equal((await moderation.json()).listing.status, 'Active');
 
   const presenceLeave = await fetch(`${baseUrl}/api/analytics/presence`, {
     method: 'POST',

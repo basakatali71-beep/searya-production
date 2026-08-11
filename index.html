@@ -1,19 +1,29 @@
 <!DOCTYPE html>
-<html lang="tr" class="dark">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Searya | Dijital Projelerin Yeni Sahiplerini Bulduğu Yer</title>
-  <meta name="description" content="Yarım kalan SaaS, AI projesi, mobil uygulama ve Chrome Extension'ları keşfedin. İkinci şans bekleyen dijital projelere hemen teklif verin veya 'Proje Arıyorum' ilanı açın.">
+  <title>Searya | Buy &amp; Sell Digital Projects</title>
+  <meta name="description" content="Discover SaaS products, apps, AI tools and other digital projects for acquisition—or list your own and connect with serious buyers.">
   <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://searya.com/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Searya">
-  <meta property="og:title" content="Searya | Dijital Proje Pazaryeri">
-  <meta property="og:description" content="SaaS, AI, mobil uygulama ve eklenti projelerini keşfedin veya yeni sahibini bulun.">
-  <meta property="og:image" content="/src/assets/searya-logo.png">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:url" content="https://searya.com/">
+  <meta property="og:title" content="Searya | Buy &amp; Sell Digital Projects">
+  <meta property="og:description" content="A marketplace where buyers discover digital projects and developers find the right buyer for what they built.">
+  <meta property="og:image" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
+  <meta property="og:image:secure_url" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Searya — Buy and sell digital projects">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Searya | Dijital Proje Pazaryeri">
-  <meta name="twitter:description" content="Yarım kalan dijital projeler için güvenli keşif ve doğrudan iletişim.">
+  <meta name="twitter:title" content="Searya | Buy &amp; Sell Digital Projects">
+  <meta name="twitter:description" content="Discover projects to acquire or list the one you built and connect with serious buyers.">
+  <meta name="twitter:image" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
+  <meta name="twitter:image:alt" content="Searya — Buy and sell digital projects">
   <link rel="icon" type="image/png" href="./public/searya-logo.png?v=20260807-2">
   
   <!-- Fonts (Space Grotesk) -->
@@ -60,19 +70,14 @@
           <img src="./src/assets/searya-logo.png?v=20260807-1" alt="" class="sy-brand-logo-full" width="1250" height="359">
         </a>
 
-        <!-- Header Controls (Theme & Lang Switcher) -->
+        <!-- Header Controls -->
         <div class="flex items-center gap-2">
           <button id="ob-card-theme-btn" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-purple-600 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer">
             <i class="ph-bold ph-sun text-amber-500 text-sm"></i>
             <i class="ph-bold ph-moon text-indigo-400 text-sm hidden"></i>
           </button>
 
-          <select id="ob-card-lang-select" aria-label="Dil seçimi" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer">
-            <option value="tr">🌐 TR</option>
-            <option value="en">🌐 EN</option>
-          </select>
-
-          <button id="ob-close-btn" type="button" aria-label="Kapat" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-purple-600 transition-all cursor-pointer">
+          <button id="ob-close-btn" type="button" aria-label="Close" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-purple-600 transition-all cursor-pointer">
             <i class="ph-bold ph-x text-sm"></i>
           </button>
         </div>
@@ -161,12 +166,6 @@
 
         <!-- Global Actions -->
         <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          <!-- Language Switcher (TR / EN) -->
-          <select id="lang-select" aria-label="Dil seçimi" class="hidden sm:block bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer">
-            <option value="tr">🇹🇷 TR</option>
-            <option value="en">🇬🇧 EN</option>
-          </select>
-
           <!-- Dark/Light Theme Toggle -->
           <button id="theme-toggle-btn" aria-label="Temayı değiştir" class="p-2.5 sm:px-3 sm:py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold">
             <i class="ph-bold ph-sun text-amber-500 text-base dark:hidden"></i>
@@ -1064,7 +1063,7 @@
   </section>
 
   <!-- Main Application Logic -->
-  <script type="module" src="./src/app.js?v=20260810-33"></script>
+  <script type="module" src="./src/app.js?v=20260811-34"></script>
 
 </body>
 </html>
