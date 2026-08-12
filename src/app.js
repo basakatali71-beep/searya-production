@@ -587,6 +587,7 @@ function apiErrorMessage(error) {
 
 async function handleUrlState() {
   const url = new URL(window.location.href);
+  const categoryMatch = url.pathname.match(/^\/projects\/category\/([^/]+)\/?$/);
   const resetToken = url.searchParams.get('reset_token');
   const verifyToken = url.searchParams.get('verify_token');
   const payment = url.searchParams.get('payment');
@@ -626,6 +627,7 @@ async function handleUrlState() {
     url.searchParams.delete('reason');
     history.replaceState({}, '', url);
   }
+  if (categoryMatch) selectCategory(decodeURIComponent(categoryMatch[1]));
   await openListingFromUrl();
 }
 
@@ -770,9 +772,12 @@ function updateStaticTranslations() {
   const dict = t();
   const isEn = true;
   document.documentElement.lang = 'en';
-  document.title = 'Searya | Buy & Sell Digital Projects';
-  const description = document.querySelector('meta[name="description"]');
-  if (description) description.content = 'Buy and sell SaaS products, AI projects, mobile apps and browser extensions. Discover promising digital projects or list your own.';
+  const isSeoRoute = /^\/projects\/(?:category\/)?[^/]+\/?$/.test(window.location.pathname);
+  if (!isSeoRoute) {
+    document.title = 'Searya — Discover Digital Projects, SaaS, Apps & AI Tools';
+    const description = document.querySelector('meta[name="description"]');
+    if (description) description.content = 'Discover SaaS products, mobile apps, AI tools, websites and digital projects. List your project or connect directly with owners on Searya.';
+  }
   
   // Navigation & Theme Toggle Bar
   const navListings = document.getElementById('t-nav-listings');
@@ -1260,6 +1265,7 @@ function setupEventListeners() {
     catPills.addEventListener('click', (e) => {
       const chip = e.target.closest('.cat-chip');
       if (!chip) return;
+      e.preventDefault();
       selectCategory(chip.dataset.category);
     });
   }
@@ -2532,9 +2538,7 @@ function openProjectDetailModal(p) {
   if (!backdrop || !content) return;
   state.openListingSlug = p.slug || p.id || '';
   if (state.openListingSlug) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('listing', state.openListingSlug);
-    history.replaceState({}, '', url);
+    history.replaceState({}, '', `/projects/${encodeURIComponent(state.openListingSlug)}`);
   }
 
   content.innerHTML = `
@@ -2671,14 +2675,14 @@ function closeModal() {
   if (backdrop) backdrop.classList.add('hidden');
   if (state.openListingSlug) {
     state.openListingSlug = '';
-    const url = new URL(window.location.href);
-    url.searchParams.delete('listing');
-    history.replaceState({}, '', url);
+    history.replaceState({}, '', '/');
   }
 }
 
 async function openListingFromUrl() {
-  const slug = new URL(window.location.href).searchParams.get('listing');
+  const pageUrl = new URL(window.location.href);
+  const routeMatch = pageUrl.pathname.match(/^\/projects\/([^/]+)\/?$/);
+  const slug = routeMatch ? decodeURIComponent(routeMatch[1]) : pageUrl.searchParams.get('listing');
   if (!slug) return;
   const local = [...state.forSaleListings, ...state.wtbListings].find(item => item.slug === slug || item.id === slug);
   if (local) return openProjectDetailModal(local);
@@ -2720,7 +2724,7 @@ function openShareCardModal(p) {
   trackBehavior('button_clicked', { action: 'share_card_opened', listingId: p.id, listingTitle: p.title });
   const isSale = p.type === 'sale' || p.askingPrice;
   let activeFormat = 'twitter';
-  const shareUrl = `${window.location.origin}${window.location.pathname}?listing=${encodeURIComponent(p.slug || p.id)}`;
+  const shareUrl = `${window.location.origin}/projects/${encodeURIComponent(p.slug || p.id)}`;
   const backdrop = el.modalBackdrop();
   const content = el.modalContent();
   if (!backdrop || !content) return;

@@ -40,6 +40,34 @@ test('health and seeded listings are available', async () => {
   assert.equal(listings.listings.every(item => item.type === 'sale'), true);
 });
 
+test('technical SEO exposes canonical metadata, robots rules and public sitemap URLs', async () => {
+  const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
+  assert.match(homepage, /<title>Searya — Discover Digital Projects, SaaS, Apps &amp; AI Tools<\/title>/);
+  assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
+  assert.match(homepage, /"@type":"Organization"/);
+  assert.match(homepage, /"@type":"WebSite"/);
+
+  const robots = await fetch(`${baseUrl}/robots.txt`).then(response => response.text());
+  assert.match(robots, /Disallow: \/admin\.html/);
+  assert.match(robots, /Disallow: \/messages/);
+  assert.match(robots, /Sitemap: https:\/\/searya\.com\/sitemap\.xml/);
+
+  const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
+  const listing = listings.listings[0];
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com\\/projects\\/${listing.slug}`));
+  assert.match(sitemap, /https:\/\/searya\.com\/projects\/category\/saas/);
+  assert.doesNotMatch(sitemap, /\?listing=|\?sort=|utm_source/);
+
+  const detail = await fetch(`${baseUrl}/projects/${listing.slug}?utm_source=test`).then(response => response.text());
+  assert.match(detail, new RegExp(`<title>${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\| Digital Project on Searya<\\/title>`));
+  assert.match(detail, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com\\/projects\\/${listing.slug}">`));
+  assert.match(detail, /"@type":"WebPage"/);
+
+  const missing = await fetch(`${baseUrl}/projects/not-a-public-project`);
+  assert.equal(missing.status, 404);
+});
+
 test('anonymous visitors cannot create listings', async () => {
   const response = await fetch(`${baseUrl}/api/listings`, {
     method: 'POST',

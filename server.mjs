@@ -13,6 +13,7 @@ const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const APP_ORIGIN = process.env.APP_ORIGIN || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
+const PUBLIC_ORIGIN = 'https://searya.com';
 const REQUESTED_PAYMENT_MODE = process.env.PAYMENT_MODE || (NODE_ENV === 'production' ? 'disabled' : 'demo');
 const POLAR_SERVER = String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
 const PAYMENT_MODE = NODE_ENV === 'production' && REQUESTED_PAYMENT_MODE === 'polar' && POLAR_SERVER !== 'production' ? 'disabled' : REQUESTED_PAYMENT_MODE;
@@ -832,7 +833,7 @@ async function sendDueProjectAlerts() {
     const query = String(alert.query || '').toLocaleLowerCase('tr-TR');
     const matches = db.prepare(`SELECT slug,title,price_cents FROM listings WHERE status='approved' AND type='sale' AND updated_at>? AND price_cents BETWEEN ? AND ? AND (?='all' OR category=?) AND (?='' OR lower(title || ' ' || content_json) LIKE ?) ORDER BY updated_at DESC LIMIT 10`).all(lastSentAt, alert.min_price * 100, alert.max_price * 100, alert.category, alert.category, query, `%${query}%`);
     if (matches.length) {
-      const lines = matches.map(item => `• ${item.title} — $${(item.price_cents / 100).toLocaleString('en-US')}\n  ${APP_ORIGIN}/?listing=${encodeURIComponent(item.slug)}`).join('\n');
+      const lines = matches.map(item => `• ${item.title} — $${(item.price_cents / 100).toLocaleString('en-US')}\n  ${PUBLIC_ORIGIN}/projects/${encodeURIComponent(item.slug)}`).join('\n');
       try {
         await sendEmail({ to: alert.email, subject: `${matches.length} new project matches on Searya`, text: `Hi ${alert.name},\n\nNew listings match your project alert:\n\n${lines}\n\nYou can manage this alert from your Searya account.`, idempotencyKey: `alert-${alert.id}-${sha256(lastSentAt).slice(0, 16)}` });
       } catch (error) {
@@ -1701,6 +1702,72 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
+const SEO_TITLE = 'Searya — Discover Digital Projects, SaaS, Apps & AI Tools';
+const SEO_DESCRIPTION = 'Discover SaaS products, mobile apps, AI tools, websites and digital projects. List your project or connect directly with owners on Searya.';
+const SEO_CATEGORIES = Object.freeze({
+  saas: 'SaaS Projects',
+  mobile: 'Mobile Apps',
+  ai: 'AI Tools',
+  extension: 'Chrome Extensions'
+});
+const SEO_CATEGORY_SINGULAR = Object.freeze({ saas: 'SaaS project', mobile: 'mobile app', ai: 'AI tool', extension: 'Chrome extension' });
+
+function escapeMarkup(value) {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+
+function xmlUrl(pathname = '/') {
+  return escapeMarkup(new URL(pathname, `${PUBLIC_ORIGIN}/`).href);
+}
+
+function publicListingDescription(row) {
+  const content = JSON.parse(row.content_json || '{}');
+  const category = cleanText(SEO_CATEGORY_SINGULAR[row.category] || content.categoryEn || row.category || 'digital project', 80);
+  const article = /^[aeiou]/i.test(category) ? 'an' : 'a';
+  return `Discover ${row.title}, ${article} ${category} listed on Searya. View project details and connect directly with the owner.`;
+}
+
+function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`, robots = 'index, follow, max-image-preview:large', structuredData = null } = {}) {
+  let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const safeTitle = escapeMarkup(title);
+  const safeDescription = escapeMarkup(description);
+  const safeCanonical = escapeMarkup(canonical);
+  const safeImage = escapeMarkup(image);
+  html = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${safeTitle}</title>`)
+    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${safeDescription}">`)
+    .replace(/<meta name="robots" content="[^"]*">/, `<meta name="robots" content="${escapeMarkup(robots)}">`)
+    .replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${safeCanonical}">`)
+    .replace(/<meta property="og:type" content="[^"]*">/, `<meta property="og:type" content="${escapeMarkup(type)}">`)
+    .replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${safeCanonical}">`)
+    .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${safeTitle}">`)
+    .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${safeDescription}">`)
+    .replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${safeImage}">`)
+    .replace(/<meta property="og:image:secure_url" content="[^"]*">/, `<meta property="og:image:secure_url" content="${safeImage}">`)
+    .replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${safeTitle}">`)
+    .replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${safeDescription}">`)
+    .replace(/<meta name="twitter:image" content="[^"]*">/, `<meta name="twitter:image" content="${safeImage}">`);
+  if (structuredData) {
+    const json = JSON.stringify(structuredData).replaceAll('<', '\\u003c');
+    html = html.replace(/<script id="searya-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="searya-structured-data" type="application/ld+json">${json}</script>`);
+  }
+  return html;
+}
+
+function htmlResponse(req, res, body, status = 200) {
+  const buffer = Buffer.from(body);
+  res.writeHead(status, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Length': buffer.length,
+    'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Frame-Options': 'DENY',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+  });
+  if (req.method === 'HEAD') res.end(); else res.end(buffer);
+}
+
 function serveStatic(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === '/') pathname = '/index.html';
@@ -1743,17 +1810,65 @@ const server = createServer(async (req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, { Allow: 'GET,HEAD,POST,PATCH,DELETE,OPTIONS' }); return res.end(); }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     if (url.pathname === '/robots.txt') {
-      const body = `User-agent: *\nAllow: /\nSitemap: ${APP_ORIGIN}/sitemap.xml\n`;
+      const body = `User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /account\nDisallow: /settings\nDisallow: /messages\nDisallow: /login\nDisallow: /register\nDisallow: /dashboard\nDisallow: /api/\n\nSitemap: ${PUBLIC_ORIGIN}/sitemap.xml\n`;
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });
       return res.end(body);
     }
     if (url.pathname === '/sitemap.xml') {
-      const listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all();
-      const pages = ['', 'legal/privacy.html', 'legal/terms.html', 'legal/cookies.html', 'legal/transfer-checklist.html'].map(path => `<url><loc>${APP_ORIGIN}/${path}</loc></url>`).join('');
-      const listings = listingRows.map(row => `<url><loc>${APP_ORIGIN}/?listing=${encodeURIComponent(row.slug)}</loc><lastmod>${row.updated_at.slice(0, 10)}</lastmod></url>`).join('');
-      const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages}${listings}</urlset>`;
+      let listingRows = [];
+      try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
+      catch (error) { console.error('Sitemap listing query failed:', error); }
+      const pages = ['/', '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
+        .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
+      const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
+      const listings = listingRows.map(row => `<url><loc>${xmlUrl(`/projects/${encodeURIComponent(row.slug)}`)}</loc><lastmod>${escapeMarkup(String(row.updated_at || '').slice(0, 10))}</lastmod></url>`).join('');
+      const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages}${categories}${listings}</urlset>`;
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });
       return res.end(body);
+    }
+    const legacyListingSlug = url.pathname === '/' ? url.searchParams.get('listing') : '';
+    if (legacyListingSlug) return redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`);
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
+      return htmlResponse(req, res, renderSeoPage());
+    }
+    const projectMatch = url.pathname.match(/^\/projects\/([^/]+)\/?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && projectMatch) {
+      const slug = decodeURIComponent(projectMatch[1]);
+      const row = db.prepare(`SELECT * FROM listings WHERE slug=? AND status='approved'`).get(slug);
+      if (!row) return serveStatic(req, res, new URL('/not-found', APP_ORIGIN));
+      const listing = listingFromRow(row);
+      const canonical = `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(row.slug)}`;
+      const title = `${row.title} | Digital Project on Searya`;
+      const description = publicListingDescription(row);
+      const image = /^https:\/\//i.test(listing.coverImage || '') ? listing.coverImage : `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`;
+      return htmlResponse(req, res, renderSeoPage({
+        title,
+        description,
+        canonical,
+        type: 'article',
+        image,
+        structuredData: {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          name: row.title,
+          description,
+          url: canonical,
+          genre: SEO_CATEGORIES[row.category] || row.category,
+          datePublished: row.created_at,
+          dateModified: row.updated_at,
+          isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }
+        }
+      }));
+    }
+    const categoryMatch = url.pathname.match(/^\/projects\/category\/([^/]+)\/?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && categoryMatch) {
+      const category = decodeURIComponent(categoryMatch[1]);
+      const categoryName = SEO_CATEGORIES[category];
+      if (!categoryName) return serveStatic(req, res, new URL('/not-found', APP_ORIGIN));
+      const canonical = `${PUBLIC_ORIGIN}/projects/category/${category}`;
+      const title = `${categoryName} to Discover | Searya`;
+      const description = `Discover ${categoryName.toLowerCase()} listed on Searya and connect directly with project owners.`;
+      return htmlResponse(req, res, renderSeoPage({ title, description, canonical }));
     }
     return serveStatic(req, res, url);
   } catch (error) {

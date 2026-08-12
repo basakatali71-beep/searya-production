@@ -57,7 +57,7 @@ test('The footer includes a clear buyer and seller safety warning', () => {
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
-  assert.match(pageSource, /<title>Searya \| Buy &amp; Sell Digital Projects<\/title>/);
+  assert.match(pageSource, /<title>Searya — Discover Digital Projects, SaaS, Apps &amp; AI Tools<\/title>/);
   assert.match(pageSource, /property="og:locale" content="en_US"/);
   assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-social-preview-en\.png\?v=20260811-1"/);
   assert.match(pageSource, /property="og:image:width" content="1200"/);
