@@ -53,6 +53,14 @@ test('Social sharing metadata uses an absolute English preview card', () => {
   assert.match(pageSource, /property="og:image:height" content="630"/);
 });
 
+test('Searya favicon and English feedback contact are published', () => {
+  assert.match(pageSource, /href="\/favicon\.ico\?v=20260812-1"/);
+  assert.match(pageSource, /href="\/public\/favicon-32\.png\?v=20260812-1"/);
+  assert.match(pageSource, /href="mailto:basakatali71@gmail\.com\?subject=Searya%20Feedback/);
+  assert.match(pageSource, /Help shape Searya/);
+  assert.match(pageSource, /Send Feedback/);
+});
+
 test('Featured project preview and listing cards contain no sample labels', () => {
   for (const id of ['t-preview-view-value', 't-preview-data-value', 't-launch-chat-period']) {
     assert.match(pageSource, new RegExp(`id=["']${id}["']`));

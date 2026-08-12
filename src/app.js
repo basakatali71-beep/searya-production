@@ -288,6 +288,7 @@ function initCookieConsent() {
     showToast(state.lang === 'en' ? 'Only essential cookies will be used.' : 'Yalnızca zorunlu çerezler kullanılacak.');
   });
   document.getElementById('cookie-settings-btn')?.addEventListener('click', () => banner?.classList.remove('hidden'));
+  document.getElementById('feedback-email-link')?.addEventListener('click', () => trackBehavior('button_clicked', { action: 'feedback_email' }));
 }
 
 async function enableAnalyticsTracking() {
