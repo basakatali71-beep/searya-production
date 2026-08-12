@@ -602,7 +602,7 @@ export const translations = {
     footerCommunitySoon: "Official community channels are coming soon.",
     cookiePreferences: "Cookie Preferences",
     cookieTitle: "Your privacy preference",
-    cookieText: "Essential cookies support sign-in. With permission, anonymous visits and campaign conversions are measured.",
+    cookieText: "Essential cookies support sign-in. With permission, anonymous visits, actions and campaign conversions are measured.",
     cookieDetails: "View details",
     cookieEssential: "Essential only",
     cookieAccept: "Allow analytics",

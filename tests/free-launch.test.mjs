@@ -163,3 +163,43 @@ test('campaign attribution reaches the administrator conversion funnel', async (
   assert.equal(campaign.listings, 1);
   assert.equal(campaign.conversations, 1);
 });
+
+test('consented behavior analytics are sanitized and visible only to administrators', async () => {
+  const pageView = await fetch(`${baseUrl}/api/analytics/pageview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: '/?utm_source=x&utm_medium=paid&utm_campaign=behavior_test' })
+  });
+  const visitorCookie = pageView.headers.getSetCookie()[0].split(';')[0];
+  const sessionId = '11111111-2222-4333-8444-555555555555';
+  const presence = await fetch(`${baseUrl}/api/analytics/presence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+    body: JSON.stringify({ sessionId, action: 'enter', path: '/', device: 'mobile' })
+  });
+  assert.equal(presence.status, 201);
+  const tracked = await fetch(`${baseUrl}/api/analytics/event`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+    body: JSON.stringify({
+      eventName: 'search_performed',
+      metadata: { sessionId, path: '/', device: 'mobile', query: 'contact person@example.com', resultCount: 0, password: 'never-store-this', message: 'private message' }
+    })
+  });
+  assert.equal(tracked.status, 201);
+  const stored = db.prepare(`SELECT metadata_json AS metadataJson FROM analytics_events WHERE event_name='search_performed' ORDER BY created_at DESC LIMIT 1`).get();
+  assert.equal(stored.metadataJson.includes('never-store-this'), false);
+  assert.equal(stored.metadataJson.includes('private message'), false);
+  assert.equal(stored.metadataJson.includes('person@example.com'), false);
+
+  const publicOverview = await fetch(`${baseUrl}/api/admin/overview`);
+  assert.equal(publicOverview.status, 401);
+  const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'free-admin@searya.test', password: 'AdminSecurePass123' })
+  });
+  const adminCookie = adminLogin.headers.getSetCookie()[0].split(';')[0];
+  const overview = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
+  assert.equal(overview.analytics.behavior.searches.some(item => item.query.includes('[email removed]')), true);
+  assert.equal(overview.analytics.behavior.devices.some(item => item.key === 'mobile'), true);
+  assert.equal(overview.analytics.behavior.journeys.some(item => item.events.some(event => event.eventName === 'search_performed')), true);
+});

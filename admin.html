@@ -6,7 +6,8 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Searya Admin Center</title>
   <link rel="icon" href="/public/searya-logo.png">
-  <link rel="stylesheet" href="/src/styles/admin.css?v=20260810-2">
+  <link rel="stylesheet" href="/src/styles/admin.css?v=20260812-3">
+  <link rel="stylesheet" href="/src/styles/admin-behavior.css?v=20260812-1">
   <style>.utm-example{margin:-4px 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#080d16;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.utm-example code{color:#a9bfff}.funnel{margin-bottom:0}.live-card{border-color:rgba(50,210,150,.3);background:linear-gradient(145deg,rgba(20,49,47,.92),rgba(11,17,28,.98))}.live-card h2{display:flex;align-items:center;gap:8px}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(50,210,150,.12);animation:livePulse 1.8s ease-in-out infinite}.live-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0}.live-metrics .metric{background:rgba(8,12,20,.44)}.metric-live strong{color:#5ee0ad}@keyframes livePulse{50%{opacity:.5;box-shadow:0 0 0 8px rgba(50,210,150,0)}}@media(max-width:620px){.live-metrics{grid-template-columns:1fr}.live-card .card-head>span{display:none}}</style>
 </head>
 <body>
@@ -15,6 +16,7 @@
     <p class="eyebrow">ADMIN CENTER</p>
     <nav>
       <button class="active" data-section="dashboard">Overview</button>
+      <button data-section="behavior">Visitor Behavior</button>
       <button data-section="analytics">Ad Analytics</button>
       <button data-section="listings">Listings <span id="pending-badge">0</span></button>
       <button data-section="users">Users</button>
@@ -32,6 +34,22 @@
       <article class="card chart-card"><div class="card-head"><h2>Last 7 days</h2><span>Visits and sign-ups</span></div><div id="chart" class="chart"></div></article>
       <div class="split"><article class="card"><div class="card-head"><h2>Listings pending approval</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Open reports</h2></div><div id="report-preview"></div></article></div>
     </section>
+    <section id="behavior" class="panel">
+      <div id="behavior-metrics" class="metrics"></div>
+      <div class="split behavior-split">
+        <article class="card"><div class="card-head"><div><h2>Most viewed listings</h2><span>Listing opens during the last 30 days</span></div></div><div id="behavior-listings" class="insight-list"></div></article>
+        <article class="card"><div class="card-head"><div><h2>Search insights</h2><span>Terms are sanitized; form values are never recorded</span></div></div><div id="behavior-searches" class="insight-list"></div></article>
+      </div>
+      <div class="split behavior-split">
+        <article class="card"><div class="card-head"><div><h2>Why visitors leave</h2><span>Optional exit feedback</span></div></div><div id="behavior-exits" class="insight-list"></div></article>
+        <article class="card"><div class="card-head"><div><h2>Drop-off signals</h2><span>Behavioral indicators, not definite intent</span></div></div><div id="behavior-dropoffs" class="insight-list"></div></article>
+      </div>
+      <div class="split behavior-split">
+        <article class="card"><div class="card-head"><div><h2>Popular actions</h2><span>Most frequent tracked interactions</span></div></div><div id="behavior-actions" class="insight-list"></div></article>
+        <article class="card"><div class="card-head"><div><h2>Devices</h2><span>Session-level device categories</span></div></div><div id="behavior-devices" class="insight-list"></div></article>
+      </div>
+      <article class="card"><div class="card-head"><div><h2>Recent visitor journeys</h2><span>Anonymous unless a visitor signs in · No passwords, messages or form contents</span></div></div><div id="behavior-journeys" class="journey-list"></div></article>
+    </section>
     <section id="analytics" class="panel">
       <div class="card"><div class="card-head"><div><h2>30-day conversion funnel</h2><span>Visitors who consented to analytics only</span></div></div><div id="funnel-metrics" class="metrics funnel"></div></div>
       <div class="card"><div class="card-head"><div><h2>Campaign performance</h2><span>Use UTM parameters in X ad links</span></div></div><div class="utm-example">Example: <code>https://searya.com/?utm_source=x&amp;utm_medium=paid&amp;utm_campaign=seller_launch</code></div><div class="table-wrap"><table><thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Visitors</th><th>Sign-ups</th><th>Listings</th><th>Conversations</th></tr></thead><tbody id="campaign-table"></tbody></table></div></div>
@@ -41,6 +59,6 @@
     <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Plan sales</h2></div><div class="table-wrap"><table><thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
     <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Reports</h2></div><div class="table-wrap"><table><thead><tr><th>Reporter</th><th>Target</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
   </main>
-  <script type="module" src="/src/admin.js?v=20260812-7"></script>
+  <script type="module" src="/src/admin.js?v=20260812-8"></script>
 </body>
 </html>

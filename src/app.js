@@ -1,6 +1,6 @@
 import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-7';
-import { translations } from './data/translations.js?v=20260812-12';
-import { ApiError, SearyaApi } from './api.js?v=20260812-9';
+import { translations } from './data/translations.js?v=20260812-13';
+import { ApiError, SearyaApi } from './api.js?v=20260812-10';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
@@ -10,6 +10,11 @@ const AUTH_ATTEMPT_WINDOW_MS = 60_000;
 const PRESENCE_HEARTBEAT_MS = 30_000;
 let presenceTimer = null;
 let presenceSessionId = '';
+let behaviorSessionStartedAt = 0;
+let behaviorSearchTimer = null;
+let activeBehaviorFlow = null;
+let exitFeedbackTimer = null;
+const EXIT_FEEDBACK_KEY = 'searya-exit-feedback-v1';
 
 function readClientState() {
   try {
@@ -257,6 +262,13 @@ async function startApp() {
   await hydrateBackendState();
 }
 
+window.addEventListener('error', event => {
+  if (!event.filename || new URL(event.filename, location.href).origin !== location.origin) return;
+  trackBehavior('ui_error', { code: 'runtime_error', source: new URL(event.filename, location.href).pathname.split('/').pop() || 'app' });
+});
+
+window.addEventListener('unhandledrejection', () => trackBehavior('ui_error', { code: 'unhandled_request', source: 'app' }));
+
 function initCookieConsent() {
   const banner = document.getElementById('cookie-consent-banner');
   const preference = localStorage.getItem(COOKIE_CONSENT_KEY);
@@ -282,21 +294,57 @@ async function enableAnalyticsTracking() {
   try {
     await SearyaApi.trackPageView(`${location.pathname}${location.search}`, document.referrer);
     startPresenceTracking();
+    setupExitFeedback();
   } catch {
     // Analytics must never interrupt the marketplace experience.
   }
 }
 
+function analyticsDevice() {
+  const width = Math.min(window.innerWidth || 0, screen.width || 0);
+  return width < 640 ? 'mobile' : width < 1024 ? 'tablet' : 'desktop';
+}
+
 function presencePayload(action) {
-  return { sessionId: presenceSessionId, action, path: `${location.pathname}${location.search}` };
+  return { sessionId: presenceSessionId, action, path: `${location.pathname}${location.search}`, device: analyticsDevice() };
+}
+
+function trackBehavior(eventName, metadata = {}) {
+  if (!presenceSessionId || localStorage.getItem(COOKIE_CONSENT_KEY) !== 'analytics') return;
+  SearyaApi.trackEvent(eventName, {
+    sessionId: presenceSessionId,
+    path: `${location.pathname}${location.search}`,
+    device: analyticsDevice(),
+    durationSeconds: behaviorSessionStartedAt ? Math.round((Date.now() - behaviorSessionStartedAt) / 1000) : 0,
+    ...metadata
+  }).catch(() => {});
+}
+
+function startBehaviorFlow(type, metadata = {}) {
+  if (activeBehaviorFlow?.type === type) return;
+  activeBehaviorFlow = { type, metadata, startedAt: Date.now() };
+}
+
+function completeBehaviorFlow(type) {
+  if (activeBehaviorFlow?.type === type) activeBehaviorFlow = null;
+}
+
+function abandonBehaviorFlow(reason = 'closed') {
+  if (!activeBehaviorFlow) return;
+  const eventName = activeBehaviorFlow.type === 'auth' ? 'auth_abandoned' : activeBehaviorFlow.type === 'listing' ? 'listing_form_abandoned' : '';
+  if (eventName) trackBehavior(eventName, { ...activeBehaviorFlow.metadata, reason });
+  activeBehaviorFlow = null;
 }
 
 function startPresenceTracking() {
   if (!presenceSessionId) presenceSessionId = crypto.randomUUID();
-  SearyaApi.trackPresence(presenceSessionId, 'enter', `${location.pathname}${location.search}`).catch(() => {});
+  behaviorSessionStartedAt = Date.now();
+  SearyaApi.trackPresence(presenceSessionId, 'enter', `${location.pathname}${location.search}`, analyticsDevice()).then(() => {
+    trackBehavior('session_started', { source: document.referrer ? 'referral' : 'direct' });
+  }).catch(() => {});
   if (!presenceTimer) {
     presenceTimer = window.setInterval(() => {
-      if (!document.hidden) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`).catch(() => {});
+      if (!document.hidden) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`, analyticsDevice()).catch(() => {});
     }, PRESENCE_HEARTBEAT_MS);
   }
 }
@@ -304,18 +352,75 @@ function startPresenceTracking() {
 function stopPresenceTracking() {
   if (presenceTimer) window.clearInterval(presenceTimer);
   presenceTimer = null;
+  if (exitFeedbackTimer) window.clearTimeout(exitFeedbackTimer);
+  exitFeedbackTimer = null;
   presenceSessionId = '';
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && presenceSessionId) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`).catch(() => {});
+  if (!document.hidden && presenceSessionId) SearyaApi.trackPresence(presenceSessionId, 'heartbeat', `${location.pathname}${location.search}`, analyticsDevice()).catch(() => {});
 });
 
 window.addEventListener('pagehide', event => {
   if (event.persisted || !presenceSessionId || localStorage.getItem(COOKIE_CONSENT_KEY) !== 'analytics') return;
   const body = new Blob([JSON.stringify(presencePayload('leave'))], { type: 'application/json' });
   navigator.sendBeacon('/api/analytics/presence', body);
+  if (activeBehaviorFlow) {
+    const eventName = activeBehaviorFlow.type === 'auth' ? 'auth_abandoned' : activeBehaviorFlow.type === 'listing' ? 'listing_form_abandoned' : '';
+    if (eventName) navigator.sendBeacon('/api/analytics/event', new Blob([JSON.stringify({ eventName, metadata: { ...presencePayload('leave'), ...activeBehaviorFlow.metadata, reason: 'page_exit' } })], { type: 'application/json' }));
+  }
 });
+
+function setupExitFeedback() {
+  let previous = null;
+  try { previous = JSON.parse(localStorage.getItem(EXIT_FEEDBACK_KEY) || 'null'); } catch { previous = null; }
+  if (previous?.until && previous.until > Date.now()) return;
+  const eligibleAt = Date.now() + 20_000;
+  let triggered = false;
+  const desktopExitIntent = event => {
+    if (!triggered && event.clientY <= 0 && Date.now() >= eligibleAt) {
+      triggered = true;
+      showExitFeedback();
+    }
+  };
+  document.addEventListener('mouseout', desktopExitIntent);
+  exitFeedbackTimer = window.setTimeout(showExitFeedback, analyticsDevice() === 'mobile' ? 75_000 : 120_000);
+}
+
+function showExitFeedback() {
+  if (document.getElementById('exit-feedback-card') || localStorage.getItem(COOKIE_CONSENT_KEY) !== 'analytics') return;
+  const wrapper = document.createElement('aside');
+  wrapper.id = 'exit-feedback-card';
+  wrapper.className = 'fixed z-[90] bottom-4 left-4 right-4 sm:left-auto sm:w-[390px] rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-5 animate-fade-in';
+  wrapper.setAttribute('aria-label', 'Exit feedback');
+  wrapper.innerHTML = `
+    <button type="button" id="exit-feedback-close" class="absolute right-4 top-4 text-slate-400 hover:text-slate-900 dark:hover:text-white" aria-label="Close"><i class="ph-bold ph-x"></i></button>
+    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">One quick question</p>
+    <h2 class="mt-1 pr-8 text-lg font-black text-slate-950 dark:text-white">What kept you from continuing today?</h2>
+    <div class="mt-4 grid gap-2">
+      ${[
+        ['could_not_find_project', 'I could not find the right project'],
+        ['trust_concerns', 'I need more trust or verification'],
+        ['not_ready', 'I am only browsing for now'],
+        ['something_broken', 'Something did not work'],
+        ['need_more_information', 'I need more information'],
+        ['other', 'Another reason']
+      ].map(([value, label]) => `<button type="button" data-exit-reason="${value}" class="text-left rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors">${label}</button>`).join('')}
+    </div>`;
+  document.body.appendChild(wrapper);
+  trackBehavior('exit_feedback_shown');
+  wrapper.querySelectorAll('[data-exit-reason]').forEach(button => button.addEventListener('click', () => {
+    trackBehavior('exit_feedback_submitted', { reason: button.dataset.exitReason });
+    try { localStorage.setItem(EXIT_FEEDBACK_KEY, JSON.stringify({ until: Date.now() + 30 * 86400000 })); } catch { /* Optional storage. */ }
+    wrapper.innerHTML = '<div class="py-5 text-center"><i class="ph-fill ph-check-circle text-3xl text-emerald-500"></i><p class="mt-2 font-black text-slate-900 dark:text-white">Thank you — this helps us improve Searya.</p></div>';
+    window.setTimeout(() => wrapper.remove(), 1400);
+  }));
+  document.getElementById('exit-feedback-close')?.addEventListener('click', () => {
+    trackBehavior('exit_feedback_dismissed');
+    try { localStorage.setItem(EXIT_FEEDBACK_KEY, JSON.stringify({ until: Date.now() + 3 * 86400000 })); } catch { /* Optional storage. */ }
+    wrapper.remove();
+  });
+}
 
 function applyAuthenticatedUser(user) {
   state.currentUser = user || null;
@@ -1129,6 +1234,10 @@ function setupEventListeners() {
     search.addEventListener('input', (e) => {
       state.searchQuery = normalizeSearch(e.target.value).trim();
       renderListings();
+      window.clearTimeout(behaviorSearchTimer);
+      behaviorSearchTimer = window.setTimeout(() => {
+        if (state.searchQuery.length >= 2) trackBehavior('search_performed', { query: state.searchQuery, resultCount: document.querySelectorAll('.project-card').length, tab: state.activeTab });
+      }, 700);
     });
   }
 
@@ -1137,6 +1246,7 @@ function setupEventListeners() {
     sort.addEventListener('change', (e) => {
       state.sortBy = e.target.value;
       renderListings();
+      trackBehavior('sort_changed', { sort: state.sortBy, tab: state.activeTab });
     });
   }
 
@@ -1927,6 +2037,7 @@ function switchPricingView(mode) {
 
 // Switch Main Tab cleanly
 function switchTab(tab) {
+  const changed = state.activeTab !== tab;
   state.activeTab = tab;
   state.categoryFilter = 'all';
 
@@ -1954,6 +2065,7 @@ function switchTab(tab) {
     if (gSub) gSub.textContent = dict.gridSubtitleWtb;
   }
   renderListings();
+  if (changed) trackBehavior('tab_changed', { tab });
 }
 
 function selectCategory(category = 'all') {
@@ -1966,6 +2078,7 @@ function selectCategory(category = 'all') {
   selected?.classList.add('active', 'bg-slate-900', 'text-white', 'dark:bg-slate-800');
   state.categoryFilter = selected?.dataset.category || 'all';
   renderListings();
+  trackBehavior('filter_changed', { category: state.categoryFilter, tab: state.activeTab });
 }
 
 function updateAlertControls() {
@@ -2407,6 +2520,7 @@ function openProjectDetailModal(p) {
   const safeTitle = escapeHtml(title);
   const safeDesc = escapeHtml(desc);
   const profile = p.seller || p.buyer || {};
+  trackBehavior('listing_opened', { listingId: p.id, listingTitle: title, listingType: isSale ? 'sale' : 'wtb' });
   p.views = (p.views || 0) + 1;
   if (!p.viewRecorded && p.id) {
     p.viewRecorded = true;
@@ -2551,6 +2665,7 @@ function openProjectDetailModal(p) {
 }
 
 function closeModal() {
+  if (activeBehaviorFlow?.type === 'listing') abandonBehaviorFlow('modal_closed');
   const backdrop = el.modalBackdrop();
   if (backdrop) backdrop.classList.add('hidden');
   if (state.openListingSlug) {
@@ -2601,6 +2716,7 @@ function openReportModal(listing) {
 
 // Interactive Social Media Share Card Generator Modal
 function openShareCardModal(p) {
+  trackBehavior('button_clicked', { action: 'share_card_opened', listingId: p.id, listingTitle: p.title });
   const isSale = p.type === 'sale' || p.askingPrice;
   let activeFormat = 'twitter';
   const shareUrl = `${window.location.origin}${window.location.pathname}?listing=${encodeURIComponent(p.slug || p.id)}`;
@@ -2741,7 +2857,7 @@ function openShareCardModal(p) {
             <span>${state.lang === 'en' ? 'Copy Text & Link' : 'Metni & Linki Kopyala'}</span>
           </button>
 
-          <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(`🔥 SEARYA ${badgeText}: ${cardTitle}\n💰 ${priceText}\n👉 Details: ${shareUrl}\n#BuildInPublic #Searya`)}" target="_blank" rel="noopener noreferrer" class="flex-1 py-3 rounded-xl ${isPurple ? 'bg-purple-600 hover:bg-purple-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all text-center">
+          <a id="share-x-link" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(`🔥 SEARYA ${badgeText}: ${cardTitle}\n💰 ${priceText}\n👉 Details: ${shareUrl}\n#BuildInPublic #Searya`)}" target="_blank" rel="noopener noreferrer" class="flex-1 py-3 rounded-xl ${isPurple ? 'bg-purple-600 hover:bg-purple-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all text-center">
             <i class="ph-bold ph-x-logo text-base"></i>
             <span>${state.lang === 'en' ? 'Share on X / Twitter' : 'X (Twitter)\'da Paylaş'}</span>
           </a>
@@ -2763,12 +2879,14 @@ function openShareCardModal(p) {
       const text = document.getElementById('tweet-textarea').value;
       try {
         await navigator.clipboard.writeText(text);
+        trackBehavior('listing_shared', { listingId: p.id, listingTitle: p.title, listingType: p.type || (p.askingPrice ? 'sale' : 'wtb'), action: 'copy' });
         showToast(t().toastCopied);
       } catch {
         document.getElementById('tweet-textarea')?.select();
         showToast(state.lang === 'en' ? 'Select and copy the text manually.' : 'Metni seçip manuel olarak kopyalayın.');
       }
     });
+    document.getElementById('share-x-link')?.addEventListener('click', () => trackBehavior('listing_shared', { listingId: p.id, listingTitle: p.title, listingType: p.type || (p.askingPrice ? 'sale' : 'wtb'), action: 'x' }));
   };
 
   updateCardPreview();
@@ -2784,6 +2902,8 @@ function openCreateListingModal(editListing = null) {
     return;
   }
   const dict = t();
+  startBehaviorFlow('listing', { mode: editListing ? 'edit' : 'create', listingType: editListing?.type || 'undecided' });
+  trackBehavior('listing_form_started', { mode: editListing ? 'edit' : 'create', listingType: editListing?.type || 'undecided' });
   let uploadedImageData = editListing?.coverImage || '';
   const backdrop = el.modalBackdrop();
   const content = el.modalContent();
@@ -2963,6 +3083,7 @@ function openCreateListingModal(editListing = null) {
     }
 
     if (!requireAuthenticated()) return;
+    trackBehavior('listing_submit_attempted', { mode: editListing ? 'edit' : 'create', listingType: type, category });
     const submitButton = e.currentTarget.querySelector('button[type="submit"]');
     const originalButtonHtml = submitButton?.innerHTML || '';
     if (submitButton) {
@@ -2983,6 +3104,8 @@ function openCreateListingModal(editListing = null) {
       };
       const result = editListing ? await SearyaApi.updateListing(editListing.id, listingPayload) : await SearyaApi.createListing(listingPayload);
       if (result.user) applyAuthenticatedUser(result.user);
+      trackBehavior('listing_submit_succeeded', { mode: editListing ? 'edit' : 'create', listingType: type, category, listingId: result.listing?.id || editListing?.id || '' });
+      completeBehaviorFlow('listing');
       closeModal();
       if (editListing) {
         await hydrateBackendState();
@@ -3000,6 +3123,7 @@ function openCreateListingModal(editListing = null) {
         await openAccountModal({ notice: state.lang === 'en' ? 'Your listing is visible below with “Pending review” status. It will appear publicly after approval.' : 'İlanınız aşağıda “Onay bekliyor” durumuyla görünüyor. Yönetici onayından sonra herkese açık yayınlanacak.' });
       }
     } catch (error) {
+      trackBehavior('listing_submit_failed', { mode: editListing ? 'edit' : 'create', listingType: type, category, code: error?.code || 'request_failed' });
       if (error instanceof ApiError && error.code === 'FREE_LAUNCH_LISTING_LIMIT') {
         setFormStatus(apiErrorMessage(error), 'error');
         if (submitButton) {
@@ -3065,7 +3189,11 @@ async function toggleInboxDrawer() {
 }
 
 async function openInboxWithMessage(listing) {
-  if (!requireAuthenticated()) return;
+  trackBehavior('conversation_attempted', { listingId: listing.id, listingTitle: listing.title, listingType: listing.type || (listing.askingPrice ? 'sale' : 'wtb') });
+  if (!requireAuthenticated()) {
+    trackBehavior('conversation_failed', { listingId: listing.id, code: 'authentication_required' });
+    return;
+  }
   try {
     const starter = state.lang === 'en' ? `Hi! I am interested in ${listing.title}. Is it still available?` : `Selam! ${listing.title} ilanı ile ilgileniyorum. Hâlâ müsait mi?`;
     const result = await SearyaApi.startThread(listing.id, starter);
@@ -3075,7 +3203,9 @@ async function openInboxWithMessage(listing) {
     state.inboxOpen = true;
     renderInboxDrawerContent();
     el.inboxDrawer()?.classList.remove('translate-x-full');
+    trackBehavior('conversation_started_client', { listingId: listing.id, listingTitle: listing.title });
   } catch (error) {
+    trackBehavior('conversation_failed', { listingId: listing.id, code: error?.code || 'request_failed' });
     if (error instanceof ApiError && error.code === 'FREE_LAUNCH_CONNECTION_LIMIT') showToast(apiErrorMessage(error));
     else if (error instanceof ApiError && error.code === 'CONNECTION_CREDIT_REQUIRED') openBuyerConnectionPack();
     else showToast(apiErrorMessage(error));
@@ -3260,6 +3390,8 @@ let authRole = 'buyer';
 
 function showOnboardingPage(mode = 'login') {
   authMode = mode === 'register' || mode === 1 ? 'register' : 'login';
+  startBehaviorFlow('auth', { mode: authMode });
+  trackBehavior('auth_started', { mode: authMode });
   const obView = document.getElementById('onboarding-fullview');
   const mainView = document.getElementById('main-app-view');
 
@@ -3279,6 +3411,7 @@ function showMainAppPage(scrollToListings = false) {
   const mainView = document.getElementById('main-app-view');
 
   if (obView && mainView) {
+    if (activeBehaviorFlow?.type === 'auth') abandonBehaviorFlow('auth_view_closed');
     obView.classList.add('hidden');
     obView.classList.remove('flex');
     mainView.classList.remove('hidden');
@@ -3466,14 +3599,19 @@ function renderAuthCard() {
         : await SearyaApi.login({ email, password });
       state.backendReady = true;
       if (payload.verificationRequired) {
+        trackBehavior('auth_completed', { mode: authMode, role: authRole, step: 'verification_required' });
+        completeBehaviorFlow('auth');
         showMainAppPage();
         openVerificationPendingModal(email);
         return;
       }
       applyAuthenticatedUser(payload.user);
+      trackBehavior('auth_completed', { mode: authMode, role: payload.user?.role || authRole, step: 'signed_in' });
+      completeBehaviorFlow('auth');
       showToast(authMode === 'login' ? (isEn ? 'Welcome back!' : 'Başarıyla giriş yapıldı!') : (isEn ? 'Your account is ready!' : 'Hesabınız başarıyla oluşturuldu!'));
       showMainAppPage();
     } catch (error) {
+      trackBehavior('auth_failed', { mode: authMode, role: authMode === 'register' ? authRole : '', code: error?.code || 'request_failed' });
       const message = apiErrorMessage(error);
       if (status) {
         status.textContent = message;

@@ -1,0 +1,33 @@
+.insight-list { display: grid; gap: 2px; }
+.insight-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+.insight-row:first-child { border-top: 0; }
+.insight-copy { min-width: 0; }
+.insight-copy strong, .insight-copy small { display: block; }
+.insight-copy strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.insight-copy small { color: var(--muted); font-size: 10px; margin-top: 3px; }
+.insight-value { width: 110px; flex: 0 0 110px; text-align: right; }
+.insight-value b { font-size: 12px; }
+.insight-value i { display: block; height: 4px; margin-top: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--blue) var(--fill), #1b2537 var(--fill)); }
+.journey-list { display: grid; gap: 9px; }
+.journey { border: 1px solid var(--line); border-radius: 14px; background: rgba(7,11,18,.45); overflow: hidden; }
+.journey summary { list-style: none; cursor: pointer; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.journey summary::-webkit-details-marker { display: none; }
+.journey summary strong, .journey summary small { display: block; }
+.journey summary strong { font-size: 12px; }
+.journey summary small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.journey-outcome { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.journey-outcome b { font-size: 11px; color: #b5c1d4; }
+.journey-body { border-top: 1px solid var(--line); padding: 13px 16px; }
+.journey-body > p { margin: 0 0 12px; color: var(--muted); font-size: 10px; }
+.journey-body > p strong { color: #cad4e6; margin-right: 5px; }
+.journey-body ol { list-style: none; margin: 0; padding: 0; display: grid; }
+.journey-body li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: start; padding: 7px 0; }
+.journey-body li > i { width: 8px; height: 8px; border: 2px solid var(--blue); border-radius: 50%; margin-top: 3px; }
+.journey-body li strong, .journey-body li small { display: block; font-size: 10px; }
+.journey-body li small { color: var(--muted); margin-top: 2px; }
+.journey-body time { font-size: 9px; color: #68778d; }
+@media (max-width: 520px) {
+  .journey summary { align-items: flex-start; flex-direction: column; }
+  .journey-outcome { width: 100%; justify-content: space-between; }
+  .insight-value { width: 72px; flex-basis: 72px; }
+}
