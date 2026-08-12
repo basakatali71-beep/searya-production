@@ -24,13 +24,13 @@ test('The public interface is English-only', () => {
   assert.doesNotMatch(apiSource, /İstek başarısız/);
 });
 
-test('The admin interface is English-only', () => {
-  assert.match(adminPageSource, /<html lang="en"/);
-  assert.match(adminPageSource, /Searya Admin Center/);
-  assert.match(adminPageSource, /Live visitor tracking/);
-  assert.doesNotMatch(adminPageSource, /[çğıöşüÇĞİÖŞÜ]/);
-  assert.doesNotMatch(adminSource, /toLocaleString\('tr-TR'\)/);
-  assert.match(adminSource, /Administrator sign-in required/);
+test('The private admin interface is Turkish', () => {
+  assert.match(adminPageSource, /<html lang="tr"/);
+  assert.match(adminPageSource, /Searya Yönetim Paneli/);
+  assert.match(adminPageSource, /Canlı ziyaretçi takibi/);
+  assert.match(adminPageSource, /Ziyaretçi Davranışları/);
+  assert.match(adminSource, /toLocaleLowerCase\('tr-TR'\)/);
+  assert.match(adminSource, /Yönetici girişi gerekiyor/);
 });
 
 test('Dead fake-success and paid legacy sections are not shipped', () => {
