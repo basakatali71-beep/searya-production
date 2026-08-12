@@ -68,6 +68,49 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(missing.status, 404);
 });
 
+test('high-intent landing routes have unique metadata, visible FAQs and real filtered listings', async () => {
+  const routes = new Map([
+    ['/saas-for-sale', 'Discover SaaS Projects for Sale'],
+    ['/micro-saas-for-sale', 'Discover Micro SaaS Projects for Sale'],
+    ['/mobile-apps-for-sale', 'Discover Mobile App Projects for Sale'],
+    ['/ai-tools-for-sale', 'Discover AI Tools &amp; Projects for Sale'],
+    ['/chrome-extensions-for-sale', 'Discover Chrome Extension Projects for Sale'],
+    ['/websites-for-sale', 'Discover Websites &amp; Web Projects for Sale'],
+    ['/sell-your-saas', 'Looking to Sell Your SaaS? Get Discovered by Potential Buyers'],
+    ['/sell-your-app', 'Looking to Sell Your App? Find Potential Buyers'],
+    ['/sell-your-digital-project', 'Find Potential Buyers for Your Digital Project']
+  ]);
+  const titles = new Set();
+  for (const [route, h1] of routes) {
+    const response = await fetch(`${baseUrl}${route}?utm_source=test`);
+    assert.equal(response.status, 200, route);
+    const html = await response.text();
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com${route}">`), route);
+    assert.ok(html.includes(`<h1>${h1}</h1>`), route);
+    assert.match(html, /"@type":"FAQPage"/, route);
+    assert.match(html, /<section class="section">[\s\S]*Frequently asked questions/, route);
+    assert.doesNotMatch(html, /Buy now|Secure checkout|Transaction protection|guaranteed buyers|guaranteed sales/i, route);
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+    assert.ok(title && !titles.has(title), `unique title for ${route}`);
+    titles.add(title);
+  }
+
+  const mobileListings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
+  const mobile = mobileListings.listings.find(item => item.category === 'mobile');
+  const mobilePage = await fetch(`${baseUrl}/mobile-apps-for-sale`).then(response => response.text());
+  assert.match(mobilePage, new RegExp(`/projects/${mobile.slug}`));
+  const websitePage = await fetch(`${baseUrl}/websites-for-sale`).then(response => response.text());
+  assert.match(websitePage, /No projects in this category yet/);
+
+  const requests = await fetch(`${baseUrl}/api/listings?type=wtb`).then(response => response.json());
+  const request = requests.listings.find(item => item.category === 'mobile');
+  const sellerPage = await fetch(`${baseUrl}/sell-your-app`).then(response => response.text());
+  assert.match(sellerPage, new RegExp(`/projects/${request.slug}`));
+
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  for (const route of routes.keys()) assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${route}`));
+});
+
 test('anonymous visitors cannot create listings', async () => {
   const response = await fetch(`${baseUrl}/api/listings`, {
     method: 'POST',

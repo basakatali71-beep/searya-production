@@ -72,6 +72,14 @@ test('Searya favicon and English feedback contact are published', () => {
   assert.match(pageSource, /Send Feedback/);
 });
 
+test('The footer exposes a concise set of SEO discovery links', () => {
+  assert.match(pageSource, /aria-label="Explore project categories"/);
+  assert.match(pageSource, /href="\/saas-for-sale"/);
+  assert.match(pageSource, /href="\/mobile-apps-for-sale"/);
+  assert.match(pageSource, /href="\/ai-tools-for-sale"/);
+  assert.match(pageSource, /href="\/sell-your-digital-project"/);
+});
+
 test('Featured project preview and listing cards contain no sample labels', () => {
   for (const id of ['t-preview-view-value', 't-preview-data-value', 't-launch-chat-period']) {
     assert.match(pageSource, new RegExp(`id=["']${id}["']`));

@@ -1711,6 +1711,147 @@ const SEO_CATEGORIES = Object.freeze({
   extension: 'Chrome Extensions'
 });
 const SEO_CATEGORY_SINGULAR = Object.freeze({ saas: 'SaaS project', mobile: 'mobile app', ai: 'AI tool', extension: 'Chrome extension' });
+const SEO_LANDING_PATHS = Object.freeze([
+  '/saas-for-sale', '/micro-saas-for-sale', '/mobile-apps-for-sale', '/ai-tools-for-sale', '/chrome-extensions-for-sale', '/websites-for-sale',
+  '/sell-your-saas', '/sell-your-app', '/sell-your-digital-project'
+]);
+const SEO_LANDING_PAGES = Object.freeze({
+  '/saas-for-sale': {
+    title: 'SaaS Projects for Sale | Discover SaaS Opportunities | Searya',
+    description: 'Browse SaaS projects listed on Searya. Discover software opportunities and connect directly with project owners.',
+    h1: 'Discover SaaS Projects for Sale',
+    intro: 'Browse SaaS projects listed by their owners and connect directly with founders when you find an opportunity that interests you.',
+    kicker: 'SaaS opportunities', category: 'saas', listingTitle: 'Current SaaS projects',
+    explanation: 'SaaS listings can range from focused software tools and early MVPs to established subscription products. Review each project’s product scope, technology, ownership and evidence directly with its owner.',
+    related: ['/micro-saas-for-sale', '/ai-tools-for-sale', '/sell-your-saas'],
+    faqs: [
+      ['Can I buy a SaaS directly through Searya?', 'No. Searya helps potential buyers discover SaaS projects and contact their owners. Negotiation, due diligence and any transaction take place outside Searya.'],
+      ['What should I review before pursuing a SaaS project?', 'Inspect the product, source code, ownership, infrastructure, customer obligations, operating costs and any claimed revenue directly with the owner.'],
+      ['Can owners list SaaS products built specifically to sell?', 'Yes. Searya is open to eligible SaaS projects intentionally built for sale as well as products whose owners are ready to move on.'],
+      ['Does Searya take a commission from a SaaS sale?', 'Searya does not process the transaction between buyer and seller and does not take a marketplace commission from that transaction.']
+    ]
+  },
+  '/micro-saas-for-sale': {
+    title: 'Micro SaaS for Sale | Discover Small SaaS Projects | Searya',
+    description: 'Discover micro SaaS and small software projects listed by their owners. Browse opportunities and connect directly on Searya.',
+    h1: 'Discover Micro SaaS Projects for Sale',
+    intro: 'Explore focused software products built for specific audiences, then speak directly with the owners behind the projects that fit your interests.',
+    kicker: 'Focused software products', category: 'saas', micro: true, listingTitle: 'Current micro SaaS projects',
+    explanation: 'Micro SaaS projects usually solve one focused problem for a defined audience. Evaluate the workflow, codebase, maintenance needs, distribution channels and evidence behind any business claims before moving forward.',
+    related: ['/saas-for-sale', '/ai-tools-for-sale', '/sell-your-saas'],
+    faqs: [
+      ['What counts as a micro SaaS project?', 'A micro SaaS is generally a focused software product serving a narrow use case or audience, often operated by a small team or solo founder.'],
+      ['Are all listed micro SaaS projects generating revenue?', 'No. Project stages vary. Use only the information shown in each listing and ask the owner to substantiate any revenue or customer claims.'],
+      ['How do I contact a micro SaaS owner?', 'Open the project details and start a conversation through Searya. The owner can then answer product-specific questions directly.'],
+      ['Does Searya handle the project transfer?', 'No. Searya facilitates discovery and contact. The parties independently arrange due diligence, agreements, payment and transfer.']
+    ]
+  },
+  '/mobile-apps-for-sale': {
+    title: 'Mobile Apps for Sale | Discover App Projects | Searya',
+    description: 'Explore iOS, Android and cross-platform app projects listed by owners, then connect directly to discuss the product and transfer scope.',
+    h1: 'Discover Mobile App Projects for Sale',
+    intro: 'Explore iOS, Android and cross-platform app projects, review what each listing includes and connect directly with the project owner.',
+    kicker: 'iOS and Android projects', category: 'mobile', listingTitle: 'Current mobile app projects',
+    explanation: 'A mobile app opportunity may include source code, designs, store listings, back-end services or related accounts. Confirm exactly what is owned and transferable before making any commitment.',
+    related: ['/ai-tools-for-sale', '/websites-for-sale', '/sell-your-app'],
+    faqs: [
+      ['Does Searya sell mobile apps?', 'No. Owners publish app listings and interested people can contact them. Searya does not process the purchase or transfer.'],
+      ['Should I check App Store and Play Store ownership?', 'Yes. Confirm developer-account constraints, app ownership, signing keys, privacy obligations, third-party SDKs and which assets can legally be transferred.'],
+      ['Can unpublished mobile app projects be listed?', 'Yes, provided the listing clearly explains the current stage and the owner has the rights required to offer the project.'],
+      ['Can I post what kind of app I am looking for?', 'Yes. A Looking to Buy request can describe your preferred platform, category, technology, requirements and budget.']
+    ]
+  },
+  '/ai-tools-for-sale': {
+    title: 'AI Tools for Sale | Discover AI Projects | Searya',
+    description: 'Discover AI tools, AI SaaS and software projects listed by their owners. Review opportunities and connect directly on Searya.',
+    h1: 'Discover AI Tools & Projects for Sale',
+    intro: 'Explore AI tools and AI-enabled software projects, understand how they work and contact their owners directly when there is a potential fit.',
+    kicker: 'AI software opportunities', category: 'ai', listingTitle: 'Current AI tools and projects',
+    explanation: 'AI projects may depend on model providers, data sources and usage-based infrastructure. Review prompts, workflows, data rights, API costs, reliability and technical documentation with the owner.',
+    related: ['/saas-for-sale', '/micro-saas-for-sale', '/sell-your-digital-project'],
+    faqs: [
+      ['Are the AI models included with a listed project?', 'Not necessarily. Many tools rely on third-party APIs or open-source models. Ask the owner which accounts, licenses, data and model access can be transferred.'],
+      ['Does Searya verify AI project performance?', 'Searya does not guarantee model quality, accuracy or business claims. Buyers should test the working product and review the implementation themselves.'],
+      ['Can I discover an early-stage AI prototype?', 'Yes. Listings may cover different stages, provided their descriptions accurately explain what currently works and what remains to be built.'],
+      ['Where does the transaction happen?', 'Outside Searya. The platform helps you discover the project and start a direct conversation with its owner.']
+    ]
+  },
+  '/chrome-extensions-for-sale': {
+    title: 'Chrome Extensions for Sale | Discover Projects | Searya',
+    description: 'Discover Chrome and browser extension projects listed by their owners. View details and connect directly through Searya.',
+    h1: 'Discover Chrome Extension Projects for Sale',
+    intro: 'Explore browser extension projects, compare their use cases and technology, and speak directly with project owners.',
+    kicker: 'Browser extension projects', category: 'extension', listingTitle: 'Current Chrome extension projects',
+    explanation: 'Before pursuing an extension, review its Manifest version, permissions, store status, privacy disclosures, code ownership and any dependencies on external services.',
+    related: ['/saas-for-sale', '/websites-for-sale', '/sell-your-digital-project'],
+    faqs: [
+      ['Can Chrome Web Store listings be transferred?', 'Store and developer-account rules can change. Confirm the current platform requirements and the exact transfer process before agreeing to anything.'],
+      ['Are Firefox or other browser extensions eligible?', 'Yes. Owners can describe supported browsers in the listing, even though this page primarily helps people discover Chrome extension opportunities.'],
+      ['What permissions should I review?', 'Inspect every requested browser permission, the privacy policy, data handling, remote services and whether the current implementation follows store policies.'],
+      ['Does Searya provide checkout for extensions?', 'No. Searya supports discovery and owner contact only; it does not process a purchase or project transfer.']
+    ]
+  },
+  '/websites-for-sale': {
+    title: 'Websites for Sale | Discover Web Projects | Searya',
+    description: 'Explore websites and web projects listed by owners. Discover online project opportunities and connect directly on Searya.',
+    h1: 'Discover Websites & Web Projects for Sale',
+    intro: 'Discover websites and web-based projects from their owners, review what is included and start a direct conversation when a project interests you.',
+    kicker: 'Web project discovery', category: 'website', listingTitle: 'Current websites and web projects',
+    explanation: 'Website projects can involve code, content, domains, hosting, analytics and third-party accounts. Verify ownership and document every asset included in a proposed transfer.',
+    related: ['/saas-for-sale', '/mobile-apps-for-sale', '/sell-your-digital-project'],
+    faqs: [
+      ['What kinds of websites can appear here?', 'Eligible listings may include content sites, web applications, online tools and other web projects whose owners are prepared to discuss a transfer.'],
+      ['Will the domain always be included?', 'No. The owner must state what is included. Confirm the domain, code, content, brand, hosting and connected accounts individually.'],
+      ['Can I contact an owner without completing a purchase?', 'Yes. Searya is designed to help interested people ask questions and assess potential fit before making independent decisions.'],
+      ['Does Searya guarantee website traffic?', 'No. Ask for verifiable analytics access and independently assess traffic quality, ownership and historical performance.']
+    ]
+  },
+  '/sell-your-saas': {
+    title: 'Sell Your SaaS | Find Potential SaaS Buyers | Searya',
+    description: 'List your SaaS project on Searya and become discoverable to people exploring software opportunities. Connect directly with interested buyers.',
+    h1: 'Looking to Sell Your SaaS? Get Discovered by Potential Buyers',
+    intro: 'Create a clear SaaS listing, explain what you built and become discoverable to people actively exploring digital projects.',
+    kicker: 'For SaaS owners', category: 'saas', seller: true, listingTitle: 'People looking for SaaS projects', cta: 'List Your SaaS',
+    explanation: 'A useful listing sets expectations: describe the problem, current product stage, technology, included assets and the evidence you can share privately. Searya helps potential buyers find and contact you; it does not promise a sale.',
+    related: ['/saas-for-sale', '/micro-saas-for-sale', '/sell-your-digital-project'],
+    faqs: [
+      ['Will Searya sell my SaaS for me?', 'No. Searya helps your project become discoverable and gives interested people a way to contact you directly.'],
+      ['What should my SaaS listing include?', 'Explain the product, audience, current stage, technology, asking price, included assets and any important limitations accurately.'],
+      ['Can I list a SaaS with no revenue?', 'Yes. Clearly state the current stage and avoid implying traction or revenue that you cannot verify.'],
+      ['Does Searya take a commission?', 'Searya does not process the transaction and does not take a marketplace commission from a sale arranged between users.']
+    ]
+  },
+  '/sell-your-app': {
+    title: 'Sell Your Mobile App | Find Potential App Buyers | Searya',
+    description: 'List your mobile app project and connect with people exploring iOS, Android and cross-platform app opportunities on Searya.',
+    h1: 'Looking to Sell Your App? Find Potential Buyers',
+    intro: 'Present your mobile app clearly and make it discoverable to people searching for iOS, Android and cross-platform projects.',
+    kicker: 'For mobile app owners', category: 'mobile', seller: true, listingTitle: 'People looking for mobile app projects', cta: 'List Your App',
+    explanation: 'Tell potential buyers whether the app is published, which platforms it supports, what technology it uses and which code, design, back-end and store assets are included.',
+    related: ['/mobile-apps-for-sale', '/sell-your-digital-project', '/ai-tools-for-sale'],
+    faqs: [
+      ['Can I list an app that is not in an app store?', 'Yes. Describe whether it is a prototype, MVP, TestFlight build or production app so interested people understand its actual stage.'],
+      ['Should I publish private source code in my listing?', 'No. Explain the technology and product clearly, then share sensitive evidence only through an appropriate due-diligence process.'],
+      ['Does listing guarantee buyer interest?', 'No. A listing makes the project discoverable, but Searya cannot promise messages, offers or a completed sale.'],
+      ['Who handles the app transfer?', 'You and the interested party arrange the agreement, payment and transfer outside Searya.']
+    ]
+  },
+  '/sell-your-digital-project': {
+    title: 'Sell Your Digital Project | Find Potential Buyers | Searya',
+    description: 'List your software, website, app, AI tool or side project on Searya and connect directly with potential buyers.',
+    h1: 'Find Potential Buyers for Your Digital Project',
+    intro: 'List your software, app, website, AI tool or online project and make it easier for interested people to discover what you built.',
+    kicker: 'For project owners', category: 'all', seller: true, listingTitle: 'What buyers are currently looking for', cta: 'List Your Project',
+    explanation: 'Strong listings are specific and honest. Explain the project’s purpose, stage, technology, included assets and known limitations so potential buyers can decide whether to start a conversation.',
+    related: ['/sell-your-saas', '/sell-your-app', '/websites-for-sale'],
+    faqs: [
+      ['What digital projects can I list?', 'Eligible projects can include SaaS products, mobile apps, AI tools, websites, browser extensions and other software-based projects you are authorized to offer.'],
+      ['Is Searya only for unfinished projects?', 'No. Owners can list intentionally built projects, active products, side projects or other eligible digital projects they are ready to discuss.'],
+      ['How do potential buyers reach me?', 'Interested users can open your public listing and start a conversation through Searya.'],
+      ['Does Searya manage agreements or payments?', 'No. Searya connects users. The parties are responsible for due diligence, contracts, payments and transfers outside the platform.']
+    ]
+  }
+});
 
 function escapeMarkup(value) {
   return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
@@ -1768,6 +1909,55 @@ function htmlResponse(req, res, body, status = 200) {
   if (req.method === 'HEAD') res.end(); else res.end(buffer);
 }
 
+function landingListingMatches(row, page) {
+  if (page.category === 'all') return true;
+  if (row.category !== page.category) return false;
+  if (!page.micro) return true;
+  const content = JSON.parse(row.content_json || '{}');
+  return /micro\s*saas/i.test(`${content.categoryEn || ''} ${content.descriptionEn || ''} ${content.shortDescEn || ''} ${row.title}`);
+}
+
+function landingProjectCard(row) {
+  const listing = listingFromRow(row);
+  const content = JSON.parse(row.content_json || '{}');
+  const description = cleanText(content.shortDescEn || content.descriptionEn || content.description || '', 190);
+  const person = content.seller?.name || content.buyer?.name || 'Project owner';
+  const label = row.type === 'wtb' ? 'Looking to buy' : (SEO_CATEGORIES[row.category] || cleanText(row.category, 40));
+  const rawImage = safeImageData(content.coverImage);
+  const image = /^https:\/\//i.test(rawImage) ? rawImage : '';
+  const title = listing.titleEn || row.title;
+  return `<article class="project-card">${image ? `<img src="${escapeMarkup(image)}" alt="${escapeMarkup(title)}" loading="lazy" width="640" height="340">` : ''}<div class="project-body"><div class="project-meta"><span>${escapeMarkup(label)}</span><span>${row.type === 'wtb' ? 'Request' : 'Listing'}</span></div><h3>${escapeMarkup(title)}</h3><p>${escapeMarkup(description || 'Open the listing to review the available project information.')}</p><p class="owner">Listed by ${escapeMarkup(person)}</p><a class="project-link" href="/projects/${encodeURIComponent(row.slug)}">View project details →</a></div></article>`;
+}
+
+function landingLabel(pathname) {
+  return SEO_LANDING_PAGES[pathname]?.h1.replace(/^Discover |^Looking to |^Find /, '') || pathname;
+}
+
+function renderLandingPage(pathname) {
+  const page = SEO_LANDING_PAGES[pathname];
+  const canonical = `${PUBLIC_ORIGIN}${pathname}`;
+  const listingType = page.seller ? 'wtb' : 'sale';
+  let rows = [];
+  try {
+    rows = db.prepare(`SELECT * FROM listings WHERE status='approved' AND type=? ORDER BY (boosted_until IS NOT NULL AND boosted_until>?) DESC, updated_at DESC LIMIT 30`).all(listingType, nowIso()).filter(row => landingListingMatches(row, page)).slice(0, 6);
+  } catch (error) { console.error(`SEO landing query failed for ${pathname}:`, error); }
+  const listingContent = rows.length
+    ? `<div class="cards">${rows.map(landingProjectCard).join('')}</div>`
+    : `<div class="empty"><h3>No projects in this category yet.</h3><p>Have one? Be the first to list it and make it discoverable to interested people.</p><a class="button" href="/?create=listing">List your project</a></div>`;
+  const faqSchema = page.faqs.map(([name, answer]) => ({ '@type': 'Question', name, acceptedAnswer: { '@type': 'Answer', text: answer } }));
+  const related = page.related.map(path => `<a href="${path}">${escapeMarkup(landingLabel(path))}</a>`).join('');
+  const primaryCta = page.seller ? (page.cta || 'List Your Project') : 'Explore All Projects';
+  const primaryHref = page.seller ? '/?create=listing' : '/#listings-grid';
+  const categoryHeading = page.seller ? 'Create a listing that earns the right conversation' : `Understanding ${page.kicker.toLowerCase()}`;
+  const ctaHeading = page.seller ? 'Ready to introduce your project?' : 'Found a project worth exploring?';
+  const ctaText = page.seller ? 'Publish an accurate listing and give potential buyers a clear reason to start a conversation.' : 'Review its details, ask the owner direct questions and complete independent due diligence before making decisions.';
+  const pageJsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': [
+    { '@type': 'WebPage', name: page.h1, description: page.description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
+    { '@type': 'FAQPage', mainEntity: faqSchema }
+  ] }).replaceAll('<', '\\u003c');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(page.title)}</title><meta name="description" content="${escapeMarkup(page.description)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(page.title)}"><meta property="og:description" content="${escapeMarkup(page.description)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(page.title)}"><meta name="twitter:description" content="${escapeMarkup(page.description)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)}</p><h1>${escapeMarkup(page.h1)}</h1><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div></div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
+}
+
 function serveStatic(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === '/') pathname = '/index.html';
@@ -1818,7 +2008,7 @@ const server = createServer(async (req, res) => {
       let listingRows = [];
       try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
       catch (error) { console.error('Sitemap listing query failed:', error); }
-      const pages = ['/', '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
+      const pages = ['/', ...SEO_LANDING_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
         .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
       const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
       const listings = listingRows.map(row => `<url><loc>${xmlUrl(`/projects/${encodeURIComponent(row.slug)}`)}</loc><lastmod>${escapeMarkup(String(row.updated_at || '').slice(0, 10))}</lastmod></url>`).join('');
@@ -1830,6 +2020,9 @@ const server = createServer(async (req, res) => {
     if (legacyListingSlug) return redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`);
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
       return htmlResponse(req, res, renderSeoPage());
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && SEO_LANDING_PAGES[url.pathname]) {
+      return htmlResponse(req, res, renderLandingPage(url.pathname));
     }
     const projectMatch = url.pathname.match(/^\/projects\/([^/]+)\/?$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && projectMatch) {

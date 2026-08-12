@@ -591,6 +591,7 @@ async function handleUrlState() {
   const resetToken = url.searchParams.get('reset_token');
   const verifyToken = url.searchParams.get('verify_token');
   const payment = url.searchParams.get('payment');
+  const createListing = url.searchParams.get('create') === 'listing';
   const oauth = url.searchParams.get('oauth');
   const oauthProvider = url.searchParams.get('provider');
   if (resetToken) return openResetPasswordModal(resetToken);
@@ -629,6 +630,7 @@ async function handleUrlState() {
   }
   if (categoryMatch) selectCategory(decodeURIComponent(categoryMatch[1]));
   await openListingFromUrl();
+  if (createListing) openCreateListingModal();
 }
 
 function openSocialAuthErrorModal(message) {
