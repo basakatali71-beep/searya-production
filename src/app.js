@@ -1,4 +1,4 @@
-import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-6';
+import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-7';
 import { translations } from './data/translations.js?v=20260812-12';
 import { ApiError, SearyaApi } from './api.js?v=20260812-9';
 

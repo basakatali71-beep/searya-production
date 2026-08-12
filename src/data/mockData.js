@@ -640,8 +640,8 @@ function createSaleListing({ id, title, titleEn = title, category, categoryEn, p
     isVerified: statusEn === "Verified",
     seller: {
       name: seller,
-      handle: `@${seller.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}`,
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+      handle: `@${seller.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}`,
+      avatar: "",
       githubVerified: statusEn === "Verified"
     },
     shortDesc: description,
@@ -666,8 +666,68 @@ const additionalForSaleListings = [
   createSaleListing({ id: "proj-25", title: "CartBoost Shopify Uygulaması", titleEn: "CartBoost Shopify App", category: "saas", categoryEn: "Micro SaaS", price: 2800, status: "Yayında", statusEn: "Launched", seller: "Oğuz Kılıç", description: "Sepet üst satış Shopify uygulaması inceleme aşamasında; panel ve tema entegrasyonu hazır, pazarlama yapılmadı.", descriptionEn: "Upsell Shopify app is under review; dashboard and theme integration are ready, with no marketing yet.", image: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=800&q=80", techStack: ["Remix", "Shopify API", "Prisma"], reason: "Ajans projelerine öncelik veriyorum.", reasonEn: "Prioritizing agency projects.", createdAt: "10 saat önce", createdAtEn: "10 hours ago" }),
   createSaleListing({ id: "proj-26", title: "SponsorMatch Newsletter", category: "saas", categoryEn: "Micro SaaS", price: 4200, mrr: 280, status: "Gelir Üretiyor", statusEn: "Revenue Generating", seller: "Cansu Işık", description: "Bülten sahipleriyle sponsorları eşleştiren mikro SaaS; 11 ücretli müşteri ve aylık $280 gelir.", descriptionEn: "Micro SaaS matching newsletter owners with sponsors; 11 paying customers and $280 MRR.", image: "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80", techStack: ["Next.js", "Stripe", "Supabase"], reason: "Yeni ürünüm için sermaye oluşturuyorum.", reasonEn: "Raising capital for my next product.", createdAt: "1 gün önce", createdAtEn: "1 day ago" }),
   createSaleListing({ id: "proj-27", title: "PulseAPI Monitor", category: "saas", categoryEn: "Micro SaaS", price: 6800, mrr: 520, status: "Doğrulanmış", statusEn: "Verified", seller: "Arda Yalçın", description: "API çalışma süresi ve hata takibi ürünü; 24 ücretli ekip, doğrulanmış $520 aylık gelir.", descriptionEn: "API uptime and error monitoring product with 24 paying teams and verified $520 MRR.", image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80", techStack: ["Go", "React", "PostgreSQL"], reason: "Siber güvenlik ürününe geçiş yapıyorum.", reasonEn: "Moving on to a cybersecurity product.", createdAt: "2 gün önce", createdAtEn: "2 days ago" }),
-  createSaleListing({ id: "proj-28", title: "LinguaCards Mobil MVP", titleEn: "LinguaCards Mobile MVP", category: "mobile", categoryEn: "Mobile App", price: 950, status: "MVP", statusEn: "MVP", seller: "Bora Akın", description: "Aralıklı tekrar yöntemiyle kelime öğreten Flutter MVP; çevrimdışı mod hazır, mağaza yayını ve abonelik eksik.", descriptionEn: "Flutter vocabulary MVP using spaced repetition; offline mode works, store launch and subscriptions are missing.", image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80", techStack: ["Flutter", "Dart", "SQLite"], reason: "Yurt dışına taşınacağım için projeyi devretmek istiyorum.", reasonEn: "Relocating abroad and want to transfer the project.", createdAt: "3 gün önce", createdAtEn: "3 days ago" })
+  createSaleListing({ id: "proj-28", title: "LinguaCards Mobil MVP", titleEn: "LinguaCards Mobile MVP", category: "mobile", categoryEn: "Mobile App", price: 950, status: "MVP", statusEn: "MVP", seller: "Bora Akın", description: "Aralıklı tekrar yöntemiyle kelime öğreten Flutter MVP; çevrimdışı mod hazır, mağaza yayını ve abonelik eksik.", descriptionEn: "Flutter vocabulary MVP using spaced repetition; offline mode works, store launch and subscriptions are missing.", image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80", techStack: ["Flutter", "Dart", "SQLite"], reason: "Yurt dışına taşınacağım için projeyi devretmek istiyorum.", reasonEn: "Relocating abroad and want to transfer the project.", createdAt: "3 gün önce", createdAtEn: "3 days ago" }),
+  createSaleListing({ id: "proj-29", title: "BriefPilot AI", category: "ai", categoryEn: "AI Tool", price: 3200, status: "MVP", statusEn: "MVP", seller: "Olivia Bennett", description: "AI brief generator for marketing teams with reusable templates and export workflows.", descriptionEn: "AI brief generator for marketing teams with reusable templates and export workflows.", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80", techStack: ["React", "Node.js", "OpenAI API"], reason: "I am focusing on a client services business.", reasonEn: "I am focusing on a client services business.", createdAt: "4 hours ago", createdAtEn: "4 hours ago" }),
+  createSaleListing({ id: "proj-30", title: "ShipTrack Portal", category: "saas", categoryEn: "Micro SaaS", price: 5400, status: "Launched", statusEn: "Launched", seller: "Ethan Parker", description: "Customer-facing shipment tracking portal with branded status pages and email updates.", descriptionEn: "Customer-facing shipment tracking portal with branded status pages and email updates.", image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80", techStack: ["Next.js", "PostgreSQL", "Stripe"], reason: "I am consolidating my product portfolio.", reasonEn: "I am consolidating my product portfolio.", createdAt: "7 hours ago", createdAtEn: "7 hours ago" }),
+  createSaleListing({ id: "proj-31", title: "FocusGarden Mobile", category: "mobile", categoryEn: "Mobile App", price: 1800, status: "MVP", statusEn: "MVP", seller: "Amelia Brooks", description: "A polished focus timer that turns completed sessions into a growing virtual garden.", descriptionEn: "A polished focus timer that turns completed sessions into a growing virtual garden.", image: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=800&q=80", techStack: ["Flutter", "Firebase", "RevenueCat"], reason: "I am moving to a different mobile category.", reasonEn: "I am moving to a different mobile category.", createdAt: "9 hours ago", createdAtEn: "9 hours ago" }),
+  createSaleListing({ id: "proj-32", title: "TabTidy Workspace", category: "extension", categoryEn: "Chrome Extension", price: 950, status: "Launched", statusEn: "Launched", seller: "Noah Collins", description: "A Manifest V3 extension for grouping, saving and restoring browser workspaces.", descriptionEn: "A Manifest V3 extension for grouping, saving and restoring browser workspaces.", image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80", techStack: ["TypeScript", "Manifest V3", "IndexedDB"], reason: "I no longer have time for extension marketing.", reasonEn: "I no longer have time for extension marketing.", createdAt: "1 day ago", createdAtEn: "1 day ago" }),
+  createSaleListing({ id: "proj-33", title: "ClientScope CRM", category: "saas", categoryEn: "B2B SaaS", price: 7600, status: "Launched", statusEn: "Launched", seller: "Grace Turner", description: "A lightweight CRM for small agencies with pipelines, notes and client portals.", descriptionEn: "A lightweight CRM for small agencies with pipelines, notes and client portals.", image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80", techStack: ["Laravel", "Vue", "MySQL"], reason: "I am returning to full-time product design.", reasonEn: "I am returning to full-time product design.", createdAt: "2 days ago", createdAtEn: "2 days ago" }),
+  createSaleListing({ id: "proj-34", title: "VoiceMemo Studio", category: "ai", categoryEn: "AI Tool", price: 2900, status: "MVP", statusEn: "MVP", seller: "Lucas Morgan", description: "Mobile voice notes with transcription, summaries and searchable topic labels.", descriptionEn: "Mobile voice notes with transcription, summaries and searchable topic labels.", image: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80", techStack: ["React Native", "Whisper", "Supabase"], reason: "I am prioritizing an enterprise product.", reasonEn: "I am prioritizing an enterprise product.", createdAt: "3 days ago", createdAtEn: "3 days ago" }),
+  createSaleListing({ id: "proj-35", title: "ReviewPulse", category: "saas", categoryEn: "Micro SaaS", price: 4600, status: "Launched", statusEn: "Launched", seller: "Harper Reed", description: "Review monitoring dashboard for local businesses with alerts and response drafts.", descriptionEn: "Review monitoring dashboard for local businesses with alerts and response drafts.", image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=800&q=80", techStack: ["Remix", "Supabase", "Resend"], reason: "I want to fund a new developer tool.", reasonEn: "I want to fund a new developer tool.", createdAt: "4 days ago", createdAtEn: "4 days ago" }),
+  createSaleListing({ id: "proj-36", title: "PaletteSnap", category: "extension", categoryEn: "Chrome Extension", price: 1250, status: "Launched", statusEn: "Launched", seller: "Mason Carter", description: "Color capture extension with accessible palette checks and design-token export.", descriptionEn: "Color capture extension with accessible palette checks and design-token export.", image: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80", techStack: ["JavaScript", "Chrome API", "CSS"], reason: "I am narrowing my work to one SaaS product.", reasonEn: "I am narrowing my work to one SaaS product.", createdAt: "5 days ago", createdAtEn: "5 days ago" }),
+  createSaleListing({ id: "proj-37", title: "TutorLoop", category: "mobile", categoryEn: "Mobile App", price: 6800, status: "Launched", statusEn: "Launched", seller: "Chloe Walker", description: "Tutor booking and lesson management app with calendars, notes and progress reports.", descriptionEn: "Tutor booking and lesson management app with calendars, notes and progress reports.", image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80", techStack: ["Expo", "Node.js", "PostgreSQL"], reason: "I am joining another education startup.", reasonEn: "I am joining another education startup.", createdAt: "6 days ago", createdAtEn: "6 days ago" }),
+  createSaleListing({ id: "proj-38", title: "DataNarrator", category: "ai", categoryEn: "AI Tool", price: 8900, status: "Launched", statusEn: "Launched", seller: "Henry Foster", description: "Turns uploaded spreadsheets into clear summaries, charts and presentation-ready insights.", descriptionEn: "Turns uploaded spreadsheets into clear summaries, charts and presentation-ready insights.", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80", techStack: ["Python", "FastAPI", "React"], reason: "I am focusing on data consulting engagements.", reasonEn: "I am focusing on data consulting engagements.", createdAt: "7 days ago", createdAtEn: "7 days ago" })
 ];
+
+const showcaseNameMap = {
+  "Caner Yılmaz": "Cameron Hayes", "Selin Aksoy": "Sophie Adams", "Mert Kaya": "Matthew Clark",
+  "Burak Demir": "Brandon Lewis", "Zeynep Kaya": "Zoey Harris", "Emre Arslan": "Ethan Brooks",
+  "Ece Aydın": "Ella Morgan", "Ada Erdem": "Ava Reynolds", "Kerem Tunç": "Kevin Turner",
+  "Sena Koç": "Sienna Parker", "Oğuz Kılıç": "Oscar Bennett", "Cansu Işık": "Chloe Sullivan",
+  "Arda Yalçın": "Arthur Collins", "Bora Akın": "Blake Foster", "Tarkan Güneş": "Thomas Green",
+  "Deniz Şahin": "Daisy Stone", "Kaan Yılmaz": "Kyle Williams", "Melis Tan": "Mia Taylor",
+  "Emir Korkmaz": "Elliot Foster", "Dila Öz": "Diana Evans", "Barış Eren": "Barry Edwards",
+  "Onur Polat": "Owen Powell", "Nazlı Şen": "Natalie Shaw", "Yiğit Aslan": "Logan Allen"
+};
+
+const showcaseProfileNames = [
+  "Cameron Hayes", "Sophie Adams", "Matthew Clark", "Brandon Lewis", "Zoey Harris", "Ethan Brooks",
+  "Sarah Jenkins", "Alex Rivera", "Elena Rostova", "Liam Thorne", "Marcus Bennett", "Chloe Miller",
+  "Michael Chang", "James Lawson", "Jonathan Reed", "Sophia Vance", "Benjamin Cole", "Nathan Rivera",
+  "Emma Watson", "Oliver Thorne", "Ella Morgan", "Ava Reynolds", "Kevin Turner", "Sienna Parker",
+  "Oscar Bennett", "Chloe Sullivan", "Arthur Collins", "Blake Foster", "Olivia Bennett", "Ethan Parker",
+  "Amelia Brooks", "Noah Collins", "Grace Turner", "Lucas Morgan", "Harper Reed", "Mason Carter",
+  "Chloe Walker", "Henry Foster", "Thomas Green", "Daisy Stone", "Kyle Williams", "David Vance",
+  "Sophia Sterling", "Lucas Bennett", "Christopher Cole", "Andrew Chang", "Victoria Lawson", "Mia Taylor",
+  "Elliot Foster", "Diana Evans", "Barry Edwards", "Owen Powell", "Natalie Shaw", "Logan Allen",
+  "Avery Mitchell", "Daniel Cooper", "Sofia Hayes", "Jack Sullivan", "Lily Bennett", "Samuel Ross",
+  "Emily Carter", "Owen Hughes", "Hannah Price", "Leo Martin"
+];
+
+const femaleShowcaseNames = new Set([
+  "Sophie Adams", "Zoey Harris", "Sarah Jenkins", "Elena Rostova", "Chloe Miller", "Sophia Vance",
+  "Emma Watson", "Ella Morgan", "Ava Reynolds", "Sienna Parker", "Chloe Sullivan", "Olivia Bennett",
+  "Amelia Brooks", "Grace Turner", "Harper Reed", "Chloe Walker", "Daisy Stone", "Sophia Sterling",
+  "Victoria Lawson", "Mia Taylor", "Diana Evans", "Natalie Shaw", "Avery Mitchell", "Sofia Hayes",
+  "Lily Bennett", "Emily Carter", "Hannah Price"
+]);
+
+function showcaseAvatarForName(name) {
+  const index = Math.max(0, showcaseProfileNames.indexOf(name));
+  const folder = femaleShowcaseNames.has(name) ? "women" : "men";
+  const imageNumber = (index * 7 + 11) % 90;
+  return `https://randomuser.me/api/portraits/${folder}/${imageNumber}.jpg`;
+}
+
+function normalizeShowcaseProfile(profile = {}) {
+  const name = showcaseNameMap[profile.name] || profile.name || "Searya Member";
+  return {
+    ...profile,
+    name,
+    handle: `@${name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}`,
+    avatar: showcaseAvatarForName(name)
+  };
+}
 
 export const initialForSaleListings = [
   ...baseForSaleListings.map(listing => {
@@ -675,13 +735,13 @@ export const initialForSaleListings = [
     return {
       ...listing,
       ...override,
-      seller: { ...listing.seller, ...(override.seller || {}) },
+      seller: normalizeShowcaseProfile({ ...listing.seller, ...(override.seller || {}) }),
       fullDesc: override.fullDesc || override.shortDesc || listing.shortDesc,
       fullDescEn: override.fullDescEn || override.shortDescEn || listing.shortDescEn,
       isVerified: (override.statusEn || listing.statusEn) === "Verified"
     };
   }),
-  ...additionalForSaleListings
+  ...additionalForSaleListings.map(listing => ({ ...listing, seller: normalizeShowcaseProfile(listing.seller) }))
 ];
 
 const baseWtbListings = [
@@ -908,8 +968,8 @@ function createWtbListing({ id, title, titleEn, budget, category, categoryEn, bu
     categoryEn,
     buyer: {
       name: buyer,
-      handle: `@${buyer.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}`,
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80"
+      handle: `@${buyer.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_')}`,
+      avatar: ""
     },
     description,
     descriptionEn,
@@ -929,50 +989,63 @@ const additionalWtbListings = [
   createWtbListing({ id: "wtb-13", title: "No-code ile Başlamış Micro SaaS Arıyorum", titleEn: "Looking for a No-code Micro SaaS", budget: 2500, category: "saas", categoryEn: "Micro SaaS", buyer: "Barış Eren", description: "Bubble, Webflow veya Supabase ile hazırlanmış, ilk kullanıcıları olan niş B2B ürünlerle ilgileniyorum.", descriptionEn: "Interested in niche B2B products built with Bubble, Webflow or Supabase that have early users.", tech: "Bubble, Webflow, Supabase", requirement: "İlk kullanıcılar yeterli", requirementEn: "Early users are sufficient", createdAt: "5 saat önce", createdAtEn: "5 hours ago" }),
   createWtbListing({ id: "wtb-14", title: "Geliştirici Aracı veya API Ürünü Arıyorum", titleEn: "Looking for a Developer Tool or API Product", budget: 3000, category: "saas", categoryEn: "Micro SaaS", buyer: "Onur Polat", description: "Dokümantasyonu olan CLI, API izleme veya geliştirici üretkenliği projelerini devralmak istiyorum.", descriptionEn: "Looking to acquire documented CLI, API monitoring or developer productivity projects.", tech: "Go, Node.js, Python", requirement: "Gelir şartı yok; temiz repo önemli", requirementEn: "No revenue required; clean repository matters", createdAt: "8 saat önce", createdAtEn: "8 hours ago" }),
   createWtbListing({ id: "wtb-15", title: "Basit AI Wrapper Projesi Arıyorum", titleEn: "Looking for a Focused AI Tool", budget: 1500, category: "ai", categoryEn: "AI Tool", buyer: "Nazlı Şen", description: "Tek bir işi iyi yapan, çalışan arayüzü bulunan fakat pazarlaması yapılmamış AI araçlarını satın almak istiyorum.", descriptionEn: "Want to buy focused AI tools with a working interface and strong marketing potential.", tech: "Next.js, OpenAI API or Anthropic", requirement: "Gelir şartı yok", requirementEn: "No revenue required", createdAt: "1 gün önce", createdAtEn: "1 day ago" }),
-  createWtbListing({ id: "wtb-16", title: "Öğrenci Projesi veya Hackathon MVP'si Arıyorum", titleEn: "Looking for a Student Project or Hackathon MVP", budget: 500, category: "ai", categoryEn: "AI Tool", buyer: "Yiğit Aslan", description: "Kod kalitesi makul olan, demo seviyesindeki web projelerini geliştirip yayınlamak için satın alıyorum.", descriptionEn: "Buying demo-stage web projects with reasonable code quality to improve and launch.", tech: "React, Next.js, Python", requirement: "Çalışan demo yeterli", requirementEn: "A working demo is sufficient", createdAt: "2 gün önce", createdAtEn: "2 days ago" })
+  createWtbListing({ id: "wtb-16", title: "Öğrenci Projesi veya Hackathon MVP'si Arıyorum", titleEn: "Looking for a Student Project or Hackathon MVP", budget: 500, category: "ai", categoryEn: "AI Tool", buyer: "Yiğit Aslan", description: "Kod kalitesi makul olan, demo seviyesindeki web projelerini geliştirip yayınlamak için satın alıyorum.", descriptionEn: "Buying demo-stage web projects with reasonable code quality to improve and launch.", tech: "React, Next.js, Python", requirement: "Çalışan demo yeterli", requirementEn: "A working demo is sufficient", createdAt: "2 gün önce", createdAtEn: "2 days ago" }),
+  createWtbListing({ id: "wtb-17", title: "Seeking a Newsletter Analytics Product", titleEn: "Seeking a Newsletter Analytics Product", budget: 3500, category: "saas", categoryEn: "Micro SaaS", buyer: "Avery Mitchell", description: "I am looking for a focused analytics product for newsletter operators with audience and campaign reporting.", descriptionEn: "I am looking for a focused analytics product for newsletter operators with audience and campaign reporting.", tech: "Next.js, Node.js or Python", requirement: "Live demo required; revenue optional", requirementEn: "Live demo required; revenue optional", createdAt: "40 minutes ago", createdAtEn: "40 minutes ago" }),
+  createWtbListing({ id: "wtb-18", title: "Looking for a Fitness Mobile App", titleEn: "Looking for a Fitness Mobile App", budget: 4200, category: "mobile", categoryEn: "Mobile App", buyer: "Daniel Cooper", description: "Interested in a polished workout, mobility or habit app that is ready for App Store submission.", descriptionEn: "Interested in a polished workout, mobility or habit app that is ready for App Store submission.", tech: "Flutter or React Native", requirement: "Production-ready build preferred", requirementEn: "Production-ready build preferred", createdAt: "2 hours ago", createdAtEn: "2 hours ago" }),
+  createWtbListing({ id: "wtb-19", title: "Buying a Shopify Merchant App", titleEn: "Buying a Shopify Merchant App", budget: 6500, category: "saas", categoryEn: "B2B SaaS", buyer: "Sofia Hayes", description: "Seeking a Shopify app for merchandising, retention or store operations with clear installation docs.", descriptionEn: "Seeking a Shopify app for merchandising, retention or store operations with clear installation docs.", tech: "Remix, Shopify API, Prisma", requirement: "Approved or review-ready app", requirementEn: "Approved or review-ready app", createdAt: "4 hours ago", createdAtEn: "4 hours ago" }),
+  createWtbListing({ id: "wtb-20", title: "Seeking a Browser Productivity Extension", titleEn: "Seeking a Browser Productivity Extension", budget: 1800, category: "extension", categoryEn: "Chrome Extension", buyer: "Jack Sullivan", description: "I want a well-designed extension for research, tab management or writing workflows.", descriptionEn: "I want a well-designed extension for research, tab management or writing workflows.", tech: "TypeScript, Manifest V3", requirement: "Working store-ready package", requirementEn: "Working store-ready package", createdAt: "6 hours ago", createdAtEn: "6 hours ago" }),
+  createWtbListing({ id: "wtb-21", title: "Looking for an AI Support Assistant", titleEn: "Looking for an AI Support Assistant", budget: 7200, category: "ai", categoryEn: "AI Tool", buyer: "Lily Bennett", description: "Interested in a customer-support assistant with knowledge-base search and human handoff workflows.", descriptionEn: "Interested in a customer-support assistant with knowledge-base search and human handoff workflows.", tech: "Python, React, vector database", requirement: "Secure multi-tenant architecture", requirementEn: "Secure multi-tenant architecture", createdAt: "10 hours ago", createdAtEn: "10 hours ago" }),
+  createWtbListing({ id: "wtb-22", title: "Buying a Developer API Product", titleEn: "Buying a Developer API Product", budget: 9000, category: "saas", categoryEn: "Developer Tool", buyer: "Samuel Ross", description: "Looking for a documented API product in monitoring, automation or data enrichment.", descriptionEn: "Looking for a documented API product in monitoring, automation or data enrichment.", tech: "Go, Node.js or Python", requirement: "Documentation and test suite required", requirementEn: "Documentation and test suite required", createdAt: "1 day ago", createdAtEn: "1 day ago" }),
+  createWtbListing({ id: "wtb-23", title: "Seeking a Creator Workflow SaaS", titleEn: "Seeking a Creator Workflow SaaS", budget: 5000, category: "saas", categoryEn: "Micro SaaS", buyer: "Emily Carter", description: "I am interested in tools for content planning, sponsorship management or asset approvals.", descriptionEn: "I am interested in tools for content planning, sponsorship management or asset approvals.", tech: "React, Supabase or Firebase", requirement: "Early users are a plus", requirementEn: "Early users are a plus", createdAt: "2 days ago", createdAtEn: "2 days ago" }),
+  createWtbListing({ id: "wtb-24", title: "Looking for an Education Mobile App", titleEn: "Looking for an Education Mobile App", budget: 3800, category: "mobile", categoryEn: "Mobile App", buyer: "Owen Hughes", description: "Seeking a language, study-planning or tutoring app with a clean learner experience.", descriptionEn: "Seeking a language, study-planning or tutoring app with a clean learner experience.", tech: "Flutter, Expo or native iOS", requirement: "Functional onboarding and core lesson flow", requirementEn: "Functional onboarding and core lesson flow", createdAt: "3 days ago", createdAtEn: "3 days ago" }),
+  createWtbListing({ id: "wtb-25", title: "Buying a Privacy-Friendly Analytics Tool", titleEn: "Buying a Privacy-Friendly Analytics Tool", budget: 11000, category: "saas", categoryEn: "B2B SaaS", buyer: "Hannah Price", description: "Looking for lightweight web analytics with consent-friendly tracking and team dashboards.", descriptionEn: "Looking for lightweight web analytics with consent-friendly tracking and team dashboards.", tech: "TypeScript, ClickHouse or PostgreSQL", requirement: "Deployment documentation required", requirementEn: "Deployment documentation required", createdAt: "4 days ago", createdAtEn: "4 days ago" }),
+  createWtbListing({ id: "wtb-26", title: "Seeking a Scheduling and Booking Tool", titleEn: "Seeking a Scheduling and Booking Tool", budget: 6000, category: "saas", categoryEn: "Micro SaaS", buyer: "Leo Martin", description: "Interested in scheduling software for consultants, studios or small service teams.", descriptionEn: "Interested in scheduling software for consultants, studios or small service teams.", tech: "Next.js, Laravel or Rails", requirement: "Reliable calendar sync is essential", requirementEn: "Reliable calendar sync is essential", createdAt: "5 days ago", createdAtEn: "5 days ago" })
 ];
 
 export const initialWtbListings = [
-  ...baseWtbListings.map(listing => ({ ...listing, ...(wtbBudgetOverrides[listing.id] || {}) })),
-  ...additionalWtbListings
+  ...baseWtbListings.map(listing => {
+    const normalized = { ...listing, ...(wtbBudgetOverrides[listing.id] || {}) };
+    return { ...normalized, buyer: normalizeShowcaseProfile(normalized.buyer) };
+  }),
+  ...additionalWtbListings.map(listing => ({ ...listing, buyer: normalizeShowcaseProfile(listing.buyer) }))
 ];
 
 export const initialMessages = [
   {
     id: "thread-1",
-    partnerName: "Caner Yılmaz",
-    partnerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+    partnerName: "Cameron Hayes",
+    partnerAvatar: showcaseAvatarForName("Cameron Hayes"),
     projectTitle: "AI Copywriter Pro",
     askingPrice: "$7,800",
     unread: true,
     messages: [
       { sender: "them", text: "Selam! AI Copywriter Pro projesi ile ilgilendiğinizi gördüm. Herhangi bir sorunuz var mı?", textEn: "Hi! I saw you are interested in AI Copywriter Pro. Do you have any questions?", time: "10:30" },
-      { sender: "me", text: "Merhaba Caner Bey! GitHub reposunu incelemek ve Stripe canlı verilerini görmek isterim.", textEn: "Hello Caner! I would love to inspect the GitHub repo and see live Stripe analytics.", time: "10:35" },
+      { sender: "me", text: "Hello Cameron! I would love to inspect the GitHub repo and see live Stripe analytics.", textEn: "Hello Cameron! I would love to inspect the GitHub repo and see live Stripe analytics.", time: "10:35" },
       { sender: "them", text: "Tabii ki! E-posta adresinizi iletirseniz yetki tanımlayayım.", textEn: "Sure thing! Please share your email so I can grant read access.", time: "10:38" }
     ]
   },
   {
     id: "thread-2",
-    partnerName: "Selin Aksoy",
-    partnerAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80",
+    partnerName: "Sophie Adams",
+    partnerAvatar: showcaseAvatarForName("Sophie Adams"),
     projectTitle: "MetricsFlow Analytics",
     askingPrice: "$2,200",
     unread: false,
     messages: [
-      { sender: "me", text: "MetricsFlow projesi için pazarlık payınız var mıdır?", textEn: "Is there room for negotiation on the MetricsFlow project?", time: "Dün" },
-      { sender: "them", text: "Selam! Ciddi alıcılar için ufak bir ikram yapabiliriz. Detaylı sunum iletebilirim.", textEn: "Hi! For serious cash buyers we can offer a modest discount. I can send over a deck.", time: "Dün" }
+      { sender: "me", text: "Is there room for negotiation on the MetricsFlow project?", textEn: "Is there room for negotiation on the MetricsFlow project?", time: "Yesterday" },
+      { sender: "them", text: "Hi! For serious buyers we can offer a modest discount. I can send over a deck.", textEn: "Hi! For serious buyers we can offer a modest discount. I can send over a deck.", time: "Yesterday" }
     ]
   },
   {
     id: "thread-3",
-    partnerName: "Tarkan Güneş",
-    partnerAvatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&q=80",
-    projectTitle: "Proje Arıyorum: B2B SaaS",
-    askingPrice: "$8,000 Bütçe",
+    partnerName: "Thomas Green",
+    partnerAvatar: showcaseAvatarForName("Thomas Green"),
+    projectTitle: "Wanted: B2B SaaS",
+    askingPrice: "$8,000 Budget",
     unread: false,
     messages: [
-      { sender: "me", text: "İlanınızı gördüm. Aylık $600 MRR getiren bir SEO aracım var, teklif iletmek isterim.", textEn: "I saw your WTB post. I have an SEO tool making $600 MRR, would love to submit a pitch.", time: "2 gün önce" },
-      { sender: "them", text: "Harika! Lütfen projenin demo linkini ve Stripe dokümanını iletir misiniz?", textEn: "Great! Could you please share the demo link and Stripe verification docs?", time: "2 gün önce" }
+      { sender: "me", text: "I saw your WTB post. I have an SEO tool making $600 MRR and would love to submit a pitch.", textEn: "I saw your WTB post. I have an SEO tool making $600 MRR and would love to submit a pitch.", time: "2 days ago" },
+      { sender: "them", text: "Great! Could you please share the demo link and Stripe verification docs?", textEn: "Great! Could you please share the demo link and Stripe verification docs?", time: "2 days ago" }
     ]
   }
 ];

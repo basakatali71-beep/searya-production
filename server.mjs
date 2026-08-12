@@ -795,10 +795,23 @@ function seedData() {
 
 function syncSeedContent() {
   const update = db.prepare(`UPDATE listings SET type=?,title=?,category=?,price_cents=?,content_json=?,is_verified=? WHERE id=? AND user_id LIKE 'seed-%'`);
+  const findSeedListing = db.prepare(`SELECT user_id FROM listings WHERE id=? AND user_id LIKE 'seed-%'`);
+  const insertUser = db.prepare(`INSERT OR IGNORE INTO users(id,email,password_hash,name,role,status,is_admin,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at,email_verified) VALUES(?,?,?,?,?,'active',0,?,2,1,0,0,?,?,1)`);
+  const insertListing = db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const updateSeedUser = db.prepare(`UPDATE users SET name=? WHERE id=? AND email IS NULL`);
   const all = [...initialForSaleListings.filter(item => !item.isAnonymous), ...initialWtbListings.filter(item => !item.isAnonymous)];
   db.exec('BEGIN');
   try {
     for (const item of all) {
+      const person = item.seller || item.buyer || { name: 'Searya Member' };
+      let seedListing = findSeedListing.get(item.id);
+      if (!seedListing) {
+        const userId = `seed-${slugify(person.name)}`;
+        const createdAt = new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
+        insertUser.run(userId, null, null, person.name, item.type === 'wtb' ? 'buyer' : 'seller', person.githubVerified ? 1 : 0, createdAt, createdAt);
+        insertListing.run(item.id, userId, item.type === 'wtb' ? 'wtb' : 'sale', item.title, uniqueSlug(item.title), item.category || 'saas', Math.round(Number(item.askingPrice || item.budget || 1) * 100), JSON.stringify(item), 'approved', item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0, 0, Number(item.views || 0), createdAt, createdAt);
+        seedListing = { user_id: userId };
+      }
       update.run(
         item.type === 'wtb' ? 'wtb' : 'sale',
         item.title,
@@ -808,6 +821,7 @@ function syncSeedContent() {
         item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0,
         item.id
       );
+      updateSeedUser.run(person.name, seedListing.user_id);
     }
     db.exec('COMMIT');
   } catch (error) {
