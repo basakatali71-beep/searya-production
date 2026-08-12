@@ -9,6 +9,7 @@ const adminSource = await readFile(new URL('../src/admin.js', import.meta.url), 
 const apiSource = await readFile(new URL('../src/api.js', import.meta.url), 'utf8');
 const serverSource = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
 const privacySource = await readFile(new URL('../legal/privacy.html', import.meta.url), 'utf8');
+const termsSource = await readFile(new URL('../legal/terms.html', import.meta.url), 'utf8');
 const campaignSource = await readFile(new URL('../marketing/x-seller-launch-en.md', import.meta.url), 'utf8');
 
 test('The public interface is English-only', () => {
@@ -43,6 +44,16 @@ test('Dead fake-success and paid legacy sections are not shipped', () => {
 test('Launch legal copy does not contain unfinished placeholders', () => {
   assert.match(privacySource, /export or permanently delete your account data from My Account/);
   assert.doesNotMatch(privacySource, /before launch|will be added|details are finalized/i);
+  assert.match(termsSource, /Buyer due diligence and payment safety/);
+  assert.match(termsSource, /To the fullest extent permitted by applicable law/);
+  assert.doesNotMatch(termsSource, /launch-stage informational draft/i);
+});
+
+test('The footer includes a clear buyer and seller safety warning', () => {
+  assert.match(pageSource, /id="marketplace-safety-warning"/);
+  assert.match(pageSource, /Searya only connects buyers and sellers/);
+  assert.match(pageSource, /Do not send payment until you fully trust the seller/);
+  assert.match(pageSource, /Use an independent escrow service whenever possible/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
