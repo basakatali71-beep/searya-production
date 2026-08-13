@@ -6,7 +6,9 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
-import { initialForSaleListings, initialWtbListings } from './src/data/mockData.js';
+import { initialForSaleListings, initialWtbListings } from './src/data/seedListings.js';
+import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guides.js';
+import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -326,13 +328,14 @@ const BEHAVIOR_EVENT_NAMES = new Set([
   'auth_failed', 'auth_abandoned', 'listing_form_started', 'listing_form_abandoned',
   'listing_submit_attempted', 'listing_submit_succeeded', 'listing_submit_failed',
   'conversation_attempted', 'conversation_started_client', 'conversation_failed',
-  'exit_feedback_shown', 'exit_feedback_submitted', 'exit_feedback_dismissed', 'ui_error'
+  'exit_feedback_shown', 'exit_feedback_submitted', 'exit_feedback_dismissed', 'ui_error',
+  'discovery_page_view', 'discovery_project_click', 'discovery_seller_cta_click', 'discovery_buyer_cta_click'
 ]);
 
 const BEHAVIOR_METADATA_KEYS = new Set([
   'sessionId', 'path', 'device', 'tab', 'query', 'resultCount', 'category', 'sort',
   'listingId', 'listingTitle', 'listingType', 'action', 'mode', 'role', 'step',
-  'reason', 'code', 'source', 'durationSeconds'
+  'reason', 'code', 'source', 'durationSeconds', 'discoverySlug'
 ]);
 
 function cleanBehaviorMetadata(value = {}) {
@@ -678,7 +681,8 @@ function safeImageData(value) {
 function mapListingInput(body, user) {
   const title = cleanText(body.title, 100);
   const type = body.type === 'wtb' ? 'wtb' : 'sale';
-  const category = ['ai', 'saas', 'extension', 'mobile'].includes(body.category) ? body.category : 'saas';
+  const category = ['ai', 'saas', 'extension', 'mobile', 'notion', 'ui-kit', 'api'].includes(body.category) ? body.category : 'saas';
+  const categoryLabel = SEO_CATEGORIES[category] || 'SaaS Projects';
   const price = Number(body.price ?? body.askingPrice ?? body.budget);
   const description = cleanText(body.description, 2000);
   const techStack = Array.isArray(body.techStack) ? body.techStack.map(item => cleanText(item, 40)).filter(Boolean).slice(0, 8) : [];
@@ -686,7 +690,7 @@ function mapListingInput(body, user) {
   if (title.length < 3 || !Number.isFinite(price) || price <= 0 || description.length < 20 || !techStack.length) throw Object.assign(new Error('Complete all listing fields with valid information.'), { status: 422 });
   if (type === 'sale' && !coverImage) throw Object.assign(new Error('Add a real image of your project.'), { status: 422 });
   const seller = { name: user.name, handle: `@${slugify(user.name).replaceAll('-', '_')}`, avatar: '', githubVerified: Boolean(user.is_verified) };
-  return { title, type, category, price, content: { titleEn: title, categoryEn: category.toUpperCase(), shortDesc: description, shortDescEn: description, description, descriptionEn: description, fullDesc: description, fullDescEn: description, coverImage, techStack, techPreference: techStack.join(', '), seller, buyer: { name: user.name, avatar: '' }, mrr: 0, isAnonymous: false } };
+  return { title, type, category, price, content: { titleEn: title, categoryEn: categoryLabel, shortDesc: description, shortDescEn: description, description, descriptionEn: description, fullDesc: description, fullDescEn: description, coverImage, techStack, techPreference: techStack.join(', '), seller, buyer: { name: user.name, avatar: '' }, mrr: 0, isAnonymous: false } };
 }
 
 const rateBuckets = new Map();
@@ -946,9 +950,9 @@ function seedData() {
     for (const item of all) {
       const person = item.seller || item.buyer || { name: 'Searya User' };
       const userId = `seed-${slugify(person.name)}`;
-      const createdAt = new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
+      const createdAt = item.createdAtIso || new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
       insertUser.run(userId, null, null, person.name, item.type === 'wtb' ? 'buyer' : 'seller', person.githubVerified ? 1 : 0, createdAt, createdAt);
-      insertListing.run(item.id, userId, item.type === 'wtb' ? 'wtb' : 'sale', item.title, uniqueSlug(item.title), item.category || 'saas', Math.round(Number(item.askingPrice || item.budget || 1) * 100), JSON.stringify(item), 'approved', item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0, 0, Number(item.views || 0), createdAt, createdAt);
+      insertListing.run(item.id, userId, item.type === 'wtb' ? 'wtb' : 'sale', item.title, uniqueSlug(item.slug || item.title), item.category || 'saas', Math.round(Number(item.askingPrice || item.budget || 1) * 100), JSON.stringify(item), 'approved', item.status === 'Doğrulanmış' || item.statusEn === 'Verified' || item.isVerified ? 1 : 0, 0, Number(item.views || 0), createdAt, createdAt);
     }
     db.exec('UPDATE users SET email_verified=1 WHERE email IS NULL;');
     db.exec('COMMIT');
@@ -959,7 +963,7 @@ function seedData() {
 }
 
 function syncSeedContent() {
-  const update = db.prepare(`UPDATE listings SET type=?,title=?,category=?,price_cents=?,content_json=?,is_verified=? WHERE id=? AND user_id LIKE 'seed-%'`);
+  const update = db.prepare(`UPDATE listings SET type=?,title=?,slug=?,category=?,price_cents=?,content_json=?,is_verified=?,created_at=? WHERE id=? AND user_id LIKE 'seed-%'`);
   const findSeedListing = db.prepare(`SELECT user_id FROM listings WHERE id=? AND user_id LIKE 'seed-%'`);
   const insertUser = db.prepare(`INSERT OR IGNORE INTO users(id,email,password_hash,name,role,status,is_admin,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at,email_verified) VALUES(?,?,?,?,?,'active',0,?,2,1,0,0,?,?,1)`);
   const insertListing = db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
@@ -972,18 +976,20 @@ function syncSeedContent() {
       let seedListing = findSeedListing.get(item.id);
       if (!seedListing) {
         const userId = `seed-${slugify(person.name)}`;
-        const createdAt = new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
+        const createdAt = item.createdAtIso || new Date(Date.now() - Math.max(1, Number(item.id?.match(/\d+/)?.[0] || 1)) * 3600000).toISOString();
         insertUser.run(userId, null, null, person.name, item.type === 'wtb' ? 'buyer' : 'seller', person.githubVerified ? 1 : 0, createdAt, createdAt);
-        insertListing.run(item.id, userId, item.type === 'wtb' ? 'wtb' : 'sale', item.title, uniqueSlug(item.title), item.category || 'saas', Math.round(Number(item.askingPrice || item.budget || 1) * 100), JSON.stringify(item), 'approved', item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0, 0, Number(item.views || 0), createdAt, createdAt);
+        insertListing.run(item.id, userId, item.type === 'wtb' ? 'wtb' : 'sale', item.title, uniqueSlug(item.slug || item.title), item.category || 'saas', Math.round(Number(item.askingPrice || item.budget || 1) * 100), JSON.stringify(item), 'approved', item.status === 'Doğrulanmış' || item.statusEn === 'Verified' || item.isVerified ? 1 : 0, 0, Number(item.views || 0), createdAt, createdAt);
         seedListing = { user_id: userId };
       }
       update.run(
         item.type === 'wtb' ? 'wtb' : 'sale',
         item.title,
+        uniqueSlug(item.slug || item.title, item.id),
         item.category || 'saas',
         Math.round(Number(item.askingPrice || item.budget || 1) * 100),
         JSON.stringify(item),
-        item.status === 'Doğrulanmış' || item.statusEn === 'Verified' ? 1 : 0,
+        item.status === 'Doğrulanmış' || item.statusEn === 'Verified' || item.isVerified ? 1 : 0,
+        item.createdAtIso || nowIso(),
         item.id
       );
       updateSeedUser.run(person.name, seedListing.user_id);
@@ -1708,13 +1714,18 @@ const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',
   mobile: 'Mobile Apps',
   ai: 'AI Tools',
-  extension: 'Chrome Extensions'
+  extension: 'Chrome Extensions',
+  notion: 'Notion Templates',
+  'ui-kit': 'UI Kits',
+  api: 'Developer APIs'
 });
-const SEO_CATEGORY_SINGULAR = Object.freeze({ saas: 'SaaS project', mobile: 'mobile app', ai: 'AI tool', extension: 'Chrome extension' });
+const SEO_CATEGORY_SINGULAR = Object.freeze({ saas: 'SaaS project', mobile: 'mobile app', ai: 'AI tool', extension: 'Chrome extension', notion: 'Notion template', 'ui-kit': 'UI kit', api: 'developer API' });
 const SEO_LANDING_PATHS = Object.freeze([
   '/saas-for-sale', '/micro-saas-for-sale', '/mobile-apps-for-sale', '/ai-tools-for-sale', '/chrome-extensions-for-sale', '/websites-for-sale',
   '/sell-your-saas', '/sell-your-app', '/sell-your-digital-project'
 ]);
+const GUIDE_PATHS = Object.freeze(Object.keys(GUIDES));
+const DISCOVERY_SLUGS = Object.freeze(Object.keys(DISCOVERY_PAGES));
 const SEO_LANDING_PAGES = Object.freeze({
   '/saas-for-sale': {
     title: 'SaaS Projects for Sale | Discover SaaS Opportunities | Searya',
@@ -1917,7 +1928,7 @@ function landingListingMatches(row, page) {
   return /micro\s*saas/i.test(`${content.categoryEn || ''} ${content.descriptionEn || ''} ${content.shortDescEn || ''} ${row.title}`);
 }
 
-function landingProjectCard(row) {
+function landingProjectCard(row, { discoverySlug = '', showTech = false } = {}) {
   const listing = listingFromRow(row);
   const content = JSON.parse(row.content_json || '{}');
   const description = cleanText(content.shortDescEn || content.descriptionEn || content.description || '', 190);
@@ -1926,7 +1937,9 @@ function landingProjectCard(row) {
   const rawImage = safeImageData(content.coverImage);
   const image = /^https:\/\//i.test(rawImage) ? rawImage : '';
   const title = listing.titleEn || row.title;
-  return `<article class="project-card">${image ? `<img src="${escapeMarkup(image)}" alt="${escapeMarkup(title)}" loading="lazy" width="640" height="340">` : ''}<div class="project-body"><div class="project-meta"><span>${escapeMarkup(label)}</span><span>${row.type === 'wtb' ? 'Request' : 'Listing'}</span></div><h3>${escapeMarkup(title)}</h3><p>${escapeMarkup(description || 'Open the listing to review the available project information.')}</p><p class="owner">Listed by ${escapeMarkup(person)}</p><a class="project-link" href="/projects/${encodeURIComponent(row.slug)}">View project details →</a></div></article>`;
+  const tech = showTech ? `<div class="tech-chips">${(Array.isArray(content.techStack) ? content.techStack : []).slice(0, 4).map(value => `<span>${escapeMarkup(cleanText(value, 40))}</span>`).join('')}</div>` : '';
+  const analytics = discoverySlug ? ` data-discovery-slug="${escapeMarkup(discoverySlug)}" data-listing-id="${escapeMarkup(row.id)}"` : '';
+  return `<article class="project-card">${image ? `<img src="${escapeMarkup(image)}" alt="${escapeMarkup(title)}" loading="lazy" width="640" height="340">` : ''}<div class="project-body"><div class="project-meta"><span>${escapeMarkup(label)}</span><span>${row.type === 'wtb' ? 'Request' : 'Listing'}</span></div><h3>${escapeMarkup(title)}</h3><p>${escapeMarkup(description || 'Open the listing to review the available project information.')}</p>${tech}<p class="owner">Listed by ${escapeMarkup(person)}</p><a class="project-link${discoverySlug ? ' discovery-project-link' : ''}"${analytics} href="/projects/${encodeURIComponent(row.slug)}">View project details →</a></div></article>`;
 }
 
 function landingLabel(pathname) {
@@ -1946,6 +1959,13 @@ function renderLandingPage(pathname) {
     : `<div class="empty"><h3>No projects in this category yet.</h3><p>Have one? Be the first to list it and make it discoverable to interested people.</p><a class="button" href="/?create=listing">List your project</a></div>`;
   const faqSchema = page.faqs.map(([name, answer]) => ({ '@type': 'Question', name, acceptedAnswer: { '@type': 'Answer', text: answer } }));
   const related = page.related.map(path => `<a href="${path}">${escapeMarkup(landingLabel(path))}</a>`).join('');
+  const discoveryByCategory = {
+    saas: ['nextjs-saas-projects', 'nodejs-saas-projects', 'vue-saas-projects', 'supabase-saas-projects', 'react-saas-projects'],
+    mobile: ['flutter-mobile-apps', 'firebase-mobile-apps', 'react-native-mobile-apps'],
+    ai: ['nextjs-ai-tools', 'python-ai-tools', 'openai-api-projects'],
+    extension: ['chrome-extension-projects']
+  };
+  const discoveryLinks = (discoveryByCategory[page.category] || []).map(slug => `<a href="/discover/${slug}">${escapeMarkup(DISCOVERY_PAGES[slug].h1)}</a>`).join('');
   const primaryCta = page.seller ? (page.cta || 'List Your Project') : 'Explore All Projects';
   const primaryHref = page.seller ? '/?create=listing' : '/#listings-grid';
   const categoryHeading = page.seller ? 'Create a listing that earns the right conversation' : `Understanding ${page.kicker.toLowerCase()}`;
@@ -1955,7 +1975,108 @@ function renderLandingPage(pathname) {
     { '@type': 'WebPage', name: page.h1, description: page.description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
     { '@type': 'FAQPage', mainEntity: faqSchema }
   ] }).replaceAll('<', '\\u003c');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(page.title)}</title><meta name="description" content="${escapeMarkup(page.description)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(page.title)}"><meta property="og:description" content="${escapeMarkup(page.description)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(page.title)}"><meta name="twitter:description" content="${escapeMarkup(page.description)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)}</p><h1>${escapeMarkup(page.h1)}</h1><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div></div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(page.title)}</title><meta name="description" content="${escapeMarkup(page.description)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(page.title)}"><meta property="og:description" content="${escapeMarkup(page.description)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(page.title)}"><meta name="twitter:description" content="${escapeMarkup(page.description)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)}</p><h1>${escapeMarkup(page.h1)}</h1><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div>${discoveryLinks ? `<p class="eyebrow" style="margin-top:30px">Curated technology collections</p><div class="related">${discoveryLinks}</div>` : ""}</div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
+}
+
+function guideLabel(pathname) {
+  if (pathname === '/guides') return 'All founder guides';
+  return GUIDES[pathname]?.h1 || SEO_LANDING_PAGES[pathname]?.h1 || pathname;
+}
+
+function guideHead({ title, description, canonical, type = 'article', robots = 'index, follow, max-image-preview:large', structuredData }) {
+  const socialImage = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`;
+  const json = JSON.stringify(structuredData).replaceAll('<', '\\u003c');
+  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(title)}</title><meta name="description" content="${escapeMarkup(description)}"><meta name="robots" content="${escapeMarkup(robots)}"><link rel="canonical" href="${escapeMarkup(canonical)}"><meta property="og:type" content="${type}"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${escapeMarkup(canonical)}"><meta property="og:title" content="${escapeMarkup(title)}"><meta property="og:description" content="${escapeMarkup(description)}"><meta property="og:image" content="${socialImage}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(title)}"><meta name="twitter:description" content="${escapeMarkup(description)}"><meta name="twitter:image" content="${socialImage}"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><link rel="stylesheet" href="/public/guides.css?v=20260812-1"><link rel="stylesheet" href="/public/discovery.css?v=20260812-1"><script type="application/ld+json">${json}</script>`;
+}
+
+function guideHeader(primaryHref = '/#listings-grid', primaryLabel = 'Discover projects') {
+  return `<header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/guides">Guides</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryLabel)}</a></nav></div></header>`;
+}
+
+function guideFooter() {
+  return `<footer class="site-foot"><div class="shell"><span>© 2026 Searya. Practical resources for digital project owners and buyers.</span><nav><a href="/guides">Guides</a><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer>`;
+}
+
+function renderGuidesHub() {
+  const canonical = `${PUBLIC_ORIGIN}/guides`;
+  const title = 'Guides for Buying and Selling Digital Projects | Searya';
+  const description = 'Practical founder guides for selling SaaS, apps and digital projects, evaluating opportunities, valuation and due diligence.';
+  const grouped = GUIDE_CATEGORIES.map(category => {
+    const cards = GUIDE_PATHS.filter(path => GUIDES[path].category === category).map(path => {
+      const guide = GUIDES[path];
+      return `<article class="guide-card"><p class="card-type">${escapeMarkup(category)}</p><h2><a href="${path}">${escapeMarkup(guide.h1)}</a></h2><p>${escapeMarkup(guide.description)}</p><a class="read-link" href="${path}">Read the guide <span aria-hidden="true">→</span></a></article>`;
+    }).join('');
+    return cards ? `<section class="hub-group" aria-labelledby="${category.toLowerCase().replace(/[^a-z]+/g, '-')}"><div class="group-heading"><p class="eyebrow">Resource collection</p><h2 id="${category.toLowerCase().replace(/[^a-z]+/g, '-')}">${escapeMarkup(category)}</h2></div><div class="guide-grid">${cards}</div></section>` : '';
+  }).join('');
+  const structuredData = { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'CollectionPage', name: 'Searya Guides', description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }, mainEntity: GUIDE_PATHS.map(path => ({ '@type': 'Article', headline: GUIDES[path].h1, url: `${PUBLIC_ORIGIN}${path}` })) },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Searya', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Guides', item: canonical }] }
+  ] };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title, description, canonical, type: 'website', structuredData })}</head><body>${guideHeader()}<main><section class="hero guide-hub-hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / Guides</p><p class="eyebrow">Practical founder resources</p><h1>Guides for buying and selling digital projects</h1><p class="intro">Clear, evidence-led resources for founders preparing a project, buyers evaluating an opportunity and anyone trying to understand valuation, due diligence or transfer. No fabricated success stories, guaranteed outcomes or hidden transaction claims.</p><div class="hero-actions"><a class="button" href="#guide-library">Browse the library</a><a class="button secondary" href="/#listings-grid">Discover projects</a></div></div></section><div id="guide-library" class="shell guide-library">${grouped}</div><section class="section"><div class="shell cta"><p class="eyebrow">Searya marketplace</p><h2>Put the guidance into practice</h2><p>Discover public digital projects or create an accurate listing. Searya helps users find one another and communicate directly; transactions happen independently outside the platform.</p><div class="hero-actions centered"><a class="button" href="/#listings-grid">Explore projects</a><a class="button secondary" href="/sell-your-digital-project">List a project</a></div></div></section></main>${guideFooter()}</body></html>`;
+}
+
+function renderGuidePage(pathname) {
+  const guide = GUIDES[pathname];
+  const canonical = `${PUBLIC_ORIGIN}${pathname}`;
+  const [ctaHeading, ctaText, ctaHref, ctaLabel] = guide.cta;
+  const related = guide.links.map(path => `<a href="${path}">${escapeMarkup(guideLabel(path))}</a>`).join('');
+  const sections = guide.sections.map(([heading, paragraphs], index) => `<section class="article-section" id="section-${index + 1}"><h2>${escapeMarkup(heading)}</h2>${paragraphs.map(paragraph => `<p>${escapeMarkup(paragraph)}</p>`).join('')}</section>`).join('');
+  const structuredData = { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'Article', headline: guide.h1, description: guide.description, url: canonical, datePublished: GUIDE_PUBLISHED_DATE, dateModified: GUIDE_PUBLISHED_DATE, author: { '@type': 'Organization', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }, publisher: { '@type': 'Organization', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }, mainEntityOfPage: canonical },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Searya', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Guides', item: `${PUBLIC_ORIGIN}/guides` }, { '@type': 'ListItem', position: 3, name: guide.h1, item: canonical }] }
+  ] };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title: guide.title, description: guide.description, canonical, structuredData })}</head><body>${guideHeader(ctaHref, ctaLabel)}<main><article><header class="hero article-hero"><div class="article-shell"><p class="crumbs"><a href="/">Searya</a> / <a href="/guides">Guides</a> / ${escapeMarkup(guide.category)}</p><p class="eyebrow">${escapeMarkup(guide.category)}</p><h1>${escapeMarkup(guide.h1)}</h1><p class="intro">${escapeMarkup(guide.intro)}</p><div class="byline"><span>Published by Searya</span><time datetime="${GUIDE_PUBLISHED_DATE}">August 12, 2026</time></div></div></header><div class="article-shell article-layout"><div class="article-content">${sections}<aside class="role-note" aria-label="Searya's role"><strong>Searya’s role</strong><p>Searya supports project discovery and direct communication. It does not process acquisitions, hold transaction funds, provide escrow or become a party to agreements between users.</p></aside><section class="article-related" aria-labelledby="related-guides"><p class="eyebrow">Continue your research</p><h2 id="related-guides">Related Searya resources</h2><div class="related">${related}</div></section><section class="article-cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${ctaHref}">${escapeMarkup(ctaLabel)}</a></section></div><aside class="article-aside"><div class="aside-card"><p class="eyebrow">In this guide</p><ol>${guide.sections.map(([heading], index) => `<li><a href="#section-${index + 1}">${escapeMarkup(heading)}</a></li>`).join('')}</ol></div><div class="aside-card compact"><strong>Independent verification matters</strong><p>Confirm identity, ownership, product claims and transfer terms before making a commitment.</p><a href="/legal/transfer-checklist.html">Open the handover checklist →</a></div></aside></div></article></main>${guideFooter()}</body></html>`;
+}
+
+function normalizedTechStack(row) {
+  try {
+    const content = JSON.parse(row.content_json || '{}');
+    return Array.isArray(content.techStack) ? content.techStack.map(value => cleanText(value, 40).toLowerCase()) : [];
+  } catch { return []; }
+}
+
+function discoveryMatches(row, page) {
+  if (row.type !== 'sale' || row.category !== page.category) return false;
+  if (!page.tech?.length) return true;
+  const stack = normalizedTechStack(row);
+  return page.tech.some(approvedTech => stack.includes(approvedTech));
+}
+
+function discoveryInventory() {
+  const inventory = new Map();
+  const publicRows = db.prepare(`SELECT * FROM listings WHERE status='approved' AND type='sale' ORDER BY (boosted_until IS NOT NULL AND boosted_until>?) DESC, boosted_until DESC, created_at DESC`).all(nowIso());
+  for (const slug of DISCOVERY_SLUGS) {
+    const rows = publicRows.filter(row => discoveryMatches(row, DISCOVERY_PAGES[slug]));
+    inventory.set(slug, { rows, count: rows.length, indexable: rows.length >= DISCOVERY_INDEX_THRESHOLD });
+  }
+  return inventory;
+}
+
+function renderDiscoveryCard(row, discoverySlug) {
+  return landingProjectCard(row, { discoverySlug, showTech: true });
+}
+
+function discoveryPageLinks(slugs, inventory) {
+  return slugs.filter(slug => DISCOVERY_PAGES[slug]).sort((a, b) => Number(inventory.get(b)?.indexable) - Number(inventory.get(a)?.indexable)).map(slug => {
+    const item = inventory.get(slug);
+    return `<a href="/discover/${slug}">${escapeMarkup(DISCOVERY_PAGES[slug].h1)}${item?.count ? ` <span>${item.count}</span>` : ''}</a>`;
+  }).join('');
+}
+
+function renderDiscoveryPage(slug) {
+  const page = DISCOVERY_PAGES[slug];
+  const inventory = discoveryInventory();
+  const current = inventory.get(slug);
+  const canonical = `${PUBLIC_ORIGIN}/discover/${slug}`;
+  const robots = current.indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow';
+  const projectGrid = current.rows.length ? `<div class="cards discovery-cards">${current.rows.map(row => renderDiscoveryCard(row, slug)).join('')}</div>` : `<div class="empty"><h2>No matching projects are currently listed.</h2><p>Browse all public projects, explore a related category or create an accurate listing if you own a relevant project.</p><div class="hero-actions centered"><a class="button" href="/#listings-grid">Browse all projects</a><a class="button secondary discovery-seller-cta" data-discovery-slug="${escapeMarkup(slug)}" href="/?create=listing">List a relevant project</a></div></div>`;
+  const related = discoveryPageLinks(page.related || [], inventory);
+  const guides = (page.guides || []).map(path => `<a href="${path}">${escapeMarkup(guideLabel(path))}</a>`).join('');
+  const structuredData = { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'CollectionPage', name: page.h1, description: page.description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }, numberOfItems: current.count },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Discover', item: `${PUBLIC_ORIGIN}/#listings-grid` }, { '@type': 'ListItem', position: 3, name: page.h1, item: canonical }] }
+  ] };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title: page.title, description: page.description, canonical, type: 'website', robots, structuredData })}</head><body data-discovery-slug="${escapeMarkup(slug)}">${guideHeader('/#listings-grid', 'Explore all projects')}<main><section class="hero discovery-hero"><div class="shell"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>→</span> <a href="/#listings-grid">Discover</a> <span>→</span> <span>${escapeMarkup(page.h1)}</span></nav><p class="eyebrow">Curated marketplace discovery</p><h1>${escapeMarkup(page.h1)}</h1><p class="intro">${escapeMarkup(page.intro)}</p><div class="inventory-note"><strong>${current.count}</strong> matching public ${current.count === 1 ? 'project' : 'projects'} currently listed${current.indexable ? '' : ` · This page remains noindex until it has at least ${DISCOVERY_INDEX_THRESHOLD} matching listings`}.</div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Real Searya inventory</p><h2>Projects matching this collection</h2></div><p>Only active, approved public sale listings are shown. Classification uses the category and technology stack supplied in each listing.</p></div>${projectGrid}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">Understand the category</p><h2>What this collection means</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Buyer guidance</p><h2>Verify beyond the label</h2><p>${escapeMarkup(page.buyerGuidance)}</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Related discovery</p><h2>Explore nearby project collections</h2></div></div><div class="related discovery-related">${related}</div></div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">For buyers</p><h2>Compare projects, then ask direct questions</h2><p>Use public listings as a starting point. Verify ownership, code, claims, operating costs and transferability independently with the project owner.</p><a class="project-link discovery-buyer-cta" data-discovery-slug="${escapeMarkup(slug)}" href="/#listings-grid">Browse all public projects →</a></article><article class="panel"><p class="eyebrow">For project owners</p><h2>Own a relevant project?</h2><p>Create an accurate listing with the correct category and technology stack. Indexability depends on real approved inventory, never on arbitrary user tags.</p><a class="project-link discovery-seller-cta" data-discovery-slug="${escapeMarkup(slug)}" href="/?create=listing">List your project →</a></article></div></section><section class="section"><div class="shell"><p class="eyebrow">Practical resources</p><h2>Continue with Searya guides</h2><div class="related">${guides}</div></div></section><section class="section"><div class="shell cta"><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another. It does not process acquisitions, payments or escrow and is not a party to user agreements.</p><a class="button discovery-buyer-cta" data-discovery-slug="${escapeMarkup(slug)}" href="/#listings-grid">Discover more projects</a></div></section></main>${guideFooter()}<script src="/public/discovery-analytics.js?v=20260812-1" defer></script></body></html>`;
 }
 
 function serveStatic(req, res, url) {
@@ -2008,7 +2129,8 @@ const server = createServer(async (req, res) => {
       let listingRows = [];
       try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
       catch (error) { console.error('Sitemap listing query failed:', error); }
-      const pages = ['/', ...SEO_LANDING_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
+      const indexableDiscoveryPaths = [...discoveryInventory()].filter(([, value]) => value.indexable).map(([slug]) => `/discover/${slug}`);
+      const pages = ['/', ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
         .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
       const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
       const listings = listingRows.map(row => `<url><loc>${xmlUrl(`/projects/${encodeURIComponent(row.slug)}`)}</loc><lastmod>${escapeMarkup(String(row.updated_at || '').slice(0, 10))}</lastmod></url>`).join('');
@@ -2021,8 +2143,26 @@ const server = createServer(async (req, res) => {
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
       return htmlResponse(req, res, renderSeoPage());
     }
+    const guideWithoutTrailingSlash = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
+    if ((req.method === 'GET' || req.method === 'HEAD') && (guideWithoutTrailingSlash === '/guides' || GUIDES[guideWithoutTrailingSlash])) {
+      return redirect(res, `${PUBLIC_ORIGIN}${guideWithoutTrailingSlash}`);
+    }
     if ((req.method === 'GET' || req.method === 'HEAD') && SEO_LANDING_PAGES[url.pathname]) {
       return htmlResponse(req, res, renderLandingPage(url.pathname));
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/guides') {
+      return htmlResponse(req, res, renderGuidesHub());
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && GUIDES[url.pathname]) {
+      return htmlResponse(req, res, renderGuidePage(url.pathname));
+    }
+    const discoveryMatch = url.pathname.match(/^\/discover\/([a-z0-9-]+)$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && discoveryMatch && DISCOVERY_PAGES[discoveryMatch[1]]) {
+      return htmlResponse(req, res, renderDiscoveryPage(discoveryMatch[1]));
+    }
+    const discoveryTrailingSlash = url.pathname.match(/^\/discover\/([a-z0-9-]+)\/$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && discoveryTrailingSlash && DISCOVERY_PAGES[discoveryTrailingSlash[1]]) {
+      return redirect(res, `${PUBLIC_ORIGIN}/discover/${discoveryTrailingSlash[1]}`);
     }
     const projectMatch = url.pathname.match(/^\/projects\/([^/]+)\/?$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && projectMatch) {

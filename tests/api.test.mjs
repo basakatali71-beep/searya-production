@@ -111,6 +111,108 @@ test('high-intent landing routes have unique metadata, visible FAQs and real fil
   for (const route of routes.keys()) assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${route}`));
 });
 
+test('guides hub and long-form guide routes expose indexable editorial content', async () => {
+  const routes = new Map([
+    ['/guides/how-to-sell-a-saas', 'How to Sell a SaaS'],
+    ['/guides/where-to-sell-a-saas', 'Where Can You Sell a SaaS Project?'],
+    ['/guides/how-much-is-my-saas-worth', 'How Much Is My SaaS Worth?'],
+    ['/guides/selling-a-saas-with-no-revenue', 'Can You Sell a SaaS With No Revenue?'],
+    ['/guides/how-to-sell-an-app', 'How to Sell a Mobile App'],
+    ['/guides/how-to-sell-a-side-project', 'How to Sell a Side Project Instead of Letting It Sit'],
+    ['/guides/how-to-buy-a-small-saas', 'How to Buy a Small SaaS Project'],
+    ['/guides/what-to-check-before-buying-a-saas', 'What to Check Before Buying a SaaS'],
+    ['/guides/buy-app-vs-build-from-scratch', 'Buy an Existing App or Build From Scratch?'],
+    ['/guides/how-to-find-buyers-for-a-digital-project', 'How to Find Potential Buyers for a Digital Project']
+  ]);
+  const hubResponse = await fetch(`${baseUrl}/guides?utm_source=test`);
+  assert.equal(hubResponse.status, 200);
+  const hub = await hubResponse.text();
+  assert.match(hub, /<link rel="canonical" href="https:\/\/searya\.com\/guides">/);
+  assert.match(hub, /"@type":"CollectionPage"/);
+  for (const route of routes.keys()) assert.match(hub, new RegExp(`href="${route}"`));
+
+  const titles = new Set();
+  for (const [route, h1] of routes) {
+    const response = await fetch(`${baseUrl}${route}?utm_source=test`);
+    assert.equal(response.status, 200, route);
+    const html = await response.text();
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\/\/searya\.com${route}">`), route);
+    assert.ok(html.includes(`<h1>${h1.replaceAll('&', '&amp;')}</h1>`), route);
+    assert.match(html, /"@type":"Article"/, route);
+    assert.match(html, /"@type":"BreadcrumbList"/, route);
+    assert.match(html, /"datePublished":"2026-08-12"/, route);
+    assert.match(html, /Published by Searya/, route);
+    assert.match(html, /does not process acquisitions/, route);
+    assert.doesNotMatch(html, /guaranteed (sale|buyer|return)|secure checkout|Buy now/i, route);
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+    assert.ok(title && !titles.has(title), `unique guide title for ${route}`);
+    titles.add(title);
+    const visibleWords = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length;
+    assert.ok(visibleWords >= 900 && visibleWords <= 1600, `${route} has ${visibleWords} visible words`);
+  }
+
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  assert.match(sitemap, /https:\/\/searya\.com\/guides<\/loc>/);
+  for (const route of routes.keys()) assert.match(sitemap, new RegExp(`https:\/\/searya\.com${route}<\\/loc>`));
+
+  const malformed = await fetch(`${baseUrl}/guides/not-a-published-guide`, { headers: { Accept: 'text/html' } });
+  assert.equal(malformed.status, 404);
+  const trailingSlash = await fetch(`${baseUrl}/guides/how-to-sell-a-saas/`, { redirect: 'manual' });
+  assert.equal(trailingSlash.status, 302);
+  assert.equal(trailingSlash.headers.get('location'), 'https://searya.com/guides/how-to-sell-a-saas');
+});
+
+test('curated discovery routes use real public inventory and enforce the shared index threshold', async () => {
+  const indexableRoutes = new Map([
+    ['/discover/nextjs-saas-projects', 'Next.js SaaS Projects'],
+    ['/discover/nodejs-saas-projects', 'Node.js SaaS Projects'],
+    ['/discover/vue-saas-projects', 'Vue SaaS Projects'],
+    ['/discover/flutter-mobile-apps', 'Flutter Mobile App Projects'],
+    ['/discover/react-native-mobile-apps', 'React Native Mobile App Projects'],
+    ['/discover/firebase-mobile-apps', 'Firebase Mobile App Projects'],
+    ['/discover/python-ai-tools', 'Python AI Tools &amp; Projects'],
+    ['/discover/openai-api-projects', 'OpenAI API Projects'],
+    ['/discover/nextjs-ai-tools', 'Next.js AI Tools &amp; Projects'],
+    ['/discover/chrome-extension-projects', 'Chrome Extension Projects']
+  ]);
+  const belowThresholdRoutes = new Map([
+    ['/discover/react-saas-projects', 'React SaaS Projects'],
+    ['/discover/supabase-saas-projects', 'Supabase SaaS Projects']
+  ]);
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  for (const [route, h1] of indexableRoutes) {
+    const response = await fetch(`${baseUrl}${route}?sort=recent`);
+    assert.equal(response.status, 200, route);
+    const html = await response.text();
+    assert.ok(html.includes(`<h1>${h1}</h1>`), route);
+    assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/, route);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\/\/searya\.com${route}">`), route);
+    assert.match(html, /"@type":"CollectionPage"/, route);
+    assert.match(html, /"@type":"BreadcrumbList"/, route);
+    assert.match(html, /data-discovery-slug=/, route);
+    assert.match(sitemap, new RegExp(`https:\/\/searya\.com${route}<\\/loc>`), route);
+  }
+  for (const [route, h1] of belowThresholdRoutes) {
+    const html = await fetch(`${baseUrl}${route}`).then(response => response.text());
+    assert.ok(html.includes(`<h1>${h1}</h1>`), route);
+    assert.match(html, /<meta name="robots" content="noindex, follow">/, route);
+    assert.doesNotMatch(sitemap, new RegExp(`https:\/\/searya\.com${route}<\\/loc>`), route);
+  }
+
+  const nextPage = await fetch(`${baseUrl}/discover/nextjs-saas-projects`).then(response => response.text());
+  assert.match(nextPage, /<strong>\d+<\/strong> matching public projects currently listed/);
+  assert.match(nextPage, /ClientPulse Retention Dashboard/);
+  assert.doesNotMatch(nextPage, /Briefly AI Content Planner/);
+  assert.doesNotMatch(nextPage, /Looking for a Small SaaS Product/);
+  assert.doesNotMatch(nextPage, /"@type":"Product"|"@type":"Offer"/);
+
+  const missing = await fetch(`${baseUrl}/discover/arbitrary-user-tag`, { headers: { Accept: 'text/html' } });
+  assert.equal(missing.status, 404);
+  const trailing = await fetch(`${baseUrl}/discover/nextjs-saas-projects/`, { redirect: 'manual' });
+  assert.equal(trailing.status, 302);
+  assert.equal(trailing.headers.get('location'), 'https://searya.com/discover/nextjs-saas-projects');
+});
+
 test('anonymous visitors cannot create listings', async () => {
   const response = await fetch(`${baseUrl}/api/listings`, {
     method: 'POST',

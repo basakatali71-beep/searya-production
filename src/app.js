@@ -1,4 +1,5 @@
-import { initialForSaleListings, initialWtbListings, initialMessages } from './data/mockData.js?v=20260812-7';
+import { initialForSaleListings, initialWtbListings } from './data/seedListings.js?v=20260813-1';
+import { initialMessages } from './data/mockData.js?v=20260812-7';
 import { translations } from './data/translations.js?v=20260812-13';
 import { ApiError, SearyaApi } from './api.js?v=20260812-10';
 
@@ -2185,7 +2186,10 @@ function openProjectAlertModal(options = {}) {
     ai: isEn ? 'AI Tools' : 'AI Projeleri',
     saas: 'Micro SaaS',
     extension: 'Chrome Extension',
-    mobile: isEn ? 'Mobile Apps' : 'Mobil Uygulamalar'
+    mobile: isEn ? 'Mobile Apps' : 'Mobil Uygulamalar',
+    notion: 'Notion Templates',
+    'ui-kit': 'UI Kits',
+    api: 'Developer APIs'
   };
 
   const alertRows = state.savedAlerts.map(alert => {
@@ -2956,6 +2960,9 @@ function openCreateListingModal(editListing = null) {
             <option value="saas">Micro SaaS</option>
             <option value="extension">Chrome Extension</option>
             <option value="mobile">${state.lang === 'en' ? 'Mobile App' : 'Mobil Uygulama'}</option>
+            <option value="notion">Notion Template</option>
+            <option value="ui-kit">UI Kit</option>
+            <option value="api">Developer API</option>
           </select>
         </div>
         <div>
