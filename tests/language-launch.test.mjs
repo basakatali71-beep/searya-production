@@ -80,6 +80,12 @@ test('The footer exposes a concise set of SEO discovery links', () => {
   assert.match(pageSource, /href="\/sell-your-digital-project"/);
 });
 
+test('The public homepage exposes the blog in desktop, mobile and footer navigation', () => {
+  assert.match(pageSource, /id="t-nav-blog"[^>]*>Blog<\/a>/);
+  assert.match(pageSource, /class="md:hidden[^>]*>[\s\S]*?<span class="hidden sm:inline">Blog<\/span>/);
+  assert.match(pageSource, /href="\/blog"[^>]*>Searya Blog<\/a>/);
+});
+
 test('Featured project preview and listing cards contain no sample labels', () => {
   for (const id of ['t-preview-view-value', 't-preview-data-value', 't-launch-chat-period']) {
     assert.match(pageSource, new RegExp(`id=["']${id}["']`));
