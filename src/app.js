@@ -1,6 +1,6 @@
 import { initialForSaleListings, initialWtbListings } from './data/seedListings.js?v=20260813-1';
 import { initialMessages } from './data/mockData.js?v=20260812-7';
-import { translations } from './data/translations.js?v=20260812-13';
+import { translations } from './data/translations.js?v=20260813-1';
 import { ApiError, SearyaApi } from './api.js?v=20260812-10';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';

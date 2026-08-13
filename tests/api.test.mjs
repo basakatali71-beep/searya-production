@@ -43,7 +43,11 @@ test('health and seeded listings are available', async () => {
 
 test('technical SEO exposes canonical metadata, robots rules and public sitemap URLs', async () => {
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
-  assert.match(homepage, /<title>Searya — Discover Digital Projects, SaaS, Apps &amp; AI Tools<\/title>/);
+  assert.match(homepage, /<title>Searya — Buy &amp; Sell Digital Projects \| 0% Commission &amp; Direct Messaging<\/title>/);
+  assert.match(homepage, /<meta name="description" content="Discover SaaS apps, Notion templates, and source code\. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging\.">/);
+  assert.match(homepage, /The 0% Commission Marketplace/);
+  assert.match(homepage, /for Digital Projects &amp; SaaS/);
+  assert.match(homepage, /<h2[^>]*id="t-hero-subtitle">Direct Founder-to-Buyer Messaging with Zero Transaction Fees<\/h2>/);
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
   assert.match(homepage, /"@type":"Organization"/);
   assert.match(homepage, /"@type":"WebSite"/);
@@ -61,9 +65,11 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.doesNotMatch(sitemap, /\?listing=|\?sort=|utm_source/);
 
   const detail = await fetch(`${baseUrl}/projects/${listing.slug}?utm_source=test`).then(response => response.text());
-  assert.match(detail, new RegExp(`<title>${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\| Digital Project on Searya<\\/title>`));
+  assert.match(detail, new RegExp(`<title>${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\| 0% Commission Marketplace — Searya<\\/title>`));
+  assert.match(detail, new RegExp(`<meta name="description" content="Connect directly with the owner of ${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. 0% platform commission, direct founder messaging, and instant transfer\\.">`));
   assert.match(detail, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com\\/projects\\/${listing.slug}">`));
   assert.match(detail, /"@type":"WebPage"/);
+  assert.match(detail, /"offers":\{"@type":"Offer","price":"0","priceCurrency":"USD","description":"0% Commission Marketplace with Direct Buyer Messaging"\}/);
 
   const missing = await fetch(`${baseUrl}/projects/not-a-public-project`);
   assert.equal(missing.status, 404);
@@ -145,7 +151,11 @@ test('high-intent landing routes have unique metadata, visible FAQs and real fil
     assert.equal(response.status, 200, route);
     const html = await response.text();
     assert.match(html, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com${route}">`), route);
-    assert.ok(html.includes(`<h1>${h1}</h1>`), route);
+    assert.match(html, /<h1>The 0% Commission Marketplace for Digital Projects &amp; SaaS<\/h1>/, route);
+    assert.match(html, /<h2 class="intro fee-subheading">Direct Founder-to-Buyer Messaging with Zero Transaction Fees<\/h2>/, route);
+    assert.match(html, /<title>[^<]*0% Commission &amp; Direct Messaging — Searya<\/title>/, route);
+    assert.match(html, /<meta name="description" content="[^"]*0% platform commission and direct buyer messaging\.">/, route);
+    assert.match(html, new RegExp(h1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), route);
     assert.match(html, /"@type":"FAQPage"/, route);
     assert.match(html, /<section class="section">[\s\S]*Frequently asked questions/, route);
     assert.doesNotMatch(html, /Buy now|Secure checkout|Transaction protection|guaranteed buyers|guaranteed sales/i, route);
