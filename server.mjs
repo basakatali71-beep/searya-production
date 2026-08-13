@@ -11,6 +11,8 @@ import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guide
 import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
 import { blogPosts as CORE_BLOG_POSTS } from './src/data/blogPosts.js';
 import GENERATED_BLOG_POSTS from './src/data/blogPosts.json' with { type: 'json' };
+import { INDEXNOW_KEY, indexNowKeyPath, submitIndexNow } from './src/services/indexNow.js';
+import { submitSitemapToGoogle } from './src/services/googleSearchConsole.js';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -280,6 +282,16 @@ const polarProductEnvironments = Object.freeze({
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function notifySearchEngines(paths) {
+  if (NODE_ENV !== 'production') return;
+  submitIndexNow(paths, { origin: PUBLIC_ORIGIN })
+    .then(result => console.log(`IndexNow accepted ${result.submitted} URL(s) with HTTP ${result.status}.`))
+    .catch(error => console.error('IndexNow submission error:', error));
+  submitSitemapToGoogle()
+    .then(result => { if (result.configured) console.log('Google Search Console sitemap refreshed.'); })
+    .catch(error => console.error('Google Search Console sitemap error:', error));
 }
 
 function cleanText(value, max = 500) {
@@ -1363,6 +1375,7 @@ async function handleApi(req, res, url) {
     }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     recordAnalyticsEvent(req, 'listing_created', { type: input.type });
+    if (row.status === 'approved') notifySearchEngines([`/projects/${encodeURIComponent(row.slug)}`, '/sitemap.xml']);
     if (user.email) sendEmail({ to: user.email, subject: 'We received your Searya listing', text: `Your ${input.title} listing ${status === 'pending' ? 'is under security review' : 'has been published'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
     return json(res, 201, { listing: listingFromRow(row), moderation: status === 'pending' ? 'pending' : 'approved', user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -1732,6 +1745,7 @@ async function handleApi(req, res, url) {
     if (action === 'reject') db.prepare(`UPDATE listings SET status='rejected',is_verified=0,priority_review=0,updated_at=? WHERE id=?`).run(nowIso(), id);
     else db.prepare(`UPDATE listings SET status='approved',is_verified=?,priority_review=0,updated_at=? WHERE id=?`).run(action === 'verify' ? 1 : 0, nowIso(), id);
     const updatedListing = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
+    if (updatedListing.status === 'approved') notifySearchEngines([`/projects/${encodeURIComponent(updatedListing.slug)}`, '/sitemap.xml']);
     const owner = db.prepare('SELECT email,name FROM users WHERE id=?').get(updatedListing.user_id);
     let notificationSent = false;
     if (owner?.email) {
@@ -2243,6 +2257,11 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || '/', APP_ORIGIN);
     if (req.method === 'OPTIONS') { res.writeHead(204, { Allow: 'GET,HEAD,POST,PATCH,DELETE,OPTIONS' }); return res.end(); }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    if (url.pathname === indexNowKeyPath()) {
+      const body = INDEXNOW_KEY;
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+      return res.end(body);
+    }
     if (url.pathname === '/robots.txt') {
       const body = `User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /account\nDisallow: /settings\nDisallow: /messages\nDisallow: /login\nDisallow: /register\nDisallow: /dashboard\nDisallow: /api/\n\nSitemap: ${PUBLIC_ORIGIN}/sitemap.xml\n`;
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });

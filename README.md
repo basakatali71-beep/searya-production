@@ -33,6 +33,14 @@ Copy `.env.example` to `.env` and configure:
 - A strong `SEARYA_ADMIN_EMAIL` and `SEARYA_ADMIN_PASSWORD` before the first start.
 - On Render with a persistent disk mounted at `/var/data`, use `SEARYA_DB_PATH=/var/data/searya.sqlite` and optionally `SEARYA_BACKUP_DIR=/var/data/backups`.
 
+## Search-engine notifications
+
+- The app publishes an IndexNow verification file and submits newly approved listing URLs plus the sitemap to the global IndexNow endpoint. Participating engines share accepted submissions, so one request covers Bing, Yandex and other IndexNow engines.
+- `INDEXNOW_KEY` is optional because a deploy-safe default key is included. Set it in Render and the matching GitHub Actions secret only when rotating the key.
+- The scheduled blog workflow waits until the deployed article is publicly reachable, then submits the article and sitemap through IndexNow.
+- Google Indexing API is intentionally not used for marketplace listings or blog posts: Google officially limits it to `JobPosting` and livestream `BroadcastEvent` pages. Google discovery uses the dynamic sitemap and Search Console Sitemap API instead.
+- To enable automatic Google sitemap refreshes, create a Google service account, add its email to the `sc-domain:searya.com` Search Console property, then store its complete JSON as `GOOGLE_SEARCH_CONSOLE_SERVICE_ACCOUNT_JSON` in Render and GitHub Actions secrets.
+
 Do not use `PAYMENT_MODE=demo` in production. Demo checkout is deliberately disabled when `NODE_ENV=production`.
 
 The server creates one SQLite backup per day and retains the latest seven files. These backups protect against application mistakes but live on the same disk; provider snapshots or an external database backup should also be enabled before storing valuable production data.

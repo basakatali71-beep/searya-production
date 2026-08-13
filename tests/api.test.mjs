@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 import { blogPosts } from '../src/data/blogPosts.js';
+import { INDEXNOW_KEY, indexNowKeyPath } from '../src/services/indexNow.js';
 
 const testDir = mkdtempSync(join(tmpdir(), 'searya-api-'));
 process.env.PORT = '0';
@@ -42,6 +43,10 @@ test('health and seeded listings are available', async () => {
 });
 
 test('technical SEO exposes canonical metadata, robots rules and public sitemap URLs', async () => {
+  const indexNowKey = await fetch(`${baseUrl}${indexNowKeyPath()}`);
+  assert.equal(indexNowKey.status, 200);
+  assert.equal(await indexNowKey.text(), INDEXNOW_KEY);
+
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
   assert.match(homepage, /<title>Searya — Buy &amp; Sell Digital Projects \| 0% Commission &amp; Direct Messaging<\/title>/);
   assert.match(homepage, /<meta name="description" content="Discover SaaS apps, Notion templates, and source code\. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging\.">/);

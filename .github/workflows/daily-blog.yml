@@ -41,3 +41,14 @@ jobs:
           git add src/data/blogPosts.json
           git diff --cached --quiet || git commit -m "Publish scheduled Searya blog article"
           git push
+      - name: Notify Bing and Yandex after the article is live
+        env:
+          PUBLIC_ORIGIN: https://searya.com
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: node scripts/submit-indexnow.mjs "https://searya.com/$(node -e "const p=require('./src/data/blogPosts.json'); process.stdout.write(p.at(-1).url.replace(/^\\//,''))")" "https://searya.com/sitemap.xml"
+      - name: Refresh the sitemap in Google Search Console
+        env:
+          GOOGLE_SEARCH_CONSOLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SEARCH_CONSOLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SEARCH_CONSOLE_SITE_URL: sc-domain:searya.com
+          GOOGLE_SEARCH_CONSOLE_SITEMAP_URL: https://searya.com/sitemap.xml
+        run: npm run google:submit-sitemap
