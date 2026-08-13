@@ -9,7 +9,8 @@ import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { initialForSaleListings, initialWtbListings } from './src/data/seedListings.js';
 import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guides.js';
 import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
-import BLOG_POSTS from './src/data/blogPosts.json' with { type: 'json' };
+import { blogPosts as CORE_BLOG_POSTS } from './src/data/blogPosts.js';
+import GENERATED_BLOG_POSTS from './src/data/blogPosts.json' with { type: 'json' };
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -1769,7 +1770,19 @@ const SEO_LANDING_PATHS = Object.freeze([
 ]);
 const GUIDE_PATHS = Object.freeze(Object.keys(GUIDES));
 const DISCOVERY_SLUGS = Object.freeze(Object.keys(DISCOVERY_PAGES));
-const BLOG_BY_SLUG = new Map(BLOG_POSTS.map(post => [post.slug, post]));
+const generatedBlogPosts = GENERATED_BLOG_POSTS.map(post => Object.freeze({
+  ...post,
+  slug: String(post.url || `/blog/${post.slug}`).replace(/\/$/, ''),
+  category: post.category || 'Editorial',
+  keywords: post.keywords || post.tags || [],
+  publishedDate: post.publishedDate || post.publishedAt,
+  content: post.content || (post.sections || []).map(section => `## ${section.heading}\n\n${section.paragraphs.join('\n\n')}\n\n${section.subsections.map(subsection => `### ${subsection.heading}\n\n${subsection.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')
+}));
+const BLOG_POSTS = Object.freeze([...CORE_BLOG_POSTS, ...generatedBlogPosts.filter(post => !CORE_BLOG_POSTS.some(core => core.slug === post.slug))]);
+const blogPath = post => String(post.slug || post.url || '').startsWith('/blog/') ? String(post.slug || post.url) : `/blog/${String(post.slug || '').replace(/^\/+/, '')}`;
+const blogSlug = post => blogPath(post).replace(/^\/blog\//, '');
+const blogExcerpt = post => post.excerpt || post.metaDescription;
+const BLOG_BY_SLUG = new Map(BLOG_POSTS.map(post => [blogSlug(post), post]));
 const SEO_LANDING_PAGES = Object.freeze({
   '/saas-for-sale': {
     title: 'SaaS Projects for Sale | Discover SaaS Opportunities | Searya',
@@ -2076,15 +2089,56 @@ function renderBlogHub() {
   const title = 'Searya Blog | Buying and Selling Digital Projects';
   const description = 'Practical English guides for evaluating, buying, selling and transferring SaaS products, apps, AI tools and other digital projects.';
   const canonical = `${PUBLIC_ORIGIN}/blog`;
-  const cards = [...BLOG_POSTS].sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt))).map(post => `<article class="blog-card"><div class="blog-meta"><span>${escapeMarkup(post.readTime)}</span><span>${escapeMarkup(String(post.publishedAt).slice(0,10))}</span></div><h2><a href="/blog/${encodeURIComponent(post.slug)}">${escapeMarkup(post.title)}</a></h2><p>${escapeMarkup(post.excerpt)}</p><div class="blog-tags">${post.tags.map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div></article>`).join('');
-  return `<!doctype html><html lang="en"><head>${guideHead({ title, description, canonical, type: 'website', structuredData: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Searya Blog', url: canonical } })}<link rel="stylesheet" href="/public/blog.css?v=20260813-1"></head><body>${guideHeader('/#listings-grid','Explore projects')}<main><section class="hero blog-hero"><div class="shell"><p class="eyebrow">Searya Editorial</p><h1>Practical guidance for digital project buyers and owners</h1><p class="intro">Clear, evidence-minded resources for evaluating products, planning transfers and having better direct conversations.</p></div></section><section class="section"><div class="shell">${cards ? `<div class="blog-grid">${cards}</div>` : '<div class="blog-card blog-empty"><h2>Editorial articles are coming soon.</h2><p>Our scheduled publishing system is ready and will add practical English articles here.</p></div>'}</div></section></main>${guideFooter()}</body></html>`;
+  const categories = [...new Set(BLOG_POSTS.map(post => post.category))].sort();
+  const cards = [...BLOG_POSTS].sort((a, b) => String(b.publishedDate).localeCompare(String(a.publishedDate))).map(post => `<article class="blog-card" data-blog-card data-title="${escapeMarkup(post.title.toLowerCase())}" data-category="${escapeMarkup(post.category)}" data-keywords="${escapeMarkup(post.keywords.join(' ').toLowerCase())}"><div class="blog-meta"><span>${escapeMarkup(post.category)}</span><span>${escapeMarkup(post.readTime)}</span><time datetime="${escapeMarkup(String(post.publishedDate).slice(0,10))}">${escapeMarkup(String(post.publishedDate).slice(0,10))}</time></div><h2><a href="${blogPath(post)}">${escapeMarkup(post.title)}</a></h2><p>${escapeMarkup(blogExcerpt(post))}</p><div class="blog-tags">${post.keywords.slice(0, 3).map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div></article>`).join('');
+  const filters = categories.map(category => `<button type="button" data-blog-filter="${escapeMarkup(category)}">${escapeMarkup(category)}</button>`).join('');
+  const structuredData = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Searya Blog', description, url: canonical, mainEntity: BLOG_POSTS.map(post => ({ '@type': 'Article', headline: post.title, url: `${PUBLIC_ORIGIN}${blogPath(post)}` })) };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title, description, canonical, type: 'website', structuredData })}<link rel="stylesheet" href="/public/blog.css?v=20260813-2"><script src="/public/blog.js?v=20260813-1" defer></script></head><body>${guideHeader('/#listings-grid','Explore projects')}<main><section class="hero blog-hero"><div class="shell"><p class="eyebrow">Searya Editorial</p><h1>Practical guidance for digital project buyers and owners</h1><p class="intro">Fifty in-depth, evidence-minded resources for evaluating products, planning transfers, valuing software and having better direct conversations.</p></div></section><section class="section"><div class="shell"><div class="blog-tools" role="search"><label for="blog-search">Search the Searya blog</label><input id="blog-search" type="search" placeholder="Search valuation, due diligence, SaaS…" autocomplete="off"><div class="blog-filters" aria-label="Filter articles by category"><button class="active" type="button" data-blog-filter="all">All topics</button>${filters}</div><p id="blog-result-count" aria-live="polite">${BLOG_POSTS.length} articles</p></div><div class="blog-grid">${cards}</div><div class="blog-card blog-empty" id="blog-empty" hidden><h2>No matching articles</h2><p>Try a broader search or select another topic.</p></div></div></section></main>${guideFooter()}</body></html>`;
+}
+
+function renderInlineMarkdown(value) {
+  return escapeMarkup(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https:\/\/searya\.com\/[^)\s]*|\/[^)\s]*)\)/g, '<a href="$2">$1</a>');
+}
+
+function renderMarkdown(markdown) {
+  const blocks = [];
+  let listType = '';
+  let items = [];
+  let sectionOpen = false;
+  const flushList = () => { if (items.length) blocks.push(`<${listType}>${items.map(item => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</${listType}>`); listType = ''; items = []; };
+  for (const rawLine of String(markdown || '').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) { flushList(); continue; }
+    const bullet = line.match(/^[-*] (.+)$/);
+    const ordered = line.match(/^\d+\. (.+)$/);
+    if (bullet || ordered) {
+      const nextType = bullet ? 'ul' : 'ol';
+      if (listType && listType !== nextType) flushList();
+      listType = nextType;
+      items.push((bullet || ordered)[1]);
+      continue;
+    }
+    flushList();
+    if (/^# /.test(line)) continue;
+    if (/^## /.test(line)) { const heading = line.slice(3); if (sectionOpen) blocks.push('</section>'); blocks.push(`<section><h2>${renderInlineMarkdown(heading)}</h2>`); sectionOpen = true; continue; }
+    if (/^### /.test(line)) { blocks.push(`<h3>${renderInlineMarkdown(line.slice(4))}</h3>`); continue; }
+    blocks.push(`<p>${renderInlineMarkdown(line)}</p>`);
+  }
+  flushList();
+  if (sectionOpen) blocks.push('</section>');
+  return blocks.join('');
 }
 
 function renderBlogPost(post) {
-  const canonical = `${PUBLIC_ORIGIN}/blog/${encodeURIComponent(post.slug)}`;
-  const body = post.sections.map(section => `<section><h2>${escapeMarkup(section.heading)}</h2>${section.paragraphs.map(paragraph => `<p>${escapeMarkup(paragraph)}</p>`).join('')}${section.subsections.map(sub => `<div><h3>${escapeMarkup(sub.heading)}</h3>${sub.paragraphs.map(paragraph => `<p>${escapeMarkup(paragraph)}</p>`).join('')}</div>`).join('')}</section>`).join('');
-  const structuredData = { '@context': 'https://schema.org', '@type': 'Article', headline: post.title, description: post.metaDescription, author: { '@type': 'Organization', name: post.author }, datePublished: post.publishedAt, dateModified: post.updatedAt, mainEntityOfPage: canonical };
-  return `<!doctype html><html lang="en"><head>${guideHead({ title: `${post.title} | Searya`, description: post.metaDescription, canonical, structuredData })}<link rel="stylesheet" href="/public/blog.css?v=20260813-1"></head><body>${guideHeader('/blog','All articles')}<main><section class="hero blog-hero"><div class="shell"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>→</span> <a href="/blog">Blog</a> <span>→</span> <span>${escapeMarkup(post.title)}</span></nav><p class="eyebrow">${escapeMarkup(post.author)}</p><h1>${escapeMarkup(post.title)}</h1><p class="intro">${escapeMarkup(post.excerpt)}</p><div class="blog-meta"><span>${escapeMarkup(post.readTime)}</span><span>Published ${escapeMarkup(String(post.publishedAt).slice(0,10))}</span></div></div></section><section class="section"><div class="shell"><article class="blog-article"><div class="blog-tags">${post.tags.map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div>${body}</article></div></section></main>${guideFooter()}</body></html>`;
+  const canonical = `${PUBLIC_ORIGIN}${blogPath(post)}`;
+  const body = renderMarkdown(post.content);
+  const structuredData = { '@context': 'https://schema.org', '@graph': [
+    { '@type': 'Article', headline: post.title, description: post.metaDescription, articleSection: post.category, keywords: post.keywords.join(', '), wordCount: post.wordCount, author: { '@type': 'Organization', name: post.author, url: `${PUBLIC_ORIGIN}/blog` }, publisher: { '@type': 'Organization', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }, datePublished: post.publishedDate, dateModified: post.updatedAt || post.publishedDate, mainEntityOfPage: canonical },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Searya', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Blog', item: `${PUBLIC_ORIGIN}/blog` }, { '@type': 'ListItem', position: 3, name: post.title, item: canonical }] }
+  ] };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title: `${post.title} | Searya`, description: post.metaDescription, canonical, structuredData })}<link rel="stylesheet" href="/public/blog.css?v=20260813-2"></head><body>${guideHeader('/blog','All articles')}<main><section class="hero blog-hero"><div class="shell"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>→</span> <a href="/blog">Blog</a> <span>→</span> <span>${escapeMarkup(post.category)}</span></nav><p class="eyebrow">${escapeMarkup(post.author)}</p><h1>${escapeMarkup(post.title)}</h1><p class="intro">${escapeMarkup(blogExcerpt(post))}</p><div class="blog-meta"><span>${escapeMarkup(post.category)}</span><span>${escapeMarkup(post.readTime)}</span><span>Published ${escapeMarkup(String(post.publishedDate).slice(0,10))}</span></div></div></section><section class="section"><div class="shell"><article class="blog-article"><div class="blog-tags">${post.keywords.map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div>${body}<aside class="blog-final-cta"><h2>Continue on Searya</h2><p>Explore projects available from their owners or publish an accurate listing for your own digital product.</p><div class="hero-actions"><a class="button" href="/#listings-grid">Explore projects</a><a class="button secondary" href="/?create=listing">List your project</a></div></aside></article></div></section></main>${guideFooter()}</body></html>`;
 }
 
 function normalizedTechStack(row) {
@@ -2191,7 +2245,7 @@ const server = createServer(async (req, res) => {
       const indexableDiscoveryPaths = [...discoveryInventory()].filter(([, value]) => value.indexable).map(([slug]) => `/discover/${slug}`);
       const pages = ['/', ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, '/blog', ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
         .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
-      const blogLastmods = BLOG_POSTS.map(post => `<url><loc>${xmlUrl(post.url)}</loc><lastmod>${escapeMarkup(String(post.updatedAt || post.publishedAt).slice(0,10))}</lastmod></url>`).join('');
+      const blogLastmods = BLOG_POSTS.map(post => `<url><loc>${xmlUrl(blogPath(post))}</loc><lastmod>${escapeMarkup(String(post.updatedAt || post.publishedDate).slice(0,10))}</lastmod></url>`).join('');
       const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
       const listings = listingRows.map(row => `<url><loc>${xmlUrl(`/projects/${encodeURIComponent(row.slug)}`)}</loc><lastmod>${escapeMarkup(String(row.updated_at || '').slice(0, 10))}</lastmod></url>`).join('');
       const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages}${blogLastmods}${categories}${listings}</urlset>`;
@@ -2223,7 +2277,7 @@ const server = createServer(async (req, res) => {
     if ((req.method === 'GET' || req.method === 'HEAD') && blogMatch) {
       const post = BLOG_BY_SLUG.get(blogMatch[1]);
       if (!post) return serveStatic(req, res, new URL('/not-found', APP_ORIGIN));
-      if (url.pathname.endsWith('/')) return redirect(res, `${PUBLIC_ORIGIN}/blog/${post.slug}`);
+      if (url.pathname.endsWith('/')) return redirect(res, `${PUBLIC_ORIGIN}${blogPath(post)}`);
       return htmlResponse(req, res, renderBlogPost(post));
     }
     const discoveryMatch = url.pathname.match(/^\/discover\/([a-z0-9-]+)$/);

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { blogPosts } from '../src/data/blogPosts.js';
 
 const testDir = mkdtempSync(join(tmpdir(), 'searya-api-'));
 process.env.PORT = '0';
@@ -68,12 +69,33 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(missing.status, 404);
 });
 
-test('blog hub is public and the sitemap includes its canonical URL', async () => {
+test('blog hub exposes fifty searchable articles, detail metadata and sitemap URLs', async () => {
   const blog = await fetch(`${baseUrl}/blog`).then(response => response.text());
   assert.match(blog, /<link rel="canonical" href="https:\/\/searya\.com\/blog">/);
   assert.match(blog, /Searya Editorial/);
+  assert.match(blog, /id="blog-search"/);
+  assert.match(blog, /data-blog-filter="all"/);
+  assert.equal((blog.match(/data-blog-card/g) || []).length, 50);
+
+  const post = blogPosts[0];
+  const detailResponse = await fetch(`${baseUrl}${post.slug}`);
+  assert.equal(detailResponse.status, 200);
+  const detail = await detailResponse.text();
+  assert.match(detail, new RegExp(`<link rel="canonical" href="https:\/\/searya\\.com${post.slug}">`));
+  assert.match(detail, new RegExp(`<meta name="description" content="${post.metaDescription.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
+  assert.match(detail, /"@type":"Article"/);
+  assert.match(detail, /"wordCount":1[3-4]\d{2}/);
+  assert.match(detail, /<h1>/);
+  assert.match(detail, /<h2>/);
+  assert.match(detail, /<h3>/);
+  assert.match(detail, /<ul>/);
+  assert.match(detail, /href="https:\/\/searya\.com\/#listings-grid"/);
+
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
   assert.match(sitemap, /https:\/\/searya\.com\/blog<\/loc>/);
+  for (const article of blogPosts) {
+    assert.match(sitemap, new RegExp(`https:\/\/searya\\.com${article.slug}<\\/loc><lastmod>${article.publishedDate}<\\/lastmod>`));
+  }
 });
 
 test('showcase listing messages are routed to the administrator with transparent identity', async () => {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { initialForSaleListings, initialWtbListings, seedProfiles } from '../src/data/seedListings.js';
 import { BLOG_KEYWORDS } from '../src/data/blogKeywords.js';
+import { blogPosts } from '../src/data/blogPosts.js';
 
 test('seed catalogue includes fifty unique listings for each side', () => {
   assert.equal(initialForSaleListings.length, 50);
@@ -67,4 +68,25 @@ test('automated editorial pool contains at least fifty unique US English keyword
   assert.ok(BLOG_KEYWORDS.length >= 50);
   assert.equal(new Set(BLOG_KEYWORDS).size, BLOG_KEYWORDS.length);
   assert.ok(BLOG_KEYWORDS.every(keyword => /^[\x20-\x7E]+$/.test(keyword)));
+});
+
+test('editorial library contains fifty complete structured SEO articles', () => {
+  assert.equal(blogPosts.length, 50);
+  assert.equal(new Set(blogPosts.map(post => post.id)).size, 50);
+  assert.equal(new Set(blogPosts.map(post => post.slug)).size, 50);
+  for (const post of blogPosts) {
+    assert.match(post.id, /^searya-blog-\d{2}$/);
+    assert.match(post.slug, /^\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    assert.equal(post.author, 'Searya Editorial');
+    assert.ok(post.metaDescription.length >= 120 && post.metaDescription.length <= 160);
+    assert.ok(post.keywords.length >= 4);
+    assert.ok(post.wordCount >= 1000);
+    assert.match(post.content, /^# /);
+    assert.match(post.content, /\n## /);
+    assert.match(post.content, /\n### /);
+    assert.match(post.content, /\n- /);
+    assert.match(post.content, /https:\/\/searya\.com\/#listings-grid/);
+    assert.match(post.content, /https:\/\/searya\.com\/\?create=listing/);
+    assert.ok(!Number.isNaN(Date.parse(post.publishedDate)));
+  }
 });

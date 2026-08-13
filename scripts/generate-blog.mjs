@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BLOG_KEYWORDS } from '../src/data/blogKeywords.js';
+import { blogPosts as CORE_BLOG_POSTS } from '../src/data/blogPosts.js';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const POSTS_FILE = resolve(ROOT, 'src/data/blogPosts.json');
@@ -11,7 +12,7 @@ if (!apiKey) throw new Error('OPENAI_API_KEY is required. Store it as a GitHub A
 
 const slugify = value => String(value).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 const posts = JSON.parse(await readFile(POSTS_FILE, 'utf8'));
-const used = new Set(posts.map(post => post.keyword));
+const used = new Set([...CORE_BLOG_POSTS.flatMap(post => post.keywords.slice(0, 1)), ...posts.map(post => post.keyword)]);
 const remaining = BLOG_KEYWORDS.filter(keyword => !used.has(keyword));
 const keyword = process.env.BLOG_KEYWORD || remaining[0] || BLOG_KEYWORDS[posts.length % BLOG_KEYWORDS.length];
 
