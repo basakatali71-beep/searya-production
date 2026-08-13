@@ -75,6 +75,11 @@ test('blog hub exposes fifty searchable articles, detail metadata and sitemap UR
   assert.match(blog, /Searya Editorial/);
   assert.match(blog, /id="blog-search"/);
   assert.match(blog, /data-blog-filter="all"/);
+  assert.match(blog, /class="blog-navbar"/);
+  assert.match(blog, /class="blog-announcement"/);
+  assert.match(blog, /id="blog-theme-toggle"/);
+  assert.match(blog, /src="\/src\/assets\/searya-logo\.png/);
+  assert.match(blog, /src="\/public\/blog-theme\.js/);
   assert.equal((blog.match(/data-blog-card/g) || []).length, 50);
 
   const post = blogPosts[0];
