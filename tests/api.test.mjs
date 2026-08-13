@@ -68,6 +68,38 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(missing.status, 404);
 });
 
+test('blog hub is public and the sitemap includes its canonical URL', async () => {
+  const blog = await fetch(`${baseUrl}/blog`).then(response => response.text());
+  assert.match(blog, /<link rel="canonical" href="https:\/\/searya\.com\/blog">/);
+  assert.match(blog, /Searya Editorial/);
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  assert.match(sitemap, /https:\/\/searya\.com\/blog<\/loc>/);
+});
+
+test('showcase listing messages are routed to the administrator with transparent identity', async () => {
+  const buyerRegister = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.90' },
+    body: JSON.stringify({ name: 'Showcase Buyer', email: 'showcase-buyer@example.com', password: 'SecurePass123', role: 'buyer' })
+  });
+  const buyerCookie = buyerRegister.headers.getSetCookie()[0].split(';')[0];
+  const listing = (await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json())).listings.find(item => item.managedBySearya);
+  assert.ok(listing);
+  const started = await fetch(`${baseUrl}/api/threads`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: buyerCookie }, body: JSON.stringify({ listingId: listing.id, message: 'Can you clarify what is included?' }) });
+  assert.equal(started.status, 201);
+  const threadId = (await started.json()).threadId;
+  const buyerThreads = await fetch(`${baseUrl}/api/threads`, { headers: { Cookie: buyerCookie } }).then(response => response.json());
+  const buyerThread = buyerThreads.threads.find(thread => thread.id === threadId);
+  assert.equal(buyerThread.partnerName, 'Searya Showcase Desk');
+  assert.equal(buyerThread.managedBySearya, true);
+
+  const adminLogin = await fetch(`${baseUrl}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@searya.test', password: 'AdminSecurePass123' }) });
+  const adminCookie = adminLogin.headers.getSetCookie()[0].split(';')[0];
+  const overview = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
+  assert.ok(overview.seedMessageThreads.some(thread => thread.id === threadId && thread.messages[0].body.includes('clarify')));
+  const reply = await fetch(`${baseUrl}/api/threads/${threadId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminCookie }, body: JSON.stringify({ message: 'Searya manages this showcase conversation during launch.' }) });
+  assert.equal(reply.status, 201);
+});
+
 test('high-intent landing routes have unique metadata, visible FAQs and real filtered listings', async () => {
   const routes = new Map([
     ['/saas-for-sale', 'Discover SaaS Projects for Sale'],

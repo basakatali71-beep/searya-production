@@ -38,7 +38,7 @@ function render(){
   const presence=data.analytics?.presence||{activeNow:0,enteredToday:0,exitedToday:0,updatedAt:null};
   $('#live-metrics').innerHTML=[['Şu an aktif',presence.activeNow,'Son 2 dakika'],['Bugün giren',presence.enteredToday,'Benzersiz ziyaretçi'],['Bugün ayrılan',presence.exitedToday,'Çıkış veya zaman aşımı']].map(([label,value,note],index)=>`<article class="metric ${index===0?'metric-live':''}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
   $('#live-updated').textContent=presence.updatedAt?`Güncellendi: ${new Intl.DateTimeFormat('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(presence.updatedAt))}`:'—';
-  $('#pending-badge').textContent=c.pendingListings; $('#report-badge').textContent=c.openReports;
+  $('#pending-badge').textContent=c.pendingListings; $('#report-badge').textContent=c.openReports; $('#seed-message-badge').textContent=c.seedMessageThreads||0;
   $('#metrics').innerHTML=[['Bugünkü ziyaretçiler',c.visitorsToday,'Benzersiz'],['Son 7 gün',c.visitors7d,`${c.pageViews7d} sayfa görüntüleme`],['Toplam kullanıcı',c.users,`Bugün +${c.usersToday}`],['Toplam ilan',c.listings,`${c.pendingListings} onay bekliyor`],['Paket satışları',c.paidPurchases,'Başarılı ödemeler'],['Toplam gelir',money(c.revenueCents),'Komisyon yok'],['Açık şikâyetler',c.openReports,'İnceleme bekliyor']].map(([label,value,note])=>`<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
   const max=Math.max(1,...data.daily.flatMap(item=>[item.visitors,item.signups]));
   $('#chart').innerHTML=data.daily.map(item=>`<div class="day"><div class="bars"><i class="bar" title="${item.visitors} ziyaretçi" style="height:${Math.max(3,item.visitors/max*100)}%"></i><i class="bar signup" title="${item.signups} kayıt" style="height:${Math.max(3,item.signups/max*100)}%"></i></div><label>${new Date(item.day+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</label></div>`).join('');
@@ -53,6 +53,7 @@ function render(){
   $('#user-table').innerHTML=data.users.map(user=>`<tr><td><strong>${esc(user.name)}</strong><small>${esc(user.email||'Herkese açık e-posta yok')}</small></td><td>${esc(roleLabel(user.role))}${user.isAdmin?' · Yönetici':''}</td><td>${user.buyerConnections} bağlantı<small>${user.sellerListingCredits} standart · ${user.sellerVipCredits} VIP ilan</small></td><td>${date(user.lastSeenAt)}</td><td>${user.isAdmin?'—':actions(user.id,user.status,'user')}</td></tr>`).join('');
   $('#purchase-table').innerHTML=data.purchases.map(item=>`<tr><td>${esc(item.userName)}<small>${esc(item.userEmail||'')}</small></td><td>${esc(item.packageKey)}</td><td>${money(item.amountCents,item.currency)}</td><td><span class="badge ${item.status}">${esc(statusLabel(item.status))}</span></td><td>${date(item.createdAt)}</td></tr>`).join('')||`<tr><td colspan="5">${empty('Henüz paket satışı yok.')}</td></tr>`;
   $('#report-table').innerHTML=data.reports.map(item=>`<tr><td>${esc(item.reporterName)}<small>${esc(item.reporterEmail||'')}</small></td><td>${esc(item.targetLabel)}<small>${esc(item.targetType)}</small></td><td>${esc(item.reason)}</td><td><span class="badge ${item.status}">${esc(statusLabel(item.status))}</span></td><td>${actions(item.id,item.status,'report')}</td></tr>`).join('')||`<tr><td colspan="5">${empty('Şikâyet yok.')}</td></tr>`;
+  $('#seed-message-list').innerHTML=(data.seedMessageThreads||[]).map(thread=>`<article class="admin-conversation"><header><div><strong>${esc(thread.title)}</strong><small>${esc(thread.visitorName)} · ${esc(thread.visitorEmail||'E-posta yok')} · ${date(thread.updatedAt)}</small></div>${thread.unreadCount?`<span class="badge open">${thread.unreadCount} yeni</span>`:''}</header><div class="admin-message-stream">${thread.messages.map(message=>`<p class="${message.mine?'mine':'visitor'}"><span>${esc(message.body)}</span><small>${message.mine?'Searya yönetimi':esc(thread.visitorName)} · ${date(message.createdAt)}</small></p>`).join('')}</div><form data-admin-reply="${esc(thread.id)}"><textarea required maxlength="1000" placeholder="Searya yönetimi adına yanıt yazın…"></textarea><button class="action good" type="submit">Yanıtla</button></form></article>`).join('')||empty('Örnek ilanlara henüz mesaj gelmedi.');
 }
 
 function insightRows(items,labelFor=value=>value,noteFor=()=>'',max=1){
@@ -102,6 +103,14 @@ document.addEventListener('click',async event=>{
     if(button.dataset.report)await SearyaApi.updateAdminReport(button.dataset.report,button.dataset.status);
     await load();
   }catch(error){alert(error.message);button.disabled=false;}
+});
+document.addEventListener('submit',async event=>{
+  const form=event.target.closest('[data-admin-reply]'); if(!form)return;
+  event.preventDefault();
+  const textarea=form.querySelector('textarea'); const button=form.querySelector('button');
+  button.disabled=true;
+  try{await SearyaApi.sendMessage(form.dataset.adminReply,textarea.value);textarea.value='';await SearyaApi.markThreadRead(form.dataset.adminReply);await load({silent:true});}
+  catch(error){alert(error.message);button.disabled=false;}
 });
 $('#refresh-btn').addEventListener('click',load);
 load();

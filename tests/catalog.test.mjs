@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { initialForSaleListings, initialWtbListings, seedProfiles } from '../src/data/seedListings.js';
+import { BLOG_KEYWORDS } from '../src/data/blogKeywords.js';
 
 test('seed catalogue includes fifty unique listings for each side', () => {
   assert.equal(initialForSaleListings.length, 50);
@@ -60,4 +61,10 @@ test('buyer seed data contains explicit budget ranges and detailed requirements'
     assert.ok(listing.fullDescEn.trim().split(/\s+/).length >= 100);
     assert.match(listing.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
   }
+});
+
+test('automated editorial pool contains at least fifty unique US English keywords', () => {
+  assert.ok(BLOG_KEYWORDS.length >= 50);
+  assert.equal(new Set(BLOG_KEYWORDS).size, BLOG_KEYWORDS.length);
+  assert.ok(BLOG_KEYWORDS.every(keyword => /^[\x20-\x7E]+$/.test(keyword)));
 });

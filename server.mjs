@@ -9,6 +9,7 @@ import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { initialForSaleListings, initialWtbListings } from './src/data/seedListings.js';
 import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guides.js';
 import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
+import BLOG_POSTS from './src/data/blogPosts.json' with { type: 'json' };
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -668,6 +669,7 @@ function listingFromRow(row) {
     views: row.views,
     createdAtIso: row.created_at,
     ownerId: row.user_id
+    ,managedBySearya: String(row.user_id || '').startsWith('seed-')
   };
 }
 
@@ -1017,9 +1019,39 @@ function bootstrapAdmin() {
   db.prepare(`UPDATE users SET is_admin=0 WHERE email='admin@searya.local' AND id<>?`).run(adminId);
 }
 
+function primaryAdmin() {
+  return db.prepare("SELECT * FROM users WHERE is_admin=1 AND status='active' ORDER BY CASE WHEN email=? THEN 0 ELSE 1 END,created_at LIMIT 1").get(String(process.env.SEARYA_ADMIN_EMAIL || '').trim().toLowerCase());
+}
+
+function routeSeedListingThreadsToAdmin() {
+  const admin = primaryAdmin();
+  if (!admin) return;
+  const rows = db.prepare(`SELECT t.*,l.user_id AS seed_owner_id FROM threads t JOIN listings l ON l.id=t.listing_id WHERE l.user_id LIKE 'seed-%' AND t.user_a<>? AND t.user_b<>?`).all(admin.id, admin.id);
+  db.exec('BEGIN');
+  try {
+    for (const thread of rows) {
+      const visitorId = thread.user_a === thread.seed_owner_id ? thread.user_b : thread.user_a;
+      const pair = [visitorId, admin.id].sort();
+      const existing = db.prepare('SELECT id FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(thread.listing_id, pair[0], pair[1]);
+      if (existing) {
+        db.prepare('UPDATE messages SET thread_id=? WHERE thread_id=?').run(existing.id, thread.id);
+        db.prepare('UPDATE threads SET updated_at=? WHERE id=?').run(thread.updated_at, existing.id);
+        db.prepare('DELETE FROM threads WHERE id=?').run(thread.id);
+      } else {
+        db.prepare('UPDATE threads SET user_a=?,user_b=? WHERE id=?').run(pair[0], pair[1], thread.id);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 seedData();
 syncSeedContent();
 bootstrapAdmin();
+routeSeedListingThreadsToAdmin();
 
 async function handleApi(req, res, url) {
   const method = req.method || 'GET';
@@ -1394,10 +1426,11 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res); if (!user) return;
     const rows = db.prepare(`SELECT t.*,l.title,l.price_cents,l.type,u1.name AS a_name,u2.name AS b_name FROM threads t JOIN listings l ON l.id=t.listing_id JOIN users u1 ON u1.id=t.user_a JOIN users u2 ON u2.id=t.user_b WHERE t.user_a=? OR t.user_b=? ORDER BY t.updated_at DESC`).all(user.id, user.id);
     const result = rows.map(thread => {
-      const partnerName = thread.user_a === user.id ? thread.b_name : thread.a_name;
+      const managedBySearya = String(thread.user_a === user.id ? thread.user_b : thread.user_a).startsWith('seed-') || Boolean(db.prepare(`SELECT 1 FROM listings WHERE id=? AND user_id LIKE 'seed-%'`).get(thread.listing_id));
+      const partnerName = managedBySearya ? 'Searya Showcase Desk' : (thread.user_a === user.id ? thread.b_name : thread.a_name);
       const messages = db.prepare('SELECT * FROM messages WHERE thread_id=? ORDER BY created_at').all(thread.id).map(message => ({ id: message.id, sender: message.sender_id === user.id ? 'me' : 'them', text: message.body, textEn: message.body, time: new Date(message.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }));
       const unreadCount = db.prepare('SELECT COUNT(*) AS count FROM messages WHERE thread_id=? AND sender_id<>? AND read_at IS NULL').get(thread.id, user.id).count;
-      return { id: thread.id, listingId: thread.listing_id, partnerName, partnerAvatar: '', projectTitle: thread.title, askingPrice: `$${(thread.price_cents / 100).toLocaleString('en-US')}`, unread: unreadCount > 0, unreadCount, messages };
+      return { id: thread.id, listingId: thread.listing_id, partnerName, partnerAvatar: '', projectTitle: thread.title, askingPrice: `$${(thread.price_cents / 100).toLocaleString('en-US')}`, unread: unreadCount > 0, unreadCount, messages, managedBySearya };
     });
     return json(res, 200, { threads: result, user: publicUser(user) });
   }
@@ -1407,9 +1440,13 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const listing = db.prepare(`SELECT l.*,u.name AS owner_name FROM listings l JOIN users u ON u.id=l.user_id WHERE l.id=? AND l.status='approved'`).get(String(body.listingId || ''));
     if (!listing) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
-    if (listing.user_id === user.id) return fail(res, 422, 'OWN_LISTING', 'You cannot message your own listing.');
-    const pair = [user.id, listing.user_id].sort();
-    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, listing.user_id, listing.user_id, user.id)) return fail(res, 403, 'USER_BLOCKED', 'A new conversation cannot be started with this user.');
+    const seedListing = String(listing.user_id).startsWith('seed-');
+    const managedRecipient = seedListing ? primaryAdmin() : null;
+    if (seedListing && !managedRecipient) return fail(res, 503, 'ADMIN_UNAVAILABLE', 'Searya support is temporarily unavailable for this showcase listing.');
+    const recipientId = managedRecipient?.id || listing.user_id;
+    if (recipientId === user.id) return fail(res, 422, 'OWN_LISTING', 'You cannot message your own listing.');
+    const pair = [user.id, recipientId].sort();
+    if (db.prepare('SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)').get(user.id, recipientId, recipientId, user.id)) return fail(res, 403, 'USER_BLOCKED', 'A new conversation cannot be started with this user.');
     let thread = db.prepare('SELECT * FROM threads WHERE listing_id=? AND user_a=? AND user_b=?').get(listing.id, pair[0], pair[1]);
     let createdThread = false;
     let initialMessageId = '';
@@ -1448,8 +1485,8 @@ async function handleApi(req, res, url) {
     }
     if (createdThread) {
       recordAnalyticsEvent(req, 'conversation_started');
-      const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(listing.user_id);
-      if (recipient?.email) sendEmail({ to: recipient.email, subject: 'A new conversation started on Searya', text: `${user.name} contacted you about your ${listing.title} listing.`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
+      const recipient = db.prepare('SELECT email FROM users WHERE id=?').get(recipientId);
+      if (recipient?.email) sendEmail({ to: recipient.email, subject: seedListing ? 'New message about a Searya showcase listing' : 'A new conversation started on Searya', text: `${user.name} contacted you about ${listing.title}. ${seedListing ? 'This is a Searya-managed showcase listing; reply from the admin message queue.' : ''}`, idempotencyKey: `thread-${initialMessageId}` }).catch(console.error);
     }
     return json(res, 201, { threadId: thread.id, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -1616,6 +1653,7 @@ async function handleApi(req, res, url) {
       counts: {
         pendingListings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='pending'`).get().count,
         openReports: db.prepare(`SELECT COUNT(*) AS count FROM reports WHERE status='open'`).get().count,
+        seedMessageThreads: db.prepare(`SELECT COUNT(*) AS count FROM threads t JOIN listings l ON l.id=t.listing_id WHERE l.user_id LIKE 'seed-%' AND (t.user_a=? OR t.user_b=?)`).get(user.id, user.id).count,
         users: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND is_admin=0').get().count,
         usersToday: db.prepare('SELECT COUNT(*) AS count FROM users WHERE created_at>=? AND email IS NOT NULL AND is_admin=0').get(todayIso).count,
         visitorsToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(todayIso).count,
@@ -1648,7 +1686,12 @@ async function handleApi(req, res, url) {
       recentListings: db.prepare(`SELECT l.*,u.name AS owner_name,u.email AS owner_email FROM listings l JOIN users u ON u.id=l.user_id WHERE l.user_id NOT LIKE 'seed-%' ORDER BY l.created_at DESC LIMIT 50`).all().map(row => ({ ...listingFromRow(row), ownerName: row.owner_name, ownerEmail: row.owner_email })),
       users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,buyer_connections AS buyerConnections,seller_listing_credits AS sellerListingCredits,seller_vip_credits AS sellerVipCredits,boost_credits AS boostCredits,created_at AS createdAt,last_seen_at AS lastSeenAt FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 100`).all(),
       purchases: db.prepare(`SELECT p.id,p.package_key AS packageKey,p.amount_cents AS amountCents,p.currency,p.status,p.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM purchases p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC LIMIT 100`).all(),
-      reports: db.prepare(`SELECT r.id,r.target_type AS targetType,r.target_id AS targetId,r.reason,r.status,r.created_at AS createdAt,reporter.name AS reporterName,reporter.email AS reporterEmail,COALESCE(l.title,target.name,r.target_id) AS targetLabel FROM reports r JOIN users reporter ON reporter.id=r.reporter_id LEFT JOIN listings l ON r.target_type='listing' AND l.id=r.target_id LEFT JOIN users target ON r.target_type='user' AND target.id=r.target_id ORDER BY r.created_at DESC LIMIT 100`).all()
+      reports: db.prepare(`SELECT r.id,r.target_type AS targetType,r.target_id AS targetId,r.reason,r.status,r.created_at AS createdAt,reporter.name AS reporterName,reporter.email AS reporterEmail,COALESCE(l.title,target.name,r.target_id) AS targetLabel FROM reports r JOIN users reporter ON reporter.id=r.reporter_id LEFT JOIN listings l ON r.target_type='listing' AND l.id=r.target_id LEFT JOIN users target ON r.target_type='user' AND target.id=r.target_id ORDER BY r.created_at DESC LIMIT 100`).all(),
+      seedMessageThreads: db.prepare(`SELECT t.id,t.listing_id AS listingId,t.updated_at AS updatedAt,l.title,u.name AS visitorName,u.email AS visitorEmail FROM threads t JOIN listings l ON l.id=t.listing_id JOIN users u ON u.id=CASE WHEN t.user_a=? THEN t.user_b ELSE t.user_a END WHERE l.user_id LIKE 'seed-%' AND (t.user_a=? OR t.user_b=?) ORDER BY t.updated_at DESC LIMIT 100`).all(user.id, user.id, user.id).map(thread => ({
+        ...thread,
+        unreadCount: db.prepare('SELECT COUNT(*) AS count FROM messages WHERE thread_id=? AND sender_id<>? AND read_at IS NULL').get(thread.id, user.id).count,
+        messages: db.prepare('SELECT id,sender_id AS senderId,body,created_at AS createdAt FROM messages WHERE thread_id=? ORDER BY created_at').all(thread.id).map(message => ({ ...message, mine: message.senderId === user.id }))
+      }))
     });
   }
 
@@ -1726,6 +1769,7 @@ const SEO_LANDING_PATHS = Object.freeze([
 ]);
 const GUIDE_PATHS = Object.freeze(Object.keys(GUIDES));
 const DISCOVERY_SLUGS = Object.freeze(Object.keys(DISCOVERY_PAGES));
+const BLOG_BY_SLUG = new Map(BLOG_POSTS.map(post => [post.slug, post]));
 const SEO_LANDING_PAGES = Object.freeze({
   '/saas-for-sale': {
     title: 'SaaS Projects for Sale | Discover SaaS Opportunities | Searya',
@@ -2028,6 +2072,21 @@ function renderGuidePage(pathname) {
   return `<!doctype html><html lang="en"><head>${guideHead({ title: guide.title, description: guide.description, canonical, structuredData })}</head><body>${guideHeader(ctaHref, ctaLabel)}<main><article><header class="hero article-hero"><div class="article-shell"><p class="crumbs"><a href="/">Searya</a> / <a href="/guides">Guides</a> / ${escapeMarkup(guide.category)}</p><p class="eyebrow">${escapeMarkup(guide.category)}</p><h1>${escapeMarkup(guide.h1)}</h1><p class="intro">${escapeMarkup(guide.intro)}</p><div class="byline"><span>Published by Searya</span><time datetime="${GUIDE_PUBLISHED_DATE}">August 12, 2026</time></div></div></header><div class="article-shell article-layout"><div class="article-content">${sections}<aside class="role-note" aria-label="Searya's role"><strong>Searya’s role</strong><p>Searya supports project discovery and direct communication. It does not process acquisitions, hold transaction funds, provide escrow or become a party to agreements between users.</p></aside><section class="article-related" aria-labelledby="related-guides"><p class="eyebrow">Continue your research</p><h2 id="related-guides">Related Searya resources</h2><div class="related">${related}</div></section><section class="article-cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${ctaHref}">${escapeMarkup(ctaLabel)}</a></section></div><aside class="article-aside"><div class="aside-card"><p class="eyebrow">In this guide</p><ol>${guide.sections.map(([heading], index) => `<li><a href="#section-${index + 1}">${escapeMarkup(heading)}</a></li>`).join('')}</ol></div><div class="aside-card compact"><strong>Independent verification matters</strong><p>Confirm identity, ownership, product claims and transfer terms before making a commitment.</p><a href="/legal/transfer-checklist.html">Open the handover checklist →</a></div></aside></div></article></main>${guideFooter()}</body></html>`;
 }
 
+function renderBlogHub() {
+  const title = 'Searya Blog | Buying and Selling Digital Projects';
+  const description = 'Practical English guides for evaluating, buying, selling and transferring SaaS products, apps, AI tools and other digital projects.';
+  const canonical = `${PUBLIC_ORIGIN}/blog`;
+  const cards = [...BLOG_POSTS].sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt))).map(post => `<article class="blog-card"><div class="blog-meta"><span>${escapeMarkup(post.readTime)}</span><span>${escapeMarkup(String(post.publishedAt).slice(0,10))}</span></div><h2><a href="/blog/${encodeURIComponent(post.slug)}">${escapeMarkup(post.title)}</a></h2><p>${escapeMarkup(post.excerpt)}</p><div class="blog-tags">${post.tags.map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div></article>`).join('');
+  return `<!doctype html><html lang="en"><head>${guideHead({ title, description, canonical, type: 'website', structuredData: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Searya Blog', url: canonical } })}<link rel="stylesheet" href="/public/blog.css?v=20260813-1"></head><body>${guideHeader('/#listings-grid','Explore projects')}<main><section class="hero blog-hero"><div class="shell"><p class="eyebrow">Searya Editorial</p><h1>Practical guidance for digital project buyers and owners</h1><p class="intro">Clear, evidence-minded resources for evaluating products, planning transfers and having better direct conversations.</p></div></section><section class="section"><div class="shell">${cards ? `<div class="blog-grid">${cards}</div>` : '<div class="blog-card blog-empty"><h2>Editorial articles are coming soon.</h2><p>Our scheduled publishing system is ready and will add practical English articles here.</p></div>'}</div></section></main>${guideFooter()}</body></html>`;
+}
+
+function renderBlogPost(post) {
+  const canonical = `${PUBLIC_ORIGIN}/blog/${encodeURIComponent(post.slug)}`;
+  const body = post.sections.map(section => `<section><h2>${escapeMarkup(section.heading)}</h2>${section.paragraphs.map(paragraph => `<p>${escapeMarkup(paragraph)}</p>`).join('')}${section.subsections.map(sub => `<div><h3>${escapeMarkup(sub.heading)}</h3>${sub.paragraphs.map(paragraph => `<p>${escapeMarkup(paragraph)}</p>`).join('')}</div>`).join('')}</section>`).join('');
+  const structuredData = { '@context': 'https://schema.org', '@type': 'Article', headline: post.title, description: post.metaDescription, author: { '@type': 'Organization', name: post.author }, datePublished: post.publishedAt, dateModified: post.updatedAt, mainEntityOfPage: canonical };
+  return `<!doctype html><html lang="en"><head>${guideHead({ title: `${post.title} | Searya`, description: post.metaDescription, canonical, structuredData })}<link rel="stylesheet" href="/public/blog.css?v=20260813-1"></head><body>${guideHeader('/blog','All articles')}<main><section class="hero blog-hero"><div class="shell"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span>→</span> <a href="/blog">Blog</a> <span>→</span> <span>${escapeMarkup(post.title)}</span></nav><p class="eyebrow">${escapeMarkup(post.author)}</p><h1>${escapeMarkup(post.title)}</h1><p class="intro">${escapeMarkup(post.excerpt)}</p><div class="blog-meta"><span>${escapeMarkup(post.readTime)}</span><span>Published ${escapeMarkup(String(post.publishedAt).slice(0,10))}</span></div></div></section><section class="section"><div class="shell"><article class="blog-article"><div class="blog-tags">${post.tags.map(tag => `<span>${escapeMarkup(tag)}</span>`).join('')}</div>${body}</article></div></section></main>${guideFooter()}</body></html>`;
+}
+
 function normalizedTechStack(row) {
   try {
     const content = JSON.parse(row.content_json || '{}');
@@ -2130,11 +2189,12 @@ const server = createServer(async (req, res) => {
       try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
       catch (error) { console.error('Sitemap listing query failed:', error); }
       const indexableDiscoveryPaths = [...discoveryInventory()].filter(([, value]) => value.indexable).map(([slug]) => `/discover/${slug}`);
-      const pages = ['/', ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
+      const pages = ['/', ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, '/blog', ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
         .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
+      const blogLastmods = BLOG_POSTS.map(post => `<url><loc>${xmlUrl(post.url)}</loc><lastmod>${escapeMarkup(String(post.updatedAt || post.publishedAt).slice(0,10))}</lastmod></url>`).join('');
       const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
       const listings = listingRows.map(row => `<url><loc>${xmlUrl(`/projects/${encodeURIComponent(row.slug)}`)}</loc><lastmod>${escapeMarkup(String(row.updated_at || '').slice(0, 10))}</lastmod></url>`).join('');
-      const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages}${categories}${listings}</urlset>`;
+      const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages}${blogLastmods}${categories}${listings}</urlset>`;
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });
       return res.end(body);
     }
@@ -2155,6 +2215,16 @@ const server = createServer(async (req, res) => {
     }
     if ((req.method === 'GET' || req.method === 'HEAD') && GUIDES[url.pathname]) {
       return htmlResponse(req, res, renderGuidePage(url.pathname));
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/blog') {
+      return htmlResponse(req, res, renderBlogHub());
+    }
+    const blogMatch = url.pathname.match(/^\/blog\/([a-z0-9-]+)\/?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && blogMatch) {
+      const post = BLOG_BY_SLUG.get(blogMatch[1]);
+      if (!post) return serveStatic(req, res, new URL('/not-found', APP_ORIGIN));
+      if (url.pathname.endsWith('/')) return redirect(res, `${PUBLIC_ORIGIN}/blog/${post.slug}`);
+      return htmlResponse(req, res, renderBlogPost(post));
     }
     const discoveryMatch = url.pathname.match(/^\/discover\/([a-z0-9-]+)$/);
     if ((req.method === 'GET' || req.method === 'HEAD') && discoveryMatch && DISCOVERY_PAGES[discoveryMatch[1]]) {

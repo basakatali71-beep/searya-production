@@ -2403,6 +2403,7 @@ function renderSaleSquareCard(p) {
               <i class="ph-bold ph-tag"></i> ${safeCategory}
             </span>
             ${p.isBoosted ? `<span class="px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1"><i class="ph-bold ph-trend-up"></i>${state.lang === 'en' ? 'BOOSTED' : 'ÖNE ÇIKAN'}</span>` : ''}
+            ${p.managedBySearya ? `<span class="px-2.5 py-1 rounded-lg text-[10px] font-black bg-blue-500 text-white flex items-center gap-1"><i class="ph-bold ph-info"></i>SHOWCASE · SEARYA MANAGED</span>` : ''}
             ${p.isAnonymous ? `
               <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/90 text-slate-950 backdrop-blur-md flex items-center gap-1 shadow-sm">
                 <i class="ph-bold ph-user-ghost"></i> ${dict.anonBadge}

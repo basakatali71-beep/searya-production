@@ -1,0 +1,43 @@
+name: Generate Searya SEO blog article
+
+on:
+  schedule:
+    - cron: '0 9,18 * * *'
+  workflow_dispatch:
+    inputs:
+      keyword:
+        description: Optional exact keyword override
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: searya-blog-generator
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate one reviewed-structure article
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BLOG_MODEL: gpt-5-mini
+          BLOG_KEYWORD: ${{ inputs.keyword }}
+        run: npm run blog:generate
+      - run: npm run check
+      - name: Commit generated article
+        run: |
+          git config user.name "searya-editorial-bot"
+          git config user.email "editorial-bot@users.noreply.github.com"
+          git add src/data/blogPosts.json
+          git diff --cached --quiet || git commit -m "Publish scheduled Searya blog article"
+          git push

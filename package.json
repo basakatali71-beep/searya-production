@@ -6,6 +6,7 @@
   "description": "Searya digital project marketplace MVP",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
+    "blog:generate": "node scripts/generate-blog.mjs",
     "dev": "NODE_ENV=development PAYMENT_MODE=demo node --env-file-if-exists=.env --watch server.mjs",
     "check": "node --check server.mjs && node --check src/app.js && node --check src/admin.js && node --test tests/*.test.mjs"
   },
