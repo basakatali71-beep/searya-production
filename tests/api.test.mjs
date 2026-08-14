@@ -83,7 +83,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(missing.status, 404);
 });
 
-test('blog hub exposes fifty searchable articles, detail metadata and sitemap URLs', async () => {
+test('blog hub exposes all searchable articles, detail metadata and sitemap URLs', async () => {
   const blog = await fetch(`${baseUrl}/blog`).then(response => response.text());
   assert.match(blog, /<link rel="canonical" href="https:\/\/searya\.com\/blog">/);
   assert.match(blog, /Searya Editorial/);
@@ -94,7 +94,7 @@ test('blog hub exposes fifty searchable articles, detail metadata and sitemap UR
   assert.match(blog, /id="blog-theme-toggle"/);
   assert.match(blog, /src="\/src\/assets\/searya-logo\.png/);
   assert.match(blog, /src="\/public\/blog-theme\.js/);
-  assert.equal((blog.match(/data-blog-card/g) || []).length, 50);
+  assert.equal((blog.match(/data-blog-card/g) || []).length, blogPosts.length);
 
   const post = blogPosts[0];
   const detailResponse = await fetch(`${baseUrl}${post.slug}`);

@@ -70,10 +70,10 @@ test('automated editorial pool contains at least fifty unique US English keyword
   assert.ok(BLOG_KEYWORDS.every(keyword => /^[\x20-\x7E]+$/.test(keyword)));
 });
 
-test('editorial library contains fifty complete structured SEO articles', () => {
-  assert.equal(blogPosts.length, 50);
-  assert.equal(new Set(blogPosts.map(post => post.id)).size, 50);
-  assert.equal(new Set(blogPosts.map(post => post.slug)).size, 50);
+test('editorial library contains at least fifty-two complete structured SEO articles', () => {
+  assert.ok(blogPosts.length >= 52);
+  assert.equal(new Set(blogPosts.map(post => post.id)).size, blogPosts.length);
+  assert.equal(new Set(blogPosts.map(post => post.slug)).size, blogPosts.length);
   for (const post of blogPosts) {
     assert.match(post.id, /^searya-blog-\d{2}$/);
     assert.match(post.slug, /^\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*$/);

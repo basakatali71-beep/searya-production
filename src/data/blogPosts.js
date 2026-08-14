@@ -154,7 +154,286 @@ If you own ${asset}, [create a clear Searya listing](${sellerLink}) that states 
 The best answer to **${BLOG_KEYWORDS[index]}** is a repeatable process: define the goal, review evidence in layers, verify ownership, model costs and risks, document the agreement, and transfer access carefully. Good decisions come from clear scope and independent verification—not urgency, social proof, or a single headline metric.`;
 }
 
-export const blogPosts = Object.freeze(topics.map((topic, index) => {
+const featuredArticles = [
+  {
+    id: 'searya-blog-51',
+    slug: '/blog/where-to-buy-micro-saas-projects-directly-from-founders',
+    title: 'Where to Buy Micro-SaaS Projects Directly from Founders',
+    metaDescription: 'Learn where and how to buy Micro-SaaS projects directly from founders, compare listings, verify revenue, review code, and plan a safer transfer.',
+    category: 'SaaS Acquisition',
+    keywords: ['buy Micro-SaaS projects', 'Micro-SaaS for sale', 'SaaS marketplace', 'buy SaaS from founders', 'direct founder marketplace'],
+    publishedDate: '2026-08-14',
+    content: `# Where to Buy Micro-SaaS Projects Directly from Founders
+
+Searching for **Micro-SaaS projects for sale** is easy. Finding a project that matches your skills, budget, risk tolerance, and operating capacity is much harder. The most useful marketplace is not necessarily the one with the largest headline inventory. Buyers need clear listing information, access to the actual founder, realistic asking prices, and enough time to verify what is being offered.
+
+Searya is a **0% commission marketplace for digital projects and SaaS** where buyers can discover listings and message project owners directly. That direct connection can make early evaluation faster, but it does not replace due diligence. Searya does not verify every seller claim, process the acquisition, hold funds, or guarantee a transfer. Buyers should independently confirm identity, ownership, product condition, financial information, and transferability before making a payment.
+
+This guide explains where to look, how to compare opportunities, what to ask a founder, and how to move from an interesting listing to a safer acquisition decision.
+
+## Why buyers look for Micro-SaaS projects
+
+A Micro-SaaS is usually a focused software product operated by a small team or an individual founder. It may solve one narrow workflow for a specific customer group, such as reporting for agencies, scheduling for a profession, document automation, browser productivity, or integrations between existing tools.
+
+Buying an existing project can shorten the path to a working product. Depending on the listing, the buyer may receive source code, a deployed application, a domain, documentation, design files, customer relationships, revenue history, or existing distribution. Those assets are not automatically included together. A codebase without customers is different from an operating SaaS business, and an operating product with recurring revenue deserves a much deeper review than a starter project.
+
+Before searching, decide which of these outcomes you want:
+
+- A functioning codebase that accelerates a product idea.
+- A pre-revenue MVP ready for validation and marketing.
+- A small SaaS with active users but limited revenue.
+- A profitable Micro-SaaS that requires ongoing operation.
+- Technology or intellectual property that complements another business.
+
+Clear intent prevents buyers from comparing opportunities that only look similar on the surface.
+
+## Where to find Micro-SaaS projects for sale
+
+Buyers can discover projects through founder communities, personal networks, acquisition brokers, general business marketplaces, and direct-listing platforms. Each channel has different tradeoffs.
+
+Broad marketplaces may provide large inventories but mix many business types and deal sizes. Founder communities can reveal unusual opportunities, although listings may lack consistent information. Brokers may assist with larger transactions, but small projects often fall below their preferred deal size. A direct founder marketplace can be especially useful for buyers who want an initial conversation before committing to a formal process.
+
+On Searya, you can [browse Micro-SaaS and digital projects listed by their owners](https://searya.com/#listings-grid) and compare stage, technology, asking price, revenue claims, and included assets. You can also review [Micro-SaaS projects priced under $5,000](https://searya.com/buy-micro-saas-under-5000) when your goal is a smaller acquisition or an MVP rather than an established business.
+
+The marketplace is a discovery and communication layer. The buyer and seller remain responsible for verification, agreements, payment arrangements, and transfer execution.
+
+## How to compare SaaS listings accurately
+
+An asking price is not enough to compare projects. Two products offered at the same price can have completely different risk profiles. Build a comparison sheet with the same fields for every opportunity.
+
+### Product stage and customer evidence
+
+Confirm whether the product is a prototype, deployed MVP, active application, or operating business. Ask how many people registered, how many remain active, which features they use, and whether any customers pay. Distinguish lifetime users from monthly active users and gross receipts from recurring revenue.
+
+If a seller claims monthly recurring revenue, request records from payment processors and reconcile them with anonymized customer and subscription data. Check cancellations, refunds, discounts, annual prepayments, failed payments, and customer concentration. A screenshot is a useful conversation starter, not complete verification.
+
+### Technical condition
+
+Ask the founder to demonstrate the product and repository. A technical reviewer should be able to understand the architecture, install dependencies, run tests, reproduce a build, and identify important external services. Review security basics, dependency health, authentication, data storage, backups, deployment automation, logging, and known defects.
+
+A modern technology label does not prove maintainability. A small, well-documented application may be a better acquisition than a larger system using fashionable tools but depending entirely on undocumented founder knowledge.
+
+### Operating workload and costs
+
+Ask what the founder does daily, weekly, and monthly. Include customer support, manual data work, content moderation, billing issues, deployments, sales calls, vendor management, and incident response. Calculate hosting, database, API, email, monitoring, analytics, domain, contractor, and compliance expenses.
+
+For AI products, model usage can create significant variable cost. For browser extensions and mobile apps, platform policy and store-account requirements can affect transferability. For products built around third-party data, verify that continued access is permitted after ownership changes.
+
+## Questions to ask the founder directly
+
+Direct founder messaging is most valuable when the questions are specific. Begin with information that determines whether the opportunity deserves deeper work.
+
+1. Why are you selling the project now?
+2. Exactly which assets are included and excluded?
+3. Who created the code, design, content, and brand?
+4. Are contractors or former employees involved in ownership?
+5. What is the current monthly revenue, cost, and founder workload?
+6. Which customer or vendor dependency creates the greatest risk?
+7. What breaks most often, and what would you improve first?
+8. Can the project be deployed from a clean environment?
+9. Which accounts can transfer, and which require migration?
+10. What post-transfer support is included?
+
+Record the answers and supporting evidence. If important details change during the discussion, slow down and resolve the inconsistency before negotiating payment.
+
+## How to value a small SaaS opportunity
+
+There is no universal multiple for every Micro-SaaS. Revenue quality, retention, margins, growth, customer concentration, founder workload, technical condition, documentation, competitive position, and transfer risk all influence value.
+
+For a pre-revenue project, compare the asking price with the cost and time required to recreate the included assets. Do not pay for projected customers as though they already exist. For a revenue-producing product, model at least three outcomes:
+
+- **Base case:** current revenue and costs continue with normal maintenance.
+- **Downside case:** customers leave and transfer work takes longer than expected.
+- **Improvement case:** one or two realistic changes improve acquisition or retention.
+
+The improvement case belongs to the buyer unless the seller has already demonstrated it. A buyer should not pay today for all the value they hope to create tomorrow.
+
+## Plan due diligence, payment, and transfer
+
+Once the opportunity passes initial review, use qualified legal, financial, tax, and security professionals appropriate to the transaction. The written agreement should identify the parties, assets, excluded items, representations, price, payment stages, transition support, data obligations, acceptance tests, and remedies if a required transfer cannot be completed.
+
+Consider a reputable independent escrow provider where appropriate. Do not send irreversible payments based only on a listing or message conversation. Confirm the seller's identity and control of the assets through live demonstrations and independent records.
+
+Create a transfer checklist for repositories, domains, DNS, cloud infrastructure, databases, backups, email, analytics, billing, app stores, browser extension accounts, design files, documentation, social profiles, trademarks, customer communication, and vendor contracts. Rotate credentials and API keys instead of sharing permanent personal passwords.
+
+## A better way to begin your search
+
+The fastest responsible approach is to filter first and investigate second:
+
+1. Define your target stage, category, budget, and available operating time.
+2. Shortlist listings that clearly state what is included.
+3. Message founders with focused product, financial, and technical questions.
+4. Request evidence only after the basic opportunity fits your goal.
+5. Compare total operating cost, not only asking price.
+6. Use independent review and a written transfer process before paying.
+
+You can [explore projects currently available on Searya](https://searya.com/#listings-grid) or publish a [Looking to Buy listing](https://searya.com/?create=listing) describing the product, budget, technology, and stage you want. A precise buyer brief can attract more relevant founder conversations than a generic request.
+
+### Final takeaway
+
+The best place to **buy Micro-SaaS projects directly from founders** is a platform that helps you discover relevant opportunities and have clear conversations without adding unnecessary transaction friction. The platform starts the connection; disciplined verification completes the decision. Compare consistent information, test the product, review the code and records, confirm ownership, and use a controlled agreement and transfer process.`,
+  },
+  {
+    id: 'searya-blog-52',
+    slug: '/blog/how-to-sell-source-code-online-without-commission',
+    title: 'How to Sell Source Code Online Without Commission',
+    metaDescription: 'Learn how to sell source code online without commission, prepare transferable assets, set a credible price, reach buyers, and complete a safer handover.',
+    category: 'Selling Digital Projects',
+    keywords: ['sell source code online', 'sell software project', 'zero commission marketplace', 'sell SaaS without commission', 'direct buyer messaging'],
+    publishedDate: '2026-08-14',
+    content: `# How to Sell Source Code Online Without Commission
+
+Developers often finish the technically difficult part of a product and then struggle to find the right buyer. A working application may sit unused because the founder changed direction, no longer has time for marketing, or prefers building to operating. Selling the project can recover value from the code, design, documentation, domain, users, or revenue already created.
+
+The challenge is that buyers do not purchase development hours. They purchase a defined, transferable opportunity. To **sell source code online without commission**, you need more than screenshots and a feature list. You need a credible listing, clear ownership, realistic pricing, direct buyer communication, and a handover plan that reduces uncertainty.
+
+Searya lets founders list digital projects and communicate directly with interested buyers with **0% marketplace commission**. Searya is not a broker, escrow provider, payment processor, or verifier of project claims. Buyers and sellers must independently evaluate one another, document the agreement, choose a safe payment method, and complete the transfer.
+
+## Decide what you are actually selling
+
+“Source code” can describe anything from an unfinished repository to a profitable software business. Buyers will evaluate each differently, so define the package before writing the listing.
+
+Possible assets include:
+
+- Application source code and repository history.
+- Web, iOS, Android, desktop, or browser extension builds.
+- Domain names, brand assets, and design files.
+- Deployment configuration and cloud infrastructure.
+- Documentation, tests, product roadmap, and support materials.
+- Customer, subscriber, or waitlist relationships where lawful to transfer.
+- Revenue history, analytics, and marketing assets.
+- App-store or extension-store listings where platform rules permit transfer.
+- Post-sale onboarding and technical support.
+
+Separate included assets from excluded assets. If your personal cloud account, email address, company entity, licensed media, or third-party account cannot transfer, say so. Buyers trust specific limitations more than vague promises that “everything is included.”
+
+## Prepare the project before listing it
+
+A buyer pays more confidently when the project can be understood and operated without relying entirely on its original developer. Preparation does not mean rebuilding every feature. It means removing avoidable uncertainty.
+
+### Clean the repository
+
+Remove secrets, personal files, obsolete credentials, customer exports, and unnecessary build artifacts. Check the commit history for exposed API keys and rotate anything sensitive. Document branches, releases, environment variables, background jobs, database migrations, and deployment steps.
+
+Run the project from a clean environment. If a new developer cannot install and start it by following your instructions, improve the setup documentation before meeting buyers. Record known bugs and outdated dependencies honestly. Concealing technical debt usually delays the process and damages trust when a reviewer discovers it.
+
+### Organize ownership records
+
+Confirm who created every important asset. Contractor and employee work may require written intellectual-property assignments. Review open-source licenses, commercial templates, fonts, stock media, datasets, APIs, and model providers. Buying a commercial asset for one project does not always grant permission to transfer or resell it.
+
+Prepare evidence showing control of repositories, domains, production infrastructure, storefronts, and brand accounts. Do not give permanent access during initial discussions. A live screen share can demonstrate control without exposing credentials.
+
+### Create durable documentation
+
+At minimum, provide an architecture overview, local setup guide, deployment instructions, service inventory, database notes, backup process, routine operating tasks, known issues, and transfer checklist. For a revenue-producing project, document customer support, billing, refunds, cancellations, reporting, and recurring vendor expenses.
+
+Good documentation is not decoration. It reduces buyer onboarding time and helps demonstrate that the project is transferable.
+
+## Write a listing buyers can evaluate
+
+A strong software listing answers practical questions before the buyer sends a message. Use a descriptive title that names the product type and customer outcome. “AI-powered platform” is too broad; “AI Meeting Summary SaaS for Recruiting Teams” gives buyers useful context.
+
+Your description should explain:
+
+1. The user problem and target customer.
+2. The core workflow and current product stage.
+3. Technology stack and important dependencies.
+4. Current users, traffic, or revenue with accurate definitions.
+5. Monthly infrastructure and operating costs.
+6. Founder workload and required technical skills.
+7. Included assets and transfer limitations.
+8. Known defects, policy exposure, or technical debt.
+9. Reason for selling.
+10. Asking price and what supports it.
+
+Use real product screenshots that do not expose customer information. Avoid fabricated testimonials, invented revenue, fake urgency, and unsupported superlatives. A qualified buyer is more valuable than many low-intent messages attracted by exaggerated claims.
+
+You can [create a project listing on Searya](https://searya.com/?create=listing) and communicate directly with potential buyers. The marketplace charges sellers 0% commission during the current free model, but the parties remain responsible for the transaction and any independent professional or payment-service costs.
+
+## Choose a realistic asking price
+
+Founders commonly price projects according to time invested. Buyers instead consider replacement cost, current utility, verified financial performance, transfer difficulty, maintenance burden, and risk.
+
+For pre-revenue source code, estimate what a capable buyer saves by acquiring the project instead of rebuilding it. Adjust for documentation, design quality, deployability, tests, differentiation, licensing, and the amount of rework required. An unfinished generic codebase usually cannot command the full cost of its original development.
+
+For an operating SaaS or app, separate revenue from profit and review retention, refunds, growth, customer concentration, acquisition channels, gross margin, vendor costs, founder workload, and platform risk. Provide a valuation range with assumptions rather than presenting one multiple as a universal rule.
+
+Three scenarios can keep the price discussion grounded:
+
+- **Asset case:** value of transferable code, design, domain, and documentation.
+- **Current-operation case:** value supported by verified present performance.
+- **Strategic case:** additional value to a specific buyer with matching distribution or technology.
+
+The strategic case may justify a higher offer, but sellers should not assume every buyer receives that benefit.
+
+## Reach buyers without paying marketplace commission
+
+Listing on a zero-commission marketplace is one channel, not the entire distribution plan. Link to the listing from your founder profile, relevant professional communities, an existing product audience, and direct outreach to buyers with a clear strategic fit. Share useful context rather than repeating promotional messages.
+
+On Searya, buyers can [browse source code and digital projects for sale](https://searya.com/buy-source-code-from-developers) and contact owners directly. Accurate categories, technology tags, stage information, pricing, and descriptions make your listing easier to discover through both marketplace filters and search engines.
+
+When contacting a potential buyer, explain why the project matches that buyer's existing product, customers, content, or technical capability. Do not send mass messages. A short, relevant note with one clear reason for the fit performs better than a long generic pitch.
+
+## Handle buyer messages professionally
+
+Prepare a short information package before inquiries arrive. Start with non-sensitive material: product overview, demo, asset list, operating-cost summary, anonymized metrics, and frequently asked questions. Share deeper records only after confirming the buyer's identity, intent, and ability to complete the transaction.
+
+Useful early questions include:
+
+- What outcome does the buyer want from the project?
+- Does the buyer have the technical ability to operate it?
+- Which assets and evidence matter most to the buyer?
+- What budget and timeline are realistic?
+- Who will review the code, agreement, and financial records?
+- What payment and handover process does the buyer propose?
+
+Keep important answers in writing. If you correct a metric or scope detail, update the listing and notify active buyers so everyone works from the same information.
+
+## Complete a safer agreement and transfer
+
+Do not treat marketplace messages as the final acquisition agreement. Use an appropriate written contract identifying the parties, included and excluded assets, ownership representations, price, payment stages, taxes, data responsibilities, transition support, acceptance tests, and remedies if a required asset cannot transfer.
+
+Consider a reputable independent escrow provider or qualified professional appropriate to the transaction. Never ask a buyer to rely only on personal trust, and do not surrender all production assets before the agreed protections are in place.
+
+Build the transfer in stages:
+
+1. Confirm identity, agreement, payment process, and asset schedule.
+2. Prepare buyer-owned accounts where direct transfers are unavailable.
+3. Back up repositories, databases, configuration, and documentation.
+4. Transfer code, domains, design files, and permitted accounts.
+5. Migrate infrastructure and data using a documented cutover plan.
+6. Rotate credentials, API keys, recovery methods, and billing details.
+7. Run agreed acceptance tests in the buyer-controlled environment.
+8. Deliver transition support and close remaining access safely.
+
+Personal data and customer contracts need special attention. Confirm whether notices, consent, contractual assignments, or other legal steps are required before transferring information.
+
+## Common mistakes that reduce buyer confidence
+
+- Listing a project before confirming ownership and license rights.
+- Using revenue claims without dates, definitions, and evidence.
+- Hiding operating costs, technical debt, or manual founder work.
+- Sharing passwords or customer data too early.
+- Setting a price based only on hours spent building.
+- Promising that accounts will transfer without checking provider rules.
+- Accepting irreversible payment or transferring everything without a written process.
+- Describing a codebase as a business when it has no customers or operations.
+
+Fixing these issues before publication creates better conversations and can shorten due diligence.
+
+## List your project with a clear buyer proposition
+
+To **sell a software project without commission**, present it as a transferable package rather than a collection of files. Explain the customer problem, current stage, verifiable traction, operating requirements, included assets, limitations, and the kind of buyer most likely to succeed.
+
+[List your project on Searya](https://searya.com/?create=listing) to make it discoverable to buyers and use direct messaging for initial questions. If you are still deciding what comparable opportunities look like, [explore current projects for sale](https://searya.com/#listings-grid) before setting your scope and price.
+
+### Final takeaway
+
+Selling source code online without commission can reduce marketplace friction, but the absence of commission does not remove the work required to earn buyer trust. Clean the project, document ownership, disclose limitations, price the current asset realistically, qualify buyers, and use independent safeguards for agreement, payment, and transfer. A transparent project with a controlled handover is more sellable than an impressive listing with unanswered questions.`,
+  }
+];
+
+const coreBlogPosts = topics.map((topic, index) => {
   const [title, category] = topic;
   const path = `/blog/${slugify(title)}`;
   const content = buildContent(topic, index);
@@ -172,6 +451,19 @@ export const blogPosts = Object.freeze(topics.map((topic, index) => {
     content,
     wordCount
   });
-}));
+});
+
+const normalizedFeaturedArticles = featuredArticles.map(article => {
+  const wordCount = article.content.replace(/[#*\[\]()`>-]/g, ' ').trim().split(/\s+/).length;
+  return Object.freeze({
+    ...article,
+    author: 'Searya Editorial',
+    readTime: `${Math.max(5, Math.ceil(wordCount / 220))} min read`,
+    wordCount,
+    keywords: Object.freeze(article.keywords)
+  });
+});
+
+export const blogPosts = Object.freeze([...coreBlogPosts, ...normalizedFeaturedArticles]);
 
 export default blogPosts;
