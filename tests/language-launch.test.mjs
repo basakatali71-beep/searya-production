@@ -80,6 +80,12 @@ test('The footer exposes a concise set of SEO discovery links', () => {
   assert.match(pageSource, /href="\/sell-your-digital-project"/);
 });
 
+test('The homepage links to transactional project-search landing pages', () => {
+  for (const path of ['/buy-micro-saas-under-5000', '/saas-projects-for-sale-by-owner', '/buy-source-code-from-developers', '/sell-saas-without-commission', '/zero-commission-startup-marketplace', '/buy-chrome-extension-business', '/mobile-apps-with-source-code-for-sale', '/notion-templates-for-sale-marketplace', '/where-to-sell-a-side-project', '/direct-founder-marketplace']) {
+    assert.match(pageSource, new RegExp(`href="${path}"`), path);
+  }
+});
+
 test('The public homepage exposes the blog in desktop, mobile and footer navigation', () => {
   assert.match(pageSource, /id="t-nav-blog"[^>]*>Blog<\/a>/);
   assert.match(pageSource, /class="md:hidden[^>]*>[\s\S]*?<span class="hidden sm:inline">Blog<\/span>/);

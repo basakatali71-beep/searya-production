@@ -71,10 +71,13 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
 
   const detail = await fetch(`${baseUrl}/projects/${listing.slug}?utm_source=test`).then(response => response.text());
   assert.match(detail, new RegExp(`<title>${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\| 0% Commission Marketplace — Searya<\\/title>`));
-  assert.match(detail, new RegExp(`<meta name="description" content="Connect directly with the owner of ${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. 0% platform commission, direct founder messaging, and instant transfer\\.">`));
+  assert.match(detail, new RegExp(`<meta name="description" content="Connect directly with the owner of ${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. 0% platform commission and direct founder messaging\\. Arrange due diligence and transfer independently\\.">`));
   assert.match(detail, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com\\/projects\\/${listing.slug}">`));
   assert.match(detail, /"@type":"WebPage"/);
-  assert.match(detail, /"offers":\{"@type":"Offer","price":"0","priceCurrency":"USD","description":"0% Commission Marketplace with Direct Buyer Messaging"\}/);
+  assert.match(detail, /"@type":"Product"/);
+  assert.match(detail, new RegExp(`"offers":\\{"@type":"Offer","url":"https:\\/\\/searya\\.com\\/projects\\/${listing.slug}","price":"${Number(listing.askingPrice).toFixed(2)}","priceCurrency":"USD"`));
+  assert.match(detail, /"name":"Marketplace commission","value":"0%"/);
+  assert.doesNotMatch(detail, /"price":"0"/);
 
   const missing = await fetch(`${baseUrl}/projects/not-a-public-project`);
   assert.equal(missing.status, 404);
@@ -183,6 +186,44 @@ test('high-intent landing routes have unique metadata, visible FAQs and real fil
 
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
   for (const route of routes.keys()) assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${route}`));
+});
+
+test('transactional search-intent pages expose unique H1 copy, real inventory and sitemap URLs', async () => {
+  const routes = new Map([
+    ['/buy-micro-saas-under-5000', 'Buy Micro SaaS Projects Under $5,000'],
+    ['/saas-projects-for-sale-by-owner', 'SaaS Projects for Sale Directly by Owners'],
+    ['/buy-source-code-from-developers', 'Buy Project Source Code Directly From Developers'],
+    ['/sell-saas-without-commission', 'Sell Your SaaS Without Marketplace Commission'],
+    ['/zero-commission-startup-marketplace', 'A 0% Commission Marketplace for Startup Projects'],
+    ['/buy-chrome-extension-business', 'Buy a Chrome Extension Project or Business'],
+    ['/mobile-apps-with-source-code-for-sale', 'Mobile Apps With Source Code for Sale'],
+    ['/notion-templates-for-sale-marketplace', 'Discover Notion Templates and Template Businesses for Sale'],
+    ['/where-to-sell-a-side-project', 'Where to Sell Your Side Project Directly'],
+    ['/direct-founder-marketplace', 'A Direct Founder-to-Buyer Marketplace for Digital Projects']
+  ]);
+  const titles = new Set();
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  for (const [route, heading] of routes) {
+    const response = await fetch(`${baseUrl}${route}`);
+    assert.equal(response.status, 200, route);
+    const html = await response.text();
+    assert.match(html, new RegExp(`<h1>${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</h1>`), route);
+    assert.match(html, /<h2 class="intro fee-subheading">Direct Founder-to-Buyer Messaging with Zero Transaction Fees<\/h2>/, route);
+    assert.match(html, /<title>[^<]*0% Commission &amp; Direct Messaging — Searya<\/title>/, route);
+    assert.match(html, /<meta name="description" content="[^"]*(?:0%|zero)[^"]*(?:direct|Direct)[^"]*">|<meta name="description" content="[^"]*(?:direct|Direct)[^"]*(?:0%|zero)[^"]*">/, route);
+    assert.match(html, /"@type":"FAQPage"/, route);
+    assert.match(html, /class="project-card"/, route);
+    assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${route}<\\/loc>`), route);
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+    assert.ok(title && !titles.has(title), `unique title for ${route}`);
+    titles.add(title);
+  }
+  const budgetPage = await fetch(`${baseUrl}/buy-micro-saas-under-5000`).then(response => response.text());
+  const projectSlugs = [...budgetPage.matchAll(/href="\/projects\/([^"]+)"/g)].map(match => match[1]);
+  const allSales = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
+  const bySlug = new Map(allSales.listings.map(item => [item.slug, item]));
+  assert.ok(projectSlugs.length > 0);
+  assert.equal(projectSlugs.every(slug => Number(bySlug.get(slug)?.askingPrice || Infinity) <= 5000), true);
 });
 
 test('guides hub and long-form guide routes expose indexable editorial content', async () => {

@@ -9,6 +9,7 @@ import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { initialForSaleListings, initialWtbListings } from './src/data/seedListings.js';
 import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guides.js';
 import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
+import { HIGH_INTENT_LANDING_PAGES } from './src/data/highIntentLandingPages.js';
 import { blogPosts as CORE_BLOG_POSTS } from './src/data/blogPosts.js';
 import GENERATED_BLOG_POSTS from './src/data/blogPosts.json' with { type: 'json' };
 import { INDEXNOW_KEY, indexNowKeyPath, submitIndexNow } from './src/services/indexNow.js';
@@ -1779,7 +1780,7 @@ const SEO_CATEGORIES = Object.freeze({
 });
 const SEO_LANDING_PATHS = Object.freeze([
   '/saas-for-sale', '/micro-saas-for-sale', '/mobile-apps-for-sale', '/ai-tools-for-sale', '/chrome-extensions-for-sale', '/websites-for-sale',
-  '/sell-your-saas', '/sell-your-app', '/sell-your-digital-project'
+  '/sell-your-saas', '/sell-your-app', '/sell-your-digital-project', ...Object.keys(HIGH_INTENT_LANDING_PAGES)
 ]);
 const GUIDE_PATHS = Object.freeze(Object.keys(GUIDES));
 const DISCOVERY_SLUGS = Object.freeze(Object.keys(DISCOVERY_PAGES));
@@ -1931,7 +1932,8 @@ const SEO_LANDING_PAGES = Object.freeze({
       ['How do potential buyers reach me?', 'Interested users can open your public listing and start a conversation through Searya.'],
       ['Does Searya manage agreements or payments?', 'No. Searya connects users. The parties are responsible for due diligence, contracts, payments and transfers outside the platform.']
     ]
-  }
+  },
+  ...HIGH_INTENT_LANDING_PAGES
 });
 
 function escapeMarkup(value) {
@@ -1943,7 +1945,7 @@ function xmlUrl(pathname = '/') {
 }
 
 function publicListingDescription(row) {
-  return `Connect directly with the owner of ${row.title}. 0% platform commission, direct founder messaging, and instant transfer.`;
+  return `Connect directly with the owner of ${row.title}. 0% platform commission and direct founder messaging. Arrange due diligence and transfer independently.`;
 }
 
 function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`, robots = 'index, follow, max-image-preview:large', structuredData = null } = {}) {
@@ -1988,8 +1990,8 @@ function htmlResponse(req, res, body, status = 200) {
 }
 
 function landingListingMatches(row, page) {
-  if (page.category === 'all') return true;
-  if (row.category !== page.category) return false;
+  if (page.category !== 'all' && row.category !== page.category) return false;
+  if (page.maxPriceCents && row.price_cents > page.maxPriceCents) return false;
   if (!page.micro) return true;
   const content = JSON.parse(row.content_json || '{}');
   return /micro\s*saas/i.test(`${content.categoryEn || ''} ${content.descriptionEn || ''} ${content.shortDescEn || ''} ${row.title}`);
@@ -2017,7 +2019,7 @@ function renderLandingPage(pathname) {
   const page = SEO_LANDING_PAGES[pathname];
   const canonical = `${PUBLIC_ORIGIN}${pathname}`;
   const pageTitle = `${page.title.replace(/\s*\|\s*Searya$/, '')} | 0% Commission & Direct Messaging — Searya`;
-  const pageDescription = `${page.description} Connect directly with founders with 0% platform commission and direct buyer messaging.`;
+  const pageDescription = page.intent ? page.description : `${page.description} Connect directly with founders with 0% platform commission and direct buyer messaging.`;
   const listingType = page.seller ? 'wtb' : 'sale';
   let rows = [];
   try {
@@ -2040,11 +2042,12 @@ function renderLandingPage(pathname) {
   const categoryHeading = page.seller ? 'Create a listing that earns the right conversation' : `Understanding ${page.kicker.toLowerCase()}`;
   const ctaHeading = page.seller ? 'Ready to introduce your project?' : 'Found a project worth exploring?';
   const ctaText = page.seller ? 'Publish an accurate listing and give potential buyers a clear reason to start a conversation.' : 'Review its details, ask the owner direct questions and complete independent due diligence before making decisions.';
+  const heroHeading = page.intent ? page.h1 : 'The 0% Commission Marketplace for Digital Projects & SaaS';
   const pageJsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': [
-    { '@type': 'WebPage', name: 'The 0% Commission Marketplace for Digital Projects & SaaS', description: pageDescription, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
+    { '@type': 'WebPage', name: heroHeading, description: pageDescription, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
     { '@type': 'FAQPage', mainEntity: faqSchema }
   ] }).replaceAll('<', '\\u003c');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(pageTitle)}</title><meta name="description" content="${escapeMarkup(pageDescription)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(pageTitle)}"><meta property="og:description" content="${escapeMarkup(pageDescription)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(pageTitle)}"><meta name="twitter:description" content="${escapeMarkup(pageDescription)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)} · ${escapeMarkup(page.h1)}</p><h1>The 0% Commission Marketplace for Digital Projects &amp; SaaS</h1><h2 class="intro fee-subheading">Direct Founder-to-Buyer Messaging with Zero Transaction Fees</h2><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div>${discoveryLinks ? `<p class="eyebrow" style="margin-top:30px">Curated technology collections</p><div class="related">${discoveryLinks}</div>` : ""}</div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(pageTitle)}</title><meta name="description" content="${escapeMarkup(pageDescription)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(pageTitle)}"><meta property="og:description" content="${escapeMarkup(pageDescription)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(pageTitle)}"><meta name="twitter:description" content="${escapeMarkup(pageDescription)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)}${page.intent ? '' : ` · ${escapeMarkup(page.h1)}`}</p><h1>${escapeMarkup(heroHeading)}</h1><h2 class="intro fee-subheading">Direct Founder-to-Buyer Messaging with Zero Transaction Fees</h2><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div>${discoveryLinks ? `<p class="eyebrow" style="margin-top:30px">Curated technology collections</p><div class="related">${discoveryLinks}</div>` : ""}</div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
 }
 
 function guideLabel(pathname) {
@@ -2327,29 +2330,45 @@ const server = createServer(async (req, res) => {
       const title = `${row.title} | 0% Commission Marketplace — Searya`;
       const description = publicListingDescription(row);
       const image = /^https:\/\//i.test(listing.coverImage || '') ? listing.coverImage : `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`;
+      const webPageSchema = {
+        '@type': 'WebPage',
+        '@id': `${canonical}#webpage`,
+        name: row.title,
+        description,
+        url: canonical,
+        genre: SEO_CATEGORIES[row.category] || row.category,
+        datePublished: row.created_at,
+        dateModified: row.updated_at,
+        isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }
+      };
+      const structuredData = row.type === 'sale' ? {
+        '@context': 'https://schema.org',
+        '@graph': [webPageSchema, {
+          '@type': 'Product',
+          '@id': `${canonical}#project`,
+          name: row.title,
+          description,
+          image,
+          category: SEO_CATEGORIES[row.category] || row.category,
+          mainEntityOfPage: { '@id': `${canonical}#webpage` },
+          offers: {
+            '@type': 'Offer',
+            url: canonical,
+            price: (row.price_cents / 100).toFixed(2),
+            priceCurrency: 'USD',
+            availability: 'https://schema.org/InStock',
+            description: 'Owner asking price. Searya charges 0% marketplace commission and enables direct buyer messaging.'
+          },
+          additionalProperty: { '@type': 'PropertyValue', name: 'Marketplace commission', value: '0%' }
+        }]
+      } : { '@context': 'https://schema.org', ...webPageSchema };
       return htmlResponse(req, res, renderSeoPage({
         title,
         description,
         canonical,
         type: 'article',
         image,
-        structuredData: {
-          '@context': 'https://schema.org',
-          '@type': 'WebPage',
-          name: row.title,
-          description,
-          url: canonical,
-          genre: SEO_CATEGORIES[row.category] || row.category,
-          datePublished: row.created_at,
-          dateModified: row.updated_at,
-          offers: {
-            '@type': 'Offer',
-            price: '0',
-            priceCurrency: 'USD',
-            description: '0% Commission Marketplace with Direct Buyer Messaging'
-          },
-          isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }
-        }
+        structuredData
       }));
     }
     const categoryMatch = url.pathname.match(/^\/projects\/category\/([^/]+)\/?$/);
