@@ -53,9 +53,61 @@ test('private application files are never exposed by the static server', async (
   assert.match(publicScript.headers.get('content-security-policy') || '', /^$/);
 
   const home = await fetch(`${baseUrl}/`);
-  assert.match(home.headers.get('content-security-policy') || '', /frame-ancestors 'none'/);
+  const homeHtml = await home.text();
+  const contentSecurityPolicy = home.headers.get('content-security-policy') || '';
+  assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
+  assert.doesNotMatch(contentSecurityPolicy, /unsafe-eval|unpkg\.com|cdn\.tailwindcss\.com/);
+  assert.doesNotMatch(homeHtml, /unpkg\.com|cdn\.tailwindcss\.com/);
   assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(home.headers.get('x-frame-options'), 'DENY');
+
+  const localUiAsset = await fetch(`${baseUrl}/public/vendor/tailwind.css?v=3.4.19`);
+  assert.equal(localUiAsset.status, 200);
+  assert.match(localUiAsset.headers.get('content-type') || '', /text\/css/);
+});
+
+test('request validation rejects cross-site mutations, non-JSON bodies and oversized payloads', async () => {
+  const crossSite = await fetch(`${baseUrl}/api/analytics/pageview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://attacker.example', 'Sec-Fetch-Site': 'cross-site' },
+    body: JSON.stringify({ path: '/' })
+  });
+  assert.equal(crossSite.status, 403);
+
+  const formEncoded = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'name=Invalid&email=invalid%40example.com&password=SecurePass123'
+  });
+  assert.equal(formEncoded.status, 415);
+
+  const oversized = await fetch(`${baseUrl}/api/analytics/event`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventName: 'button_clicked', metadata: { value: 'x'.repeat(140_000) } })
+  });
+  assert.equal(oversized.status, 413);
+
+  const weakPassword = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Weak Password', email: 'weak-password@example.com', password: 'short123', role: 'buyer' })
+  });
+  assert.equal(weakPassword.status, 422);
+});
+
+test('sign-in throttling also protects an account across repeated attempts', async () => {
+  const statuses = [];
+  for (let attempt = 0; attempt < 9; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `198.51.100.${attempt + 1}` },
+      body: JSON.stringify({ email: 'targeted-account@example.com', password: 'IncorrectPassword123' })
+    });
+    statuses.push(response.status);
+  }
+  assert.deepEqual(statuses.slice(0, 8), Array(8).fill(401));
+  assert.equal(statuses[8], 429);
 });
 
 test('technical SEO exposes canonical metadata, robots rules and public sitemap URLs', async () => {

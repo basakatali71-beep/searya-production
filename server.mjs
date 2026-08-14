@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -22,11 +22,11 @@ const PUBLIC_STATIC_FILES = new Set([
   'src/data/seedListings.js', 'src/data/mockData.js', 'src/data/translations.js'
 ].map(path => resolve(ROOT, path)));
 const PUBLIC_STATIC_DIRECTORIES = ['public', 'legal', 'src/assets', 'src/styles'].map(path => resolve(ROOT, path));
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const PUBLIC_ORIGIN = 'https://searya.com';
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const APP_ORIGIN = process.env.APP_ORIGIN || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
-const PUBLIC_ORIGIN = 'https://searya.com';
+const APP_ORIGIN = NODE_ENV === 'production' ? PUBLIC_ORIGIN : process.env.APP_ORIGIN || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
 const REQUESTED_PAYMENT_MODE = process.env.PAYMENT_MODE || (NODE_ENV === 'production' ? 'disabled' : 'demo');
 const POLAR_SERVER = String(process.env.POLAR_SERVER || 'sandbox').trim().toLowerCase() === 'production' ? 'production' : 'sandbox';
 const PAYMENT_MODE = NODE_ENV === 'production' && REQUESTED_PAYMENT_MODE === 'polar' && POLAR_SERVER !== 'production' ? 'disabled' : REQUESTED_PAYMENT_MODE;
@@ -41,7 +41,11 @@ const VISITOR_COOKIE = 'searya_visitor';
 const OAUTH_COOKIE = 'searya_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PRESENCE_ACTIVE_WINDOW_SECONDS = 120;
-const MAX_JSON_BYTES = 6 * 1024 * 1024;
+const DEFAULT_JSON_BYTES = 128 * 1024;
+const MAX_LISTING_JSON_BYTES = 3 * 1024 * 1024;
+const MAX_IMAGE_DATA_CHARACTERS = 2_900_000;
+const MIN_NEW_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 128;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
@@ -53,10 +57,10 @@ const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: https:",
+  "img-src 'self' data: https://images.unsplash.com https://randomuser.me",
   "connect-src 'self'",
   NODE_ENV === 'production' ? 'upgrade-insecure-requests' : ''
 ].filter(Boolean).join('; ');
@@ -75,6 +79,7 @@ function securityHeaders({ html = false } = {}) {
 
 mkdirSync(resolve(DB_PATH, '..'), { recursive: true });
 const db = new DatabaseSync(DB_PATH, { timeout: 5000 });
+try { chmodSync(DB_PATH, 0o600); } catch (error) { if (NODE_ENV === 'production') console.error('Database permission hardening failed:', error?.message || error); }
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
 db.exec(`
@@ -328,7 +333,7 @@ function notifySearchEngines(paths) {
 }
 
 function cleanText(value, max = 500) {
-  return String(value ?? '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+  return String(value ?? '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/[\u0000-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 function analyticsVisitorId(req) {
@@ -607,29 +612,19 @@ function getUser(req) {
 function sessionCookie(token, clear = false) {
   const parts = [`${SESSION_COOKIE}=${clear ? '' : encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   parts.push(`Max-Age=${clear ? 0 : SESSION_TTL_SECONDS}`);
-  if (NODE_ENV === 'production') {
-    parts.push('Secure');
-    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
-  }
+  if (NODE_ENV === 'production') parts.push('Secure');
   return parts.join('; ');
 }
 
 function oauthCookie(state, clear = false) {
-  const sameSite = NODE_ENV === 'production' ? 'None' : 'Lax';
-  const parts = [`${OAUTH_COOKIE}=${clear ? '' : encodeURIComponent(state)}`, 'Path=/api/auth/oauth', 'HttpOnly', `SameSite=${sameSite}`, `Max-Age=${clear ? 0 : 600}`];
-  if (NODE_ENV === 'production') {
-    parts.push('Secure');
-    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
-  }
+  const parts = [`${OAUTH_COOKIE}=${clear ? '' : encodeURIComponent(state)}`, 'Path=/api/auth/oauth', 'HttpOnly', 'SameSite=Lax', `Max-Age=${clear ? 0 : 600}`];
+  if (NODE_ENV === 'production') parts.push('Secure');
   return parts.join('; ');
 }
 
 function visitorCookie(visitorId, clear = false) {
   const parts = [`${VISITOR_COOKIE}=${clear ? '' : encodeURIComponent(visitorId)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${clear ? 0 : 60 * 60 * 24 * 365}`];
-  if (NODE_ENV === 'production') {
-    parts.push('Secure');
-    if (new URL(APP_ORIGIN).hostname === 'searya.com') parts.push('Domain=searya.com');
-  }
+  if (NODE_ENV === 'production') parts.push('Secure');
   return parts.join('; ');
 }
 
@@ -662,7 +657,7 @@ function fail(res, status, code, message) {
   return json(res, status, { error: { code, message } });
 }
 
-async function readBody(req, maxBytes = MAX_JSON_BYTES) {
+async function readBody(req, maxBytes = DEFAULT_JSON_BYTES) {
   const chunks = [];
   let total = 0;
   for await (const chunk of req) {
@@ -673,8 +668,10 @@ async function readBody(req, maxBytes = MAX_JSON_BYTES) {
   return Buffer.concat(chunks);
 }
 
-async function readJson(req) {
-  const raw = await readBody(req);
+async function readJson(req, maxBytes = DEFAULT_JSON_BYTES) {
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (!contentType.startsWith('application/json')) throw Object.assign(new Error('Content-Type must be application/json.'), { status: 415 });
+  const raw = await readBody(req, maxBytes);
   if (!raw.length) return {};
   try { return JSON.parse(raw.toString('utf8')); } catch { throw Object.assign(new Error('Invalid JSON.'), { status: 400 }); }
 }
@@ -721,8 +718,14 @@ function listingFromRow(row) {
 
 function safeImageData(value) {
   const text = String(value || '').trim();
-  if (/^https:\/\//i.test(text)) return text.slice(0, 2000);
-  if (/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) && text.length <= MAX_JSON_BYTES) return text;
+  if (/^https:\/\//i.test(text)) {
+    try {
+      const imageUrl = new URL(text);
+      if (['images.unsplash.com', 'randomuser.me'].includes(imageUrl.hostname)) return imageUrl.href.slice(0, 2000);
+    } catch {}
+    return '';
+  }
+  if (/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) && text.length <= MAX_IMAGE_DATA_CHARACTERS) return text;
   return '';
 }
 
@@ -735,7 +738,7 @@ function mapListingInput(body, user) {
   const description = cleanText(body.description, 2000);
   const techStack = Array.isArray(body.techStack) ? body.techStack.map(item => cleanText(item, 40)).filter(Boolean).slice(0, 8) : [];
   const coverImage = type === 'sale' ? safeImageData(body.coverImage) : '';
-  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || description.length < 20 || !techStack.length) throw Object.assign(new Error('Complete all listing fields with valid information.'), { status: 422 });
+  if (title.length < 3 || !Number.isFinite(price) || price <= 0 || price > 100_000_000 || description.length < 20 || !techStack.length) throw Object.assign(new Error('Complete all listing fields with valid information.'), { status: 422 });
   if (type === 'sale' && !coverImage) throw Object.assign(new Error('Add a real image of your project.'), { status: 422 });
   const seller = { name: user.name, handle: `@${slugify(user.name).replaceAll('-', '_')}`, avatar: '', githubVerified: Boolean(user.is_verified) };
   return { title, type, category, price, content: { titleEn: title, categoryEn: categoryLabel, shortDesc: description, shortDescEn: description, description, descriptionEn: description, fullDesc: description, fullDescEn: description, coverImage, techStack, techPreference: techStack.join(', '), seller, buyer: { name: user.name, avatar: '' }, mrr: 0, isAnonymous: false } };
@@ -746,18 +749,37 @@ const rateBuckets = new Map();
 function requestIpAddress(req) {
   const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   const cloudflare = String(req.headers['cf-connecting-ip'] || '').trim();
-  const candidate = forwarded || cloudflare || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  const candidate = cloudflare || forwarded || String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
   return /^[a-f0-9:.]+$/i.test(candidate) ? candidate : undefined;
 }
 
-function rateLimited(req, key, limit, windowMs) {
+function rateBucketExceeded(bucketKey, limit, windowMs) {
   const now = Date.now();
-  const ip = requestIpAddress(req) || 'unknown';
-  const bucketKey = `${ip}:${key}`;
   const bucket = rateBuckets.get(bucketKey);
-  if (!bucket || bucket.resetAt <= now) { rateBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs }); return false; }
+  if (!bucket || bucket.resetAt <= now) {
+    if (rateBuckets.size > 10_000) {
+      for (const [storedKey, stored] of rateBuckets) if (stored.resetAt <= now) rateBuckets.delete(storedKey);
+      while (rateBuckets.size > 7_500) rateBuckets.delete(rateBuckets.keys().next().value);
+    }
+    rateBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
+    return false;
+  }
   bucket.count += 1;
   return bucket.count > limit;
+}
+
+function rateLimited(req, key, limit, windowMs) {
+  return rateBucketExceeded(`${requestIpAddress(req) || 'unknown'}:${key}`, limit, windowMs);
+}
+
+function identityRateLimited(namespace, identity, limit, windowMs) {
+  const identityHash = sha256(String(identity || '').trim().toLowerCase()).slice(0, 24);
+  return rateBucketExceeded(`identity:${namespace}:${identityHash}`, limit, windowMs);
+}
+
+function validNewPassword(password) {
+  const length = String(password || '').length;
+  return length >= MIN_NEW_PASSWORD_LENGTH && length <= MAX_PASSWORD_LENGTH;
 }
 
 function contactInfoDetected(text) {
@@ -903,6 +925,7 @@ async function createDatabaseBackup() {
   const destination = resolve(BACKUP_DIR, `searya-${stamp}.sqlite`);
   if (!destination.startsWith(`${BACKUP_DIR}/`)) throw new Error('Invalid backup path.');
   await backup(db, destination);
+  try { chmodSync(destination, 0o600); } catch (error) { if (NODE_ENV === 'production') console.error('Backup permission hardening failed:', error?.message || error); }
   const backups = readdirSync(BACKUP_DIR).filter(name => /^searya-.*\.sqlite$/.test(name)).sort().reverse();
   for (const filename of backups.slice(7)) {
     const oldBackup = resolve(BACKUP_DIR, filename);
@@ -1052,7 +1075,7 @@ function syncSeedContent() {
 function bootstrapAdmin() {
   const email = String(process.env.SEARYA_ADMIN_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.SEARYA_ADMIN_PASSWORD || '');
-  if (!email || password.length < 8) return;
+  if (!email || password.length < MIN_NEW_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) return;
   const existing = db.prepare('SELECT id FROM users WHERE email=?').get(email);
   if (existing) {
     db.prepare('UPDATE users SET is_admin=1,email_verified=1,status=\'active\' WHERE id=?').run(existing.id);
@@ -1108,10 +1131,11 @@ async function handleApi(req, res, url) {
   if (oauthCallbackMatch && method === 'GET') return completeOauth(req, res, url, oauthCallbackMatch[1]);
   const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
   if (mutation) {
-    const origin = req.headers.origin;
-    const requestHost = String(req.headers.host || '');
-    const sameHostOrigins = new Set([APP_ORIGIN, `http://${requestHost}`, `https://${requestHost}`]);
-    if (origin && !sameHostOrigins.has(origin)) return fail(res, 403, 'BAD_ORIGIN', 'The request origin could not be verified.');
+    const origin = String(req.headers.origin || '');
+    const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+    const allowedOrigins = new Set([new URL(APP_ORIGIN).origin, new URL(PUBLIC_ORIGIN).origin]);
+    if ((origin && !allowedOrigins.has(origin)) || fetchSite === 'cross-site') return fail(res, 403, 'BAD_ORIGIN', 'The request origin could not be verified.');
+    if (NODE_ENV === 'production' && parseCookies(req)[SESSION_COOKIE] && !origin) return fail(res, 403, 'ORIGIN_REQUIRED', 'The request origin could not be verified.');
   }
 
   if (method === 'GET' && pathname === '/api/health') {
@@ -1131,7 +1155,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/analytics/event') {
-    if (rateLimited(req, 'behavior-event', 1200, 60 * 60 * 1000)) return json(res, 202, { ok: true, tracked: false });
+    if (rateLimited(req, 'behavior-event', 300, 60 * 60 * 1000)) return json(res, 202, { ok: true, tracked: false });
     const body = await readJson(req);
     const eventName = cleanText(body.eventName, 60);
     const tracked = recordBehaviorEvent(req, eventName, body.metadata);
@@ -1139,7 +1163,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/analytics/presence') {
-    if (rateLimited(req, 'presence', 6000, 60 * 60 * 1000)) return json(res, 202, { ok: true });
+    if (rateLimited(req, 'presence', 600, 60 * 60 * 1000)) return json(res, 202, { ok: true });
     const visitorId = analyticsVisitorId(req);
     if (!visitorId) return json(res, 202, { ok: true, tracked: false });
     const body = await readJson(req);
@@ -1202,7 +1226,7 @@ async function handleApi(req, res, url) {
     const password = String(body.password || '');
     const name = cleanText(body.name, 80);
     const role = ['buyer', 'seller', 'both'].includes(body.role) ? body.role : 'buyer';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || name.length < 2) return fail(res, 422, 'INVALID_INPUT', 'A name, valid email and password of at least 8 characters are required.');
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validNewPassword(password) || name.length < 2) return fail(res, 422, 'INVALID_INPUT', `A name, valid email and password of ${MIN_NEW_PASSWORD_LENGTH}–${MAX_PASSWORD_LENGTH} characters are required.`);
     if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) return fail(res, 409, 'EMAIL_EXISTS', 'An account already exists with this email address.');
     const id = randomUUID();
     const now = nowIso();
@@ -1229,8 +1253,10 @@ async function handleApi(req, res, url) {
     if (rateLimited(req, 'login', 20, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (email.length > 254 || password.length > MAX_PASSWORD_LENGTH || identityRateLimited('login', email, 8, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
-    if (!user || !verifyPassword(body.password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
+    if (!user || !verifyPassword(password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
     if (!user.email_verified) return fail(res, 403, 'EMAIL_NOT_VERIFIED', 'Verify your email address before signing in.');
     const token = createSession(user.id);
     return json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(token) });
@@ -1258,7 +1284,7 @@ async function handleApi(req, res, url) {
     const currentPassword = String(body.currentPassword || '');
     const newPassword = String(body.newPassword || '');
     if (!verifyPassword(currentPassword, user.password_hash)) return fail(res, 422, 'INVALID_PASSWORD', 'The current password is incorrect.');
-    if (newPassword.length < 8) return fail(res, 422, 'WEAK_PASSWORD', 'The new password must be at least 8 characters.');
+    if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', `The new password must be ${MIN_NEW_PASSWORD_LENGTH}–${MAX_PASSWORD_LENGTH} characters.`);
     db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(newPassword), user.id);
     const currentTokenHash = sha256(parseCookies(req)[SESSION_COOKIE] || '');
     db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(user.id, currentTokenHash);
@@ -1293,6 +1319,7 @@ async function handleApi(req, res, url) {
     if (rateLimited(req, 'forgot', 6, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
+    if (identityRateLimited('password-reset-request', email, 3, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
     let previewToken = null;
     if (user) {
@@ -1311,17 +1338,20 @@ async function handleApi(req, res, url) {
     if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'The email service is not configured.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
+    if (identityRateLimited('verification-request', email, 3, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const user = db.prepare(`SELECT id,email,name,email_verified FROM users WHERE email=? AND status='active'`).get(email);
     if (user && !user.email_verified) await sendVerificationEmail(user);
     return json(res, 200, { ok: true, message: 'If the account is unverified, a new link has been sent.' });
   }
 
   if (method === 'POST' && pathname === '/api/auth/reset-password') {
+    if (rateLimited(req, 'reset-password', 8, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const body = await readJson(req);
     const password = String(body.password || '');
-    const tokenHash = sha256(String(body.token || ''));
+    const rawToken = String(body.token || '');
+    const tokenHash = sha256(rawToken.slice(0, 256));
     const reset = db.prepare('SELECT * FROM password_resets WHERE token_hash=? AND expires_at>? AND used_at IS NULL').get(tokenHash, nowIso());
-    if (!reset || password.length < 8) return fail(res, 422, 'INVALID_RESET', 'The link is invalid or has expired.');
+    if (rawToken.length > 256 || !reset || !validNewPassword(password)) return fail(res, 422, 'INVALID_RESET', 'The link is invalid, expired, or the new password does not meet security requirements.');
     db.exec('BEGIN');
     try {
       db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(password), reset.user_id);
@@ -1333,8 +1363,11 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/auth/verify-email') {
+    if (rateLimited(req, 'verify-email', 12, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please try again later.');
     const body = await readJson(req);
-    const tokenHash = sha256(String(body.token || ''));
+    const rawToken = String(body.token || '');
+    if (rawToken.length > 256) return fail(res, 422, 'INVALID_VERIFICATION', 'The verification link is invalid or has expired.');
+    const tokenHash = sha256(rawToken);
     const verification = db.prepare('SELECT * FROM email_verifications WHERE token_hash=? AND expires_at>? AND used_at IS NULL').get(tokenHash, nowIso());
     if (!verification) return fail(res, 422, 'INVALID_VERIFICATION', 'The verification link is invalid or has expired.');
     db.exec('BEGIN');
@@ -1381,7 +1414,7 @@ async function handleApi(req, res, url) {
   if (method === 'POST' && pathname === '/api/listings') {
     const user = requireUser(req, res); if (!user) return;
     if (rateLimited(req, `listing:${user.id}`, 10, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'You have reached the hourly listing limit.');
-    const input = mapListingInput(await readJson(req), user);
+    const input = mapListingInput(await readJson(req, MAX_LISTING_JSON_BYTES), user);
     const priorityReview = 0;
     const id = randomUUID();
     const createdAt = nowIso();
@@ -1458,7 +1491,7 @@ async function handleApi(req, res, url) {
     if (!row) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
     if (row.user_id !== user.id && !user.is_admin) return fail(res, 403, 'FORBIDDEN', 'You cannot edit this listing.');
     if (method === 'DELETE') { db.prepare('DELETE FROM listings WHERE id=?').run(id); return json(res, 200, { ok: true }); }
-    const input = mapListingInput(await readJson(req), user);
+    const input = mapListingInput(await readJson(req, MAX_LISTING_JSON_BYTES), user);
     db.prepare(`UPDATE listings SET type=?,title=?,slug=?,category=?,price_cents=?,content_json=?,status=?,is_verified=0,updated_at=? WHERE id=?`).run(input.type, input.title, uniqueSlug(input.title, id), input.category, Math.round(input.price * 100), JSON.stringify(input.content), user.is_admin ? row.status : 'pending', nowIso(), id);
     const updated = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     return json(res, 200, { listing: listingFromRow(updated), moderation: updated.status, user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
@@ -1484,6 +1517,7 @@ async function handleApi(req, res, url) {
 
   if (method === 'POST' && pathname === '/api/threads') {
     const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `thread-create:${user.id}`, 20, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many conversation attempts. Please try again later.');
     const body = await readJson(req);
     const listing = db.prepare(`SELECT l.*,u.name AS owner_name FROM listings l JOIN users u ON u.id=l.user_id WHERE l.id=? AND l.status='approved'`).get(String(body.listingId || ''));
     if (!listing) return fail(res, 404, 'NOT_FOUND', 'Listing not found.');
@@ -1517,8 +1551,10 @@ async function handleApi(req, res, url) {
           const id = randomUUID();
           const createdAt = nowIso();
           db.prepare('INSERT INTO threads(id,listing_id,user_a,user_b,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, listing.id, pair[0], pair[1], createdAt, createdAt);
+          const initialMessage = cleanText(body.message || `I'd like to discuss the ${listing.title} listing.`, 1000);
+          if (!initialMessage) throw Object.assign(new Error('Message cannot be empty.'), { status: 422, code: 'EMPTY_MESSAGE' });
           initialMessageId = randomUUID();
-          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(initialMessageId, id, user.id, cleanText(body.message || `I'd like to discuss the ${listing.title} listing.`, 1000), createdAt);
+          db.prepare('INSERT INTO messages(id,thread_id,sender_id,body,created_at) VALUES(?,?,?,?,?)').run(initialMessageId, id, user.id, initialMessage, createdAt);
           thread = db.prepare('SELECT * FROM threads WHERE id=?').get(id);
           createdThread = true;
         }
@@ -1620,11 +1656,17 @@ async function handleApi(req, res, url) {
 
   if (method === 'POST' && pathname === '/api/reports') {
     const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `report:${user.id}`, 10, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many reports. Please try again later.');
     const body = await readJson(req);
     const targetType = ['listing', 'user', 'message'].includes(body.targetType) ? body.targetType : 'listing';
     const targetId = cleanText(body.targetId, 100);
     const reason = cleanText(body.reason, 500);
-    if (!targetId || reason.length < 10) return fail(res, 422, 'INVALID_REPORT', 'Please explain the reason for your report.');
+    const targetExists = targetType === 'listing'
+      ? db.prepare('SELECT 1 FROM listings WHERE id=?').get(targetId)
+      : targetType === 'user'
+        ? db.prepare('SELECT 1 FROM users WHERE id=?').get(targetId)
+        : db.prepare('SELECT 1 FROM messages m JOIN threads t ON t.id=m.thread_id WHERE m.id=? AND (t.user_a=? OR t.user_b=?)').get(targetId, user.id, user.id);
+    if (!targetId || reason.length < 10 || !targetExists) return fail(res, 422, 'INVALID_REPORT', 'Please select a valid item and explain the reason for your report.');
     db.prepare('INSERT INTO reports(id,reporter_id,target_type,target_id,reason,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(), user.id, targetType, targetId, reason, nowIso());
     return json(res, 201, { ok: true });
   }
@@ -1640,9 +1682,15 @@ async function handleApi(req, res, url) {
 
   if (method === 'POST' && pathname === '/api/alerts') {
     const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `alert:${user.id}`, 20, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many alert changes. Please try again later.');
     const body = await readJson(req);
+    const category = ['all', ...Object.keys(SEO_CATEGORIES)].includes(body.category) ? body.category : 'all';
+    const minPrice = Number(body.minPrice ?? 0);
+    const maxPrice = Number(body.maxPrice ?? 10_000_000);
+    if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice) || minPrice < 0 || maxPrice < 1 || maxPrice < minPrice || maxPrice > 100_000_000) return fail(res, 422, 'INVALID_ALERT', 'Enter a valid alert price range.');
+    if (db.prepare('SELECT COUNT(*) AS count FROM alerts WHERE user_id=?').get(user.id).count >= 20) return fail(res, 422, 'ALERT_LIMIT', 'You can save up to 20 project alerts.');
     const id = randomUUID();
-    db.prepare('INSERT INTO alerts(id,user_id,query,category,min_price,max_price,frequency,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id, user.id, cleanText(body.query, 100), cleanText(body.category || 'all', 30), Math.max(0, Number(body.minPrice || 0)), Math.max(1, Number(body.maxPrice || 10000000)), ['instant', 'daily', 'weekly'].includes(body.frequency) ? body.frequency : 'daily', nowIso());
+    db.prepare('INSERT INTO alerts(id,user_id,query,category,min_price,max_price,frequency,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id, user.id, cleanText(body.query, 100), category, minPrice, maxPrice, ['instant', 'daily', 'weekly'].includes(body.frequency) ? body.frequency : 'daily', nowIso());
     return json(res, 201, { id });
   }
 
@@ -2410,7 +2458,7 @@ const server = createServer(async (req, res) => {
     if (!['GET', 'HEAD'].includes(req.method || 'GET')) return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed.');
     return serveStatic(req, res, url);
   } catch (error) {
-    console.error(error);
+    if (!error?.status || error.status >= 500) console.error(error);
     if (!res.headersSent) return fail(res, error.status || 500, 'SERVER_ERROR', error.status ? error.message : 'An unexpected server error occurred.');
     res.end();
   }

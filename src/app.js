@@ -55,7 +55,7 @@ function safeImageUrl(value, fallback = 'https://images.unsplash.com/photo-16180
 async function optimizeListingImage(file) {
   const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
   if (!allowedTypes.includes(file?.type) || file.size > 5 * 1024 * 1024) {
-    throw new Error(state.lang === 'en' ? 'Use a PNG, JPG or WebP image under 5 MB.' : '5 MB altında PNG, JPG veya WebP görsel kullanın.');
+    throw new Error(state.lang === 'en' ? 'Use a PNG, JPG or WebP image under 3 MB.' : '3 MB altında PNG, JPG veya WebP görsel kullanın.');
   }
   const objectUrl = URL.createObjectURL(file);
   try {
@@ -77,10 +77,10 @@ async function optimizeListingImage(file) {
       context.imageSmoothingQuality = 'high';
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       dataUrl = canvas.toDataURL('image/webp', Math.max(0.62, 0.86 - attempt * 0.08));
-      if (dataUrl.length <= 2_800_000) return dataUrl;
+      if (dataUrl.length <= 2_700_000) return dataUrl;
       scale *= 0.78;
     }
-    if (dataUrl.length > 3_500_000) throw new Error(state.lang === 'en' ? 'The image is still too large. Choose a smaller image.' : 'Görsel hâlâ çok büyük. Daha küçük bir görsel seçin.');
+    if (dataUrl.length > 2_800_000) throw new Error(state.lang === 'en' ? 'The image is still too large. Choose a smaller image.' : 'Görsel hâlâ çok büyük. Daha küçük bir görsel seçin.');
     return dataUrl;
   } finally {
     URL.revokeObjectURL(objectUrl);
@@ -699,8 +699,8 @@ function openResetPasswordModal(token) {
   if (!backdrop || !content) return;
   content.innerHTML = `
     <form id="reset-password-form" class="p-6 sm:p-8 space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Set a new password' : 'Yeni şifre belirleyin'}</h3><p class="text-xs text-slate-500 mt-1">${isEn ? 'Use at least 8 characters.' : 'En az 8 karakter kullanın.'}</p></div><button type="button" id="close-reset-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
-      <input id="reset-password-input" type="password" minlength="8" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" placeholder="${isEn ? 'New password' : 'Yeni şifre'}">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Set a new password' : 'Yeni şifre belirleyin'}</h3><p class="text-xs text-slate-500 mt-1">${isEn ? 'Use 12–128 characters.' : '12–128 karakter kullanın.'}</p></div><button type="button" id="close-reset-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
+      <input id="reset-password-input" type="password" minlength="12" maxlength="128" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" placeholder="${isEn ? 'New password' : 'Yeni şifre'}">
       <button type="submit" class="w-full py-3 rounded-xl bg-blue-600 text-white font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button>
     </form>`;
   backdrop.classList.remove('hidden');
@@ -1482,7 +1482,7 @@ function openAccountSettingsModal() {
   if (!content || !backdrop) return;
   content.innerHTML = `<div class="p-5 sm:p-8 space-y-6 overflow-y-auto">
     <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4"><div><h3 class="text-xl font-black text-slate-900 dark:text-white">${isEn ? 'Account settings' : 'Hesap ayarları'}</h3><p class="text-xs text-slate-500">${escapeHtml(user.email || '')}</p></div><button id="close-settings-modal" aria-label="Close" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="ph-bold ph-x"></i></button></div>
-    <form id="change-password-form" class="space-y-3"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Change password' : 'Şifre değiştir'}</h4><input id="settings-current-password" type="password" required placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><input id="settings-new-password" type="password" required minlength="8" placeholder="${isEn ? 'New password — at least 8 characters' : 'Yeni şifre — en az 8 karakter'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><button class="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button></form>
+    <form id="change-password-form" class="space-y-3"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Change password' : 'Şifre değiştir'}</h4><input id="settings-current-password" type="password" maxlength="128" required placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><input id="settings-new-password" type="password" required minlength="12" maxlength="128" placeholder="${isEn ? 'New password — 12–128 characters' : 'Yeni şifre — 12–128 karakter'}" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm"><button class="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">${isEn ? 'Update password' : 'Şifreyi güncelle'}</button></form>
     <section class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><h4 class="text-sm font-black text-slate-900 dark:text-white">${isEn ? 'Your data' : 'Verileriniz'}</h4><p class="text-[11px] text-slate-500 mt-1 mb-3">${isEn ? 'Download a JSON copy of your account, listings, purchases and messages.' : 'Hesap, ilan, paket ve mesaj verilerinizin JSON kopyasını indirin.'}</p><button id="export-account-btn" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"><i class="ph-bold ph-download-simple mr-1"></i>${isEn ? 'Download my data' : 'Verilerimi indir'}</button></section>
     <section class="p-4 rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/30"><h4 class="text-sm font-black text-red-700 dark:text-red-400">${isEn ? 'Delete account' : 'Hesabı sil'}</h4>${user.isAdmin ? `<p class="text-[11px] text-red-600/80 mt-1">${isEn ? 'The primary administrator cannot be deleted here.' : 'Birincil yönetici hesabı bu ekrandan silinemez.'}</p>` : `<p class="text-[11px] text-red-600/80 mt-1 mb-3">${isEn ? 'This permanently removes your listings and personal account data.' : 'Bu işlem ilanlarınızı ve kişisel hesap verilerinizi kalıcı olarak kaldırır.'}</p><input id="delete-account-password" type="password" placeholder="${isEn ? 'Current password' : 'Mevcut şifre'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-2"><input id="delete-account-confirmation" type="text" placeholder="${isEn ? 'DELETE MY ACCOUNT' : 'HESABIMI SİL'}" class="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-red-200 dark:border-red-500/30 text-sm mb-3"><button id="delete-account-btn" class="w-full py-3 rounded-xl bg-red-600 text-white text-sm font-bold">${isEn ? 'Permanently delete account' : 'Hesabı kalıcı olarak sil'}</button>`}</section>
   </div>`;
@@ -2976,7 +2976,7 @@ function openCreateListingModal(editListing = null) {
       <div id="image-upload-wrapper" class="space-y-2">
         <label class="text-xs font-bold text-slate-700 dark:text-slate-300 block flex items-center justify-between">
           <span class="flex items-center gap-2"><i class="ph-bold ph-image-square text-emerald-500 text-base"></i>${state.lang === 'en' ? 'Add Listing Image' : 'İlan Fotoğrafı Ekle'}</span>
-          <span class="text-[10px] text-slate-400 font-normal">PNG, JPG, WebP · Max 5 MB</span>
+          <span class="text-[10px] text-slate-400 font-normal">PNG, JPG, WebP · Max 3 MB</span>
         </label>
         
         <div class="border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-4 text-center hover:border-emerald-500 dark:hover:border-emerald-500 transition-all bg-slate-50 dark:bg-slate-900/50 cursor-pointer relative group">
@@ -3480,7 +3480,7 @@ function renderAuthCard() {
           <label class="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">${isEn ? 'Password' : 'Şifre'}</label>
           <div class="relative">
             <i class="ph-bold ph-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-            <input type="password" id="auth-password" required minlength="6" autocomplete="current-password" placeholder="${isEn ? 'Enter password' : 'Şifrenizi girin'}" class="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
+            <input type="password" id="auth-password" required maxlength="128" autocomplete="current-password" placeholder="${isEn ? 'Enter password' : 'Şifrenizi girin'}" class="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
             <button type="button" id="toggle-pw-btn" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
               <i class="ph-bold ph-eye text-base"></i>
             </button>
@@ -3530,7 +3530,7 @@ function renderAuthCard() {
           <label class="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">${isEn ? 'Password' : 'Şifre'}</label>
           <div class="relative">
             <i class="ph-bold ph-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-            <input type="password" id="auth-password" required minlength="8" autocomplete="new-password" placeholder="${isEn ? 'Min 8 characters' : 'Şifrenizi girin (min 8 karakter)'}" class="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
+            <input type="password" id="auth-password" required minlength="12" maxlength="128" autocomplete="new-password" placeholder="${isEn ? '12–128 characters' : '12–128 karakter'}" class="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition-colors">
             <button type="button" id="toggle-pw-btn" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
               <i class="ph-bold ph-eye text-base"></i>
             </button>

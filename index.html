@@ -34,23 +34,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Phosphor Icons -->
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Space Grotesk', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Version-pinned, self-hosted UI dependencies -->
+  <link rel="stylesheet" href="/public/vendor/phosphor/regular/style.css?v=2.1.2">
+  <link rel="stylesheet" href="/public/vendor/phosphor/bold/style.css?v=2.1.2">
+  <link rel="stylesheet" href="/public/vendor/phosphor/fill/style.css?v=2.1.2">
+  <link rel="stylesheet" href="/public/vendor/phosphor/light/style.css?v=2.1.2">
+  <link rel="stylesheet" href="/public/vendor/phosphor/duotone/style.css?v=2.1.2">
+  <link rel="stylesheet" href="/public/vendor/tailwind.css?v=3.4.19">
   <link rel="stylesheet" href="/src/styles/main.css?v=20260808-9">
 </head>
 <body class="searya-vibrant bg-slate-50 text-slate-900 dark:bg-[#080C14] dark:text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white min-h-screen flex flex-col transition-colors duration-300">
