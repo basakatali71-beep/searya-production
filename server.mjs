@@ -1076,8 +1076,12 @@ function bootstrapAdmin() {
   const email = String(process.env.SEARYA_ADMIN_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.SEARYA_ADMIN_PASSWORD || '');
   if (!email || password.length < MIN_NEW_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) return;
-  const existing = db.prepare('SELECT id FROM users WHERE email=?').get(email);
+  const existing = db.prepare('SELECT id,password_hash FROM users WHERE email=?').get(email);
   if (existing) {
+    if (!verifyPassword(password, existing.password_hash)) {
+      db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(password), existing.id);
+      db.prepare('DELETE FROM sessions WHERE user_id=?').run(existing.id);
+    }
     db.prepare('UPDATE users SET is_admin=1,email_verified=1,status=\'active\' WHERE id=?').run(existing.id);
     db.prepare(`UPDATE users SET is_admin=0 WHERE email='admin@searya.local' AND id<>?`).run(existing.id);
     return;
