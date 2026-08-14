@@ -42,6 +42,22 @@ test('health and seeded listings are available', async () => {
   assert.equal(listings.listings.every(item => item.type === 'sale'), true);
 });
 
+test('private application files are never exposed by the static server', async () => {
+  for (const path of ['/server.mjs', '/package.json', '/package-lock.json', '/data/searya.sqlite', '/.env', '/.git/config', '/src/services/indexNow.js']) {
+    const response = await fetch(`${baseUrl}${path}`);
+    assert.equal(response.status, 404, `${path} must not be publicly readable`);
+  }
+
+  const publicScript = await fetch(`${baseUrl}/src/app.js`);
+  assert.equal(publicScript.status, 200);
+  assert.match(publicScript.headers.get('content-security-policy') || '', /^$/);
+
+  const home = await fetch(`${baseUrl}/`);
+  assert.match(home.headers.get('content-security-policy') || '', /frame-ancestors 'none'/);
+  assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(home.headers.get('x-frame-options'), 'DENY');
+});
+
 test('technical SEO exposes canonical metadata, robots rules and public sitemap URLs', async () => {
   const indexNowKey = await fetch(`${baseUrl}${indexNowKeyPath()}`);
   assert.equal(indexNowKey.status, 200);

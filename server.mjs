@@ -16,6 +16,12 @@ import { INDEXNOW_KEY, indexNowKeyPath, submitIndexNow } from './src/services/in
 import { submitSitemapToGoogle } from './src/services/googleSearchConsole.js';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
+const PUBLIC_STATIC_FILES = new Set([
+  'index.html', 'admin.html', '404.html', 'favicon.ico',
+  'src/app.js', 'src/api.js', 'src/admin.js',
+  'src/data/seedListings.js', 'src/data/mockData.js', 'src/data/translations.js'
+].map(path => resolve(ROOT, path)));
+const PUBLIC_STATIC_DIRECTORIES = ['public', 'legal', 'src/assets', 'src/styles'].map(path => resolve(ROOT, path));
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -40,6 +46,32 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
+
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+  NODE_ENV === 'production' ? 'upgrade-insecure-requests' : ''
+].filter(Boolean).join('; ');
+
+function securityHeaders({ html = false } = {}) {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Frame-Options': 'DENY',
+    'X-Permitted-Cross-Domain-Policies': 'none',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    ...(html ? { 'Content-Security-Policy': CONTENT_SECURITY_POLICY } : {}),
+    ...(NODE_ENV === 'production' ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {})
+  };
+}
 
 mkdirSync(resolve(DB_PATH, '..'), { recursive: true });
 const db = new DatabaseSync(DB_PATH, { timeout: 5000 });
@@ -615,12 +647,12 @@ function unreadMessageCount(userId) {
 
 function json(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', ...headers });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', ...securityHeaders(), ...headers });
   res.end(body);
 }
 
 function redirect(res, location, cookies = []) {
-  const headers = { Location: location, 'Cache-Control': 'no-store' };
+  const headers = { Location: location, 'Cache-Control': 'no-store', ...securityHeaders() };
   if (cookies.length) headers['Set-Cookie'] = cookies;
   res.writeHead(302, headers);
   res.end();
@@ -1981,10 +2013,7 @@ function htmlResponse(req, res, body, status = 200) {
     'Content-Type': 'text/html; charset=utf-8',
     'Content-Length': buffer.length,
     'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-Frame-Options': 'DENY',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+    ...securityHeaders({ html: true })
   });
   if (req.method === 'HEAD') res.end(); else res.end(buffer);
 }
@@ -2224,7 +2253,8 @@ function serveStatic(req, res, url) {
   if (pathname === '/') pathname = '/index.html';
   const candidate = normalize(join(ROOT, pathname));
   const rootPrefix = ROOT.endsWith('/') ? ROOT : `${ROOT}/`;
-  if (!candidate.startsWith(rootPrefix) || !existsSync(candidate) || !statSync(candidate).isFile()) {
+  const explicitlyPublic = PUBLIC_STATIC_FILES.has(candidate) || PUBLIC_STATIC_DIRECTORIES.some(directory => candidate.startsWith(`${directory}/`));
+  if (!candidate.startsWith(rootPrefix) || !explicitlyPublic || !existsSync(candidate) || !statSync(candidate).isFile()) {
     if ((req.headers.accept || '').includes('text/html')) {
       const notFoundPage = join(ROOT, '404.html');
       const body = readFileSync(notFoundPage);
@@ -2232,9 +2262,7 @@ function serveStatic(req, res, url) {
         'Content-Type': 'text/html; charset=utf-8',
         'Content-Length': body.length,
         'Cache-Control': 'no-cache',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'X-Frame-Options': 'DENY'
+        ...securityHeaders({ html: true })
       });
       if (req.method === 'HEAD') res.end(); else res.end(body);
       return;
@@ -2243,14 +2271,12 @@ function serveStatic(req, res, url) {
   }
   const body = readFileSync(candidate);
   const immutable = /[?&]v=/.test(req.url || '');
+  const isHtml = extname(candidate).toLowerCase() === '.html';
   res.writeHead(200, {
     'Content-Type': mimeTypes[extname(candidate).toLowerCase()] || 'application/octet-stream',
     'Content-Length': body.length,
-    'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-Frame-Options': 'DENY',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+    'Cache-Control': isHtml && candidate === resolve(ROOT, 'admin.html') ? 'no-store' : immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+    ...securityHeaders({ html: isHtml })
   });
   if (req.method === 'HEAD') res.end(); else res.end(body);
 }
@@ -2381,6 +2407,7 @@ const server = createServer(async (req, res) => {
       const description = `Discover ${categoryName.toLowerCase()} on Searya. Connect directly with founders with 0% platform commission and direct buyer messaging.`;
       return htmlResponse(req, res, renderSeoPage({ title, description, canonical }));
     }
+    if (!['GET', 'HEAD'].includes(req.method || 'GET')) return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed.');
     return serveStatic(req, res, url);
   } catch (error) {
     console.error(error);
