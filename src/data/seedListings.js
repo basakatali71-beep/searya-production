@@ -182,6 +182,10 @@ function createdDate(index) {
   return date.toISOString();
 }
 
+function seedViewCount(index) {
+  return 1000 + ((index * 37 + 17) % 100) * 10 + ((index * 7 + 3) % 10);
+}
+
 function saleDescription(row, seller) {
   const [title, category, price, mrr, stack, audience, core, traction] = row;
   return `${title} is a focused ${CATEGORY_LABELS[category].toLowerCase()} built for ${audience}. The product ${core}. It was designed as a real operating product rather than a throwaway demo, with clear navigation, responsive screens, sensible validation, and an architecture that a new owner can continue without rebuilding the foundation. The current stack includes ${stack.split(',').join(', ')}, and the repository is organized with practical setup notes, environment variable guidance, and deployment documentation.\n\nThe listing includes the source code, product name and visual assets, database schema, deployment configuration, onboarding copy, and the operating documentation used by the current owner. ${traction.charAt(0).toUpperCase() + traction.slice(1)}. ${mrr > 0 ? `Current monthly recurring revenue is approximately $${mrr.toLocaleString('en-US')}; a buyer should independently verify revenue, customer, and expense records during due diligence.` : 'The product is not currently marketed as a recurring-revenue business, so the opportunity is best suited to a buyer who values the completed product, positioning, and launch-ready assets.'}\n\nA practical next owner could improve acquisition through focused content, partnerships, direct outreach, or a tighter onboarding experiment. The codebase has no known ownership disputes, and third-party services are documented for transfer or replacement. The asking price is $${price.toLocaleString('en-US')}. I am selling to concentrate on a smaller number of commitments, and I can provide a structured handoff, one live walkthrough, and fourteen days of reasonable transition support. Searya connects interested parties only; buyers should review the code, accounts, claims, licenses, and transfer terms directly before making any payment.`;
@@ -221,6 +225,7 @@ export const initialForSaleListings = sellerRows.map((row, index) => {
     reasonForSelling: 'The owner is narrowing their product portfolio and will support an orderly transition.',
     reasonForSellingEn: 'The owner is narrowing their product portfolio and will support an orderly transition.',
     setupTimeHours: mrr > 0 ? 3 : 5,
+    views: seedViewCount(index),
     createdAt: iso,
     createdAtEn: iso,
     createdAtIso: iso
@@ -250,6 +255,7 @@ export const initialWtbListings = buyerRows.map((row, index) => {
     fullDesc: description,
     fullDescEn: description,
     techStack: stack.split(','),
+    views: seedViewCount(index + sellerRows.length),
     createdAt: iso,
     createdAtEn: iso,
     createdAtIso: iso

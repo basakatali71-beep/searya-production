@@ -1035,6 +1035,7 @@ function seedData() {
 
 function syncSeedContent() {
   const update = db.prepare(`UPDATE listings SET type=?,title=?,slug=?,category=?,price_cents=?,content_json=?,is_verified=?,created_at=? WHERE id=? AND user_id LIKE 'seed-%'`);
+  const raiseSeedViewBaseline = db.prepare(`UPDATE listings SET views=? WHERE id=? AND user_id LIKE 'seed-%' AND views<1000`);
   const findSeedListing = db.prepare(`SELECT user_id FROM listings WHERE id=? AND user_id LIKE 'seed-%'`);
   const insertUser = db.prepare(`INSERT OR IGNORE INTO users(id,email,password_hash,name,role,status,is_admin,is_verified,buyer_connections,seller_free_listings,seller_listing_credits,seller_vip_credits,created_at,last_seen_at,email_verified) VALUES(?,?,?,?,?,'active',0,?,2,1,0,0,?,?,1)`);
   const insertListing = db.prepare(`INSERT INTO listings(id,user_id,type,title,slug,category,price_cents,content_json,status,is_verified,priority_review,views,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
@@ -1063,6 +1064,7 @@ function syncSeedContent() {
         item.createdAtIso || nowIso(),
         item.id
       );
+      raiseSeedViewBaseline.run(Number(item.views || 0), item.id);
       updateSeedUser.run(person.name, seedListing.user_id);
     }
     db.exec('COMMIT');

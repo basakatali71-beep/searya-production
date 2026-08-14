@@ -14,6 +14,13 @@ test('seed catalogue includes fifty unique listings for each side', () => {
   assert.equal(new Set(initialWtbListings.map(item => item.titleEn)).size, initialWtbListings.length);
 });
 
+test('showcase listing view counts are unique and between one and two thousand', () => {
+  const views = [...initialForSaleListings, ...initialWtbListings].map(item => item.views);
+  assert.equal(views.length, 100);
+  assert.equal(new Set(views).size, views.length);
+  assert.equal(views.every(value => Number.isInteger(value) && value >= 1000 && value <= 2000), true);
+});
+
 test('showcase profiles use unique English names and unique portrait photos', () => {
   const profiles = [
     ...initialForSaleListings.map(item => item.seller),
