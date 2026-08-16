@@ -49,59 +49,50 @@ test('Launch legal copy does not contain unfinished placeholders', () => {
   assert.doesNotMatch(termsSource, /launch-stage informational draft/i);
 });
 
-test('The footer includes a clear buyer and seller safety warning', () => {
-  assert.match(pageSource, /id="marketplace-safety-warning"/);
-  assert.match(pageSource, /Searya only connects buyers and sellers/);
-  assert.match(pageSource, /Do not send payment until you fully trust the seller/);
-  assert.match(pageSource, /Use an independent escrow service whenever possible/);
+test('The homepage explains the free tools and local-first document handling', () => {
+  assert.match(pageSource, /No account required/);
+  assert.match(pageSource, /Your document data stays in this browser/);
+  assert.match(pageSource, /All core tools are free today/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
-  assert.match(pageSource, /<title>Searya — Buy &amp; Sell Digital Projects \| 0% Commission &amp; Direct Messaging<\/title>/);
+  assert.match(pageSource, /<title>Searya Tools — Free QR, Time Card & Invoice Tools<\/title>/);
   assert.match(pageSource, /property="og:locale" content="en_US"/);
-  assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-social-preview-en\.png\?v=20260811-1"/);
+  assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-tools-preview\.png\?v=20260816-1"/);
   assert.match(pageSource, /property="og:image:width" content="1200"/);
   assert.match(pageSource, /property="og:image:height" content="630"/);
 });
 
 test('Searya favicon and English feedback contact are published', () => {
-  assert.match(pageSource, /href="\/favicon\.ico\?v=20260812-1"/);
-  assert.match(pageSource, /href="\/public\/favicon-32\.png\?v=20260812-1"/);
-  assert.match(pageSource, /href="mailto:basakatali71@gmail\.com\?subject=Searya%20Feedback/);
-  assert.match(pageSource, /Help shape Searya/);
-  assert.match(pageSource, /Send Feedback/);
+  assert.match(pageSource, /href="\/favicon\.ico\?v=20260816-1"/);
+  assert.match(pageSource, /href="\/public\/favicon-32\.png\?v=20260816-1"/);
+  assert.match(pageSource, /href="mailto:basakatali71@gmail\.com"/);
+  assert.match(pageSource, />Feedback<\/a>/);
 });
 
-test('The footer exposes a concise set of SEO discovery links', () => {
-  assert.match(pageSource, /aria-label="Explore project categories"/);
-  assert.match(pageSource, /href="\/saas-for-sale"/);
-  assert.match(pageSource, /href="\/mobile-apps-for-sale"/);
-  assert.match(pageSource, /href="\/ai-tools-for-sale"/);
-  assert.match(pageSource, /href="\/sell-your-digital-project"/);
+test('The homepage exposes the core tools as crawlable links', () => {
+  assert.match(pageSource, /href="\/qr-code-generator"/);
+  assert.match(pageSource, /href="\/time-card-calculator"/);
+  assert.match(pageSource, /href="\/invoice-generator"/);
 });
 
-test('The homepage links to transactional project-search landing pages', () => {
-  for (const path of ['/buy-micro-saas-under-5000', '/saas-projects-for-sale-by-owner', '/buy-source-code-from-developers', '/sell-saas-without-commission', '/zero-commission-startup-marketplace', '/buy-chrome-extension-business', '/mobile-apps-with-source-code-for-sale', '/notion-templates-for-sale-marketplace', '/where-to-sell-a-side-project', '/direct-founder-marketplace']) {
-    assert.match(pageSource, new RegExp(`href="${path}"`), path);
-  }
+test('The tool workspace includes the three functional launch surfaces', () => {
+  assert.match(pageSource, /id="qr-form"/);
+  assert.match(pageSource, /id="time-rows"/);
+  assert.match(pageSource, /id="document-form"/);
+  assert.match(pageSource, /id="print-document"/);
 });
 
-test('The public homepage exposes the blog in desktop, mobile and footer navigation', () => {
-  assert.match(pageSource, /id="t-nav-blog"[^>]*>Blog<\/a>/);
-  assert.match(pageSource, /class="md:hidden[^>]*>[\s\S]*?<span class="hidden sm:inline">Blog<\/span>/);
-  assert.match(pageSource, /href="\/blog"[^>]*>Searya Blog<\/a>/);
+test('The tool homepage has clear navigation and launch pricing', () => {
+  assert.match(pageSource, /aria-label="Main navigation"/);
+  assert.match(pageSource, /href="\/#how-it-works"/);
+  assert.match(pageSource, /href="\/#pricing"/);
+  assert.match(pageSource, /\$0/);
 });
 
-test('Featured project preview and listing cards contain no sample labels', () => {
-  for (const id of ['t-preview-view-value', 't-preview-data-value', 't-launch-chat-period']) {
-    assert.match(pageSource, new RegExp(`id=["']${id}["']`));
-  }
-  assert.match(appSource, /'t-preview-view-value': isEn \? 'Preview'/);
-  assert.match(appSource, /'t-preview-data-value': 'Live'/);
-  assert.match(appSource, /'t-launch-chat-period': isEn \? 'during launch'/);
-  assert.doesNotMatch(pageSource, /sample/i);
-  assert.doesNotMatch(appSource, />SAMPLE</);
-  assert.match(pageSource, /Launch showcase profiles illustrate the listing experience/);
+test('The homepage contains no marketplace samples or fake traction claims', () => {
+  assert.doesNotMatch(pageSource, /sample|marketplace|commission|buyers|sellers/i);
+  assert.doesNotMatch(pageSource, /\d+[,+] users|trusted by|projects sold/i);
 });
 
 test('Listing creation requires a signed-in user before rendering the form', () => {

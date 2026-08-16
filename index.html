@@ -1,722 +1,132 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Searya — Buy &amp; Sell Digital Projects | 0% Commission &amp; Direct Messaging</title>
-  <meta name="description" content="Discover SaaS apps, Notion templates, and source code. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Searya Tools — Free QR, Time Card & Invoice Tools</title>
+  <meta name="description" content="Create QR codes, calculate work hours, and make professional invoices, quotes and receipts. Fast, private and free to use.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://searya.com/">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Searya">
+  <meta property="og:site_name" content="Searya Tools">
   <meta property="og:locale" content="en_US">
   <meta property="og:url" content="https://searya.com/">
-  <meta property="og:title" content="Searya — Buy &amp; Sell Digital Projects | 0% Commission &amp; Direct Messaging">
-  <meta property="og:description" content="Discover SaaS apps, Notion templates, and source code. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging.">
-  <meta property="og:image" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
-  <meta property="og:image:secure_url" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
+  <meta property="og:title" content="Searya Tools — Free QR, Time Card & Invoice Tools">
+  <meta property="og:description" content="Practical business tools that work instantly. No complicated setup.">
+  <meta property="og:image" content="https://searya.com/public/searya-tools-preview.png?v=20260816-1">
+  <meta property="og:image:secure_url" content="https://searya.com/public/searya-tools-preview.png?v=20260816-1">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Searya — Buy and sell digital projects">
+  <meta property="og:image:alt" content="Searya free business tools">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Searya — Buy &amp; Sell Digital Projects | 0% Commission &amp; Direct Messaging">
-  <meta name="twitter:description" content="Discover SaaS apps, Notion templates, and source code. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging.">
-  <meta name="twitter:image" content="https://searya.com/public/searya-social-preview-en.png?v=20260811-1">
-  <meta name="twitter:image:alt" content="Searya — Buy and sell digital projects">
-  <link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32.png?v=20260812-1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/public/apple-touch-icon.png?v=20260812-1">
-  <script id="searya-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://searya.com/#organization","name":"Searya","url":"https://searya.com/","logo":{"@type":"ImageObject","url":"https://searya.com/public/searya-logo.png"}},{"@type":"WebSite","@id":"https://searya.com/#website","name":"Searya","url":"https://searya.com/","publisher":{"@id":"https://searya.com/#organization"},"description":"Discover SaaS apps, Notion templates, and source code. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging."}]}</script>
-  
-  <!-- Fonts (Space Grotesk) -->
+  <meta name="twitter:title" content="Searya Tools — Free QR, Time Card & Invoice Tools">
+  <meta name="twitter:description" content="Practical business tools that work instantly. No complicated setup.">
+  <meta name="twitter:image" content="https://searya.com/public/searya-tools-preview.png?v=20260816-1">
+  <link rel="icon" href="/favicon.ico?v=20260816-1" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32.png?v=20260816-1">
+  <link rel="apple-touch-icon" href="/public/apple-touch-icon.png?v=20260816-1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Version-pinned, self-hosted UI dependencies -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/vendor/phosphor/regular/style.css?v=2.1.2">
   <link rel="stylesheet" href="/public/vendor/phosphor/bold/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/public/vendor/phosphor/fill/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/public/vendor/phosphor/light/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/public/vendor/phosphor/duotone/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/public/vendor/tailwind.css?v=3.4.19">
-  <link rel="stylesheet" href="/src/styles/main.css?v=20260808-9">
+  <link rel="stylesheet" href="/src/styles/tools.css?v=20260816-1">
+  <script id="searya-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Searya","url":"https://searya.com/","logo":"https://searya.com/public/searya-logo.png"},{"@type":"WebSite","name":"Searya Tools","url":"https://searya.com/"},{"@type":"SoftwareApplication","name":"Searya Business Tools","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}]}</script>
 </head>
-<body class="searya-vibrant bg-slate-50 text-slate-900 dark:bg-[#080C14] dark:text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white min-h-screen flex flex-col transition-colors duration-300">
-
-  <div id="service-status-banner" class="hidden sticky top-0 z-[130] px-4 py-2.5 bg-amber-400 text-amber-950 text-center text-xs font-bold shadow-lg" role="status"></div>
-
-  <!-- ======================================================= -->
-  <!-- CENTERED AUTHENTICATION & REGISTRATION MODAL VIEW       -->
-  <!-- Opens on demand without blocking marketplace discovery  -->
-  <!-- ======================================================= -->
-  <div id="onboarding-fullview" class="hidden fixed inset-0 z-[160] items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto transition-all duration-300" role="dialog" aria-modal="true" aria-labelledby="t-ob-card-title">
-    
-    <!-- Centered Auth Glass Card -->
-    <div class="w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-[#0D131F] rounded-3xl p-5 sm:p-8 border border-slate-200 dark:border-slate-800/90 shadow-2xl space-y-4 sm:space-y-6 relative animate-fade-in my-auto" id="ob-auth-card">
-      
-      <!-- Top Brand Header inside Centered Auth Card -->
-      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-        <!-- Logo -->
-        <a href="/" class="brand-logo-group sy-brand-lockup sy-brand-lockup-onboarding" data-home-link aria-label="Searya home">
-          <img src="/src/assets/searya-logo.png?v=20260807-1" alt="" class="sy-brand-logo-full" width="1250" height="359">
-        </a>
-
-        <!-- Header Controls -->
-        <div class="flex items-center gap-2">
-          <button id="ob-card-theme-btn" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-purple-600 transition-all text-xs font-bold flex items-center gap-1 cursor-pointer">
-            <i class="ph-bold ph-sun text-amber-500 text-sm"></i>
-            <i class="ph-bold ph-moon text-indigo-400 text-sm hidden"></i>
-          </button>
-
-          <button id="ob-close-btn" type="button" aria-label="Close" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-purple-600 transition-all cursor-pointer">
-            <i class="ph-bold ph-x text-sm"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Title & Subtitle -->
-      <div class="text-center space-y-1">
-        <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white" id="t-ob-card-title">Welcome to Searya! 👋</h2>
-        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="t-ob-card-sub">Don't have an account? Sign up for free.</p>
-      </div>
-
-      <!-- Segmented Tab Switcher (Sign In vs Sign Up) -->
-      <div class="grid grid-cols-2 gap-1 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        <button id="ob-tab-login" type="button" class="py-2.5 rounded-xl font-extrabold text-xs transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm cursor-pointer">
-          Sign In
-        </button>
-        <button id="ob-tab-register" type="button" class="py-2.5 rounded-xl font-semibold text-xs transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer">
-          Sign Up
-        </button>
-      </div>
-
-      <!-- Social Logins -->
-      <div>
-        <button id="google-auth-btn" data-provider="google" type="button" class="social-auth-btn w-full py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer">
-          <svg class="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
-            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
-            <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12.5s.7 2.8 1.9 5.2l3.7-2.9z"/>
-            <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"/>
-          </svg>
-          <span data-social-label class="truncate">Continue with Google</span>
-        </button>
-      </div>
-      <p id="social-auth-status" class="hidden text-center text-[10px] leading-4 text-slate-500"></p>
-
-      <!-- Divider -->
-      <div class="relative flex items-center justify-center my-1">
-        <div class="w-full border-t border-slate-200 dark:border-slate-800"></div>
-        <span id="t-ob-divider" class="absolute bg-white dark:bg-[#0D131F] px-3 text-[11px] font-bold text-slate-400">or</span>
-      </div>
-
-      <!-- Auth Dynamic Form Fields Container -->
-      <div id="ob-form-fields-container" class="space-y-4">
-        <!-- Form Fields rendered dynamically via JS -->
-      </div>
-
-      <!-- Direct Bypass Button -->
-      <div class="text-center pt-1 border-t border-slate-100 dark:border-slate-800">
-        <button id="skip-to-marketplace-btn" class="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer">
-          <span id="t-ob-skip-btn">Not now, explore listings →</span>
-        </button>
-      </div>
-
+<body>
+  <div class="page-glow glow-one"></div><div class="page-glow glow-two"></div>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="/" aria-label="Searya Tools home"><img src="/src/assets/searya-logo.png" alt="Searya" width="1250" height="359"><span>TOOLS</span></a>
+      <nav aria-label="Main navigation"><a href="/#tools">Tools</a><a href="/#how-it-works">How it works</a><a href="/#pricing">Pricing</a></nav>
+      <a class="header-cta" href="/#tools"><span>Open a free tool</span><i class="ph-bold ph-arrow-right"></i></a>
     </div>
+  </header>
 
-  </div>
-
-  <!-- ========================================== -->
-  <!-- MAIN MARKETPLACE APPLICATION HOMEPAGE VIEW -->
-  <!-- ========================================== -->
-  <div id="main-app-view" class="flex flex-col min-h-screen">
-
-    <!-- TOP ANNOUNCEMENT BANNER -->
-    <div class="sy-announcement bg-gradient-to-r from-emerald-600 via-indigo-600 to-purple-600 text-white border-b border-indigo-500/20 py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs text-center flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 shadow-md">
-      <span id="t-banner-new" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white backdrop-blur-md">🔥 NEW</span>
-      <span><strong id="t-banner-feature">Looking to Buy</strong> <span id="t-banner-text">is live! Set your budget and let sellers reach you.</span></span>
-      <button id="t-banner-action" class="underline hover:text-emerald-100 font-medium ml-1">Create Listing →</button>
-    </div>
-
-    <!-- NAVBAR -->
-    <header class="sy-navbar sticky top-0 z-40 backdrop-blur-xl bg-white/90 dark:bg-[#080C14]/90 border-b border-slate-200 dark:border-slate-800/80 transition-colors duration-300">
-      <div class="sy-navbar-inner max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
-        
-        <!-- Brand Logo -->
-        <a href="/" id="main-brand-logo" data-home-link class="brand-logo-group sy-brand-lockup sy-brand-lockup-main group min-w-0" aria-label="Searya home">
-          <img src="/src/assets/searya-logo.png?v=20260807-1" alt="" class="sy-brand-logo-full" width="1250" height="359">
-          <img src="/src/assets/searya-mark.png?v=20260807-1" alt="" class="sy-brand-logo-mark" width="351" height="342">
-        </a>
-
-        <!-- Navigation Links -->
-        <nav class="hidden md:flex items-center gap-8">
-          <a href="#listings-grid" class="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5" id="t-nav-listings">Projects for Sale</a>
-          <a href="#listings-grid" class="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1.5" id="t-nav-wtb">Looking to Buy</a>
-          <a href="#pricing-section" class="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5" id="t-nav-pricing">Free During Launch</a>
-          <a href="/blog" class="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center gap-1.5" id="t-nav-blog">Blog</a>
-        </nav>
-
-        <!-- Global Actions -->
-        <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          <a href="/blog" aria-label="Blog" title="Blog" class="md:hidden p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-all flex items-center gap-1.5 text-xs font-bold">
-            <i class="ph-bold ph-article text-base"></i><span class="hidden sm:inline">Blog</span>
-          </a>
-          <!-- Dark/Light Theme Toggle -->
-          <button id="theme-toggle-btn" aria-label="Change theme" class="p-2.5 sm:px-3 sm:py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold">
-            <i class="ph-bold ph-sun text-amber-500 text-base dark:hidden"></i>
-            <i class="ph-bold ph-moon text-indigo-400 text-base hidden dark:block"></i>
-            <span id="t-theme-light-label" class="hidden sm:inline dark:!hidden">Light Theme</span>
-            <span id="t-theme-dark-label" class="hidden sm:dark:inline">Dark Theme</span>
-          </button>
-
-          <!-- Onboarding & Registration Trigger Button -->
-          <button id="nav-register-btn" type="button" aria-label="Sign Up" title="Sign Up" class="relative flex p-2.5 md:px-4 md:py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-xs font-extrabold items-center gap-1.5 shadow-sm active:scale-95">
-            <i id="nav-account-icon" class="ph-bold ph-user-plus text-sm"></i>
-            <span id="t-nav-register" class="hidden md:inline">Sign Up</span>
-            <span id="nav-profile-state" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-900" aria-hidden="true"></span>
-          </button>
-
-          <!-- Direct Messages Trigger (Inbox) -->
-          <button id="inbox-btn" aria-label="Messages" class="relative p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-800 transition-all" title="Messages">
-            <i class="ph-bold ph-chat-circle-dots text-lg"></i>
-            <span id="unread-message-count" class="hidden absolute -top-2 -left-2 min-w-5 h-5 px-1 bg-rose-500 text-white rounded-full ring-2 ring-white dark:ring-slate-900 text-[10px] font-black items-center justify-center">0</span>
-            <span id="buyer-credit-count" class="hidden absolute -top-2 -right-2 min-w-5 h-5 px-1 bg-emerald-500 text-slate-950 rounded-full ring-2 ring-white dark:ring-slate-900 text-[10px] font-black items-center justify-center">10</span>
-          </button>
-
-          <!-- Create Listing CTA Button -->
-          <button id="create-listing-btn" aria-label="Post a Listing" class="p-2.5 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all flex items-center gap-2 transform active:scale-95">
-            <i class="ph-bold ph-plus-circle text-base"></i>
-            <span id="t-btn-create-listing" class="hidden sm:inline">Post a Listing</span>
-          </button>
+  <main>
+    <section class="hero" id="home-hero">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow"><span></span> Free tools for independent work</div>
+          <h1>Small business work,<br><em>finished faster.</em></h1>
+          <p>Create a QR code, total a time card, or send a polished business document without fighting complicated software.</p>
+          <div class="hero-actions"><a class="button primary" href="/#tools">Choose a free tool <i class="ph-bold ph-arrow-down"></i></a><span><i class="ph-bold ph-check-circle"></i> No account required</span></div>
+          <div class="trust-row"><div><strong>3</strong><span>working tools</span></div><div><strong>0</strong><span>setup steps</span></div><div><strong>Free</strong><span>during launch</span></div></div>
         </div>
-      </div>
-    </header>
-
-    <!-- HERO BANNER WITH ANIMATED 3D FEATURED CARD -->
-    <section class="sy-hero relative overflow-hidden pt-12 pb-16 lg:pt-20 lg:pb-24 border-b border-slate-200 dark:border-slate-800/80 bg-gradient-to-b from-slate-100/60 via-slate-50 to-slate-100/60 dark:from-[#080C14] dark:via-[#0E1524] dark:to-[#080C14] transition-colors duration-300">
-      <span class="sy-hero-orb sy-hero-orb-one" aria-hidden="true"></span>
-      <span class="sy-hero-orb sy-hero-orb-two" aria-hidden="true"></span>
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div class="sy-hero-grid grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-          
-          <!-- Left Hero Copy -->
-          <div class="sy-hero-copy lg:col-span-7 space-y-6 text-center lg:text-left">
-            <div class="sy-vision-pill inline-flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-lg shadow-slate-900/5 backdrop-blur-xl">
-              <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/15 to-indigo-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20"><i class="ph-bold ph-shield-check text-base"></i></span>
-              <span id="t-vision-pill">A secure, direct-transfer marketplace for digital products</span>
-            </div>
-
-            <h1 class="sy-hero-title text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-              <span id="t-hero-line1">The 0% Commission Marketplace</span> <br>
-              <span class="sy-hero-highlight text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-indigo-600 to-purple-600 dark:from-emerald-400 dark:via-indigo-400 dark:to-purple-400" id="t-hero-line2">
-                for Digital Projects &amp; SaaS
-              </span>
-            </h1>
-
-            <h2 class="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl font-semibold leading-relaxed mx-auto lg:mx-0" id="t-hero-subtitle">Direct Founder-to-Buyer Messaging with Zero Transaction Fees</h2>
-
-            <!-- Quick Stats Counter -->
-            <div class="sy-hero-stats grid grid-cols-3 gap-4 pt-4 border-t border-slate-200 dark:border-slate-800/80 max-w-lg mx-auto lg:mx-0">
-              <div class="min-w-0">
-                <span id="t-stat-listings-value" class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white block">Curated</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="t-stat-listings">Project Discovery</span>
-              </div>
-              <div class="min-w-0">
-                <span id="t-stat-deals-value" class="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 block">Direct</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="t-stat-deals">Buyer–Seller Contact</span>
-              </div>
-              <div class="min-w-0">
-                <span class="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 block" id="t-stat-response-val">No Commission</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="t-stat-response">Platform Approach</span>
-              </div>
-            </div>
-
-            <!-- Hero Action Buttons -->
-            <div class="sy-hero-actions flex items-center justify-center lg:justify-start gap-4 pt-2">
-              <a href="#listings-grid" id="t-btn-explore" class="px-6 py-3.5 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-extrabold text-sm hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xl shadow-slate-900/10 flex items-center gap-2">
-                Explore Projects →
-              </a>
-              <button id="btn-hero-sell" class="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 font-extrabold text-sm hover:border-emerald-500 dark:hover:border-emerald-500 transition-all flex items-center gap-2">
-                <i class="ph-bold ph-rocket text-emerald-500"></i>
-                <span id="t-btn-sell-project">Post for Free</span>
-              </button>
-            </div>
-            <p id="t-seller-launch-note" class="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-              Launch offer: Sellers can publish 3 active listings for free.
-            </p>
-          </div>
-
-          <!-- Right HOLOGRAPHIC & WEIGHTLESS FLOATING FEATURED CARD -->
-          <div class="sy-feature-float lg:col-span-5 animate-weightless-float">
-            <div id="hero-3d-card-target" class="sy-feature-shell holographic-card-wrapper cursor-pointer group">
-              
-              <div class="sy-feature-card relative glass-card rounded-[26px] p-6 sm:p-8 space-y-6 border border-white/20 dark:border-slate-800/80 shadow-2xl bg-white/95 dark:bg-[#0D131F]/95 backdrop-blur-2xl overflow-hidden">
-                
-                <!-- Inner Soft Shimmer Beam Glow -->
-                <div class="absolute -top-20 -right-20 w-40 h-40 bg-gradient-to-tr from-purple-600/20 to-emerald-500/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none"></div>
-                
-                <!-- Card Top Header -->
-                <div class="flex items-center justify-between">
-                  <span class="px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-2 shadow-sm" id="t-featured-card-badge">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    Featured Project
-                  </span>
-                  <span id="t-featured-card-price-tag" class="px-3 py-1 rounded-xl text-xs font-black bg-indigo-600 text-white shadow-md">
-                    Available
-                  </span>
-                </div>
-
-                <div id="featured-preview" class="sy-feature-preview" aria-label="Digital project interface">
-                  <div class="sy-preview-toolbar">
-                    <span><i class="ph-bold ph-sparkle"></i> AI Writer Pro</span>
-                    <span class="sy-preview-live"><i class="ph-fill ph-circle"></i> <span id="t-preview-live">Live</span></span>
-                  </div>
-                  <div class="sy-preview-content">
-                    <div class="sy-preview-sidebar">
-                      <span class="active"><i class="ph-bold ph-chart-line-up"></i> <span id="t-preview-overview">Overview</span></span>
-                      <span><i class="ph-bold ph-file-text"></i> <span id="t-preview-content">Content</span></span>
-                      <span><i class="ph-bold ph-users"></i> <span id="t-preview-users">Users</span></span>
-                    </div>
-                    <div class="sy-preview-dashboard">
-                      <div class="sy-preview-metrics">
-                        <span><span id="t-preview-visits">Listing view</span><strong id="t-preview-view-value">Preview</strong></span>
-                        <span><span id="t-preview-conversion">Data status</span><strong id="t-preview-data-value">Live</strong></span>
-                      </div>
-                      <div class="sy-preview-chart" aria-hidden="true">
-                        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Main Title & Desc -->
-                <div class="space-y-2">
-                  <h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" id="t-featured-card-title">
-                    AI Writer Pro
-                  </h3>
-                  <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal" id="t-featured-card-category">
-                    See how a digital project listing is presented on the marketplace.
-                  </p>
-                </div>
-
-                <!-- Live Revenue & User Stats Grid -->
-                <div class="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-xs">
-                  <div>
-                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-revenue">Listing Type</span>
-                    <span class="text-emerald-600 dark:text-emerald-400 font-extrabold text-base block mt-0.5" id="t-featured-card-revval">Digital Project</span>
-                  </div>
-                  <div>
-                    <span class="text-slate-500 dark:text-slate-400 block font-medium text-[11px]" id="t-featured-card-users">Contact</span>
-                    <span class="text-slate-900 dark:text-white font-extrabold text-base block mt-0.5" id="t-featured-card-usersval">Built-in Chat</span>
-                  </div>
-                </div>
-
-                <!-- Action CTA Button -->
-                <button id="featured-inspect-btn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
-                  <span id="t-featured-card-btn">Inspect Project Details →</span>
-                </button>
-
-              </div>
-            </div>
-          </div>
-
+        <div class="hero-visual" aria-label="Searya tool previews">
+          <div class="visual-top"><span>Today’s toolkit</span><span class="live-dot">Ready</span></div>
+          <a href="/qr-code-generator" class="mini-tool purple"><i class="ph-bold ph-qr-code"></i><div><strong>QR Code Generator</strong><small>Create a scannable code</small></div><i class="ph-bold ph-arrow-up-right"></i></a>
+          <a href="/time-card-calculator" class="mini-tool orange"><i class="ph-bold ph-clock-countdown"></i><div><strong>Time Card Calculator</strong><small>Total hours and overtime</small></div><i class="ph-bold ph-arrow-up-right"></i></a>
+          <a href="/invoice-generator" class="mini-tool blue"><i class="ph-bold ph-file-text"></i><div><strong>Invoice Maker</strong><small>Print a professional PDF</small></div><i class="ph-bold ph-arrow-up-right"></i></a>
+          <div class="visual-foot"><i class="ph-bold ph-lock-key"></i> Your document data stays in this browser</div>
         </div>
       </div>
     </section>
 
-    <!-- MARKETPLACE SECTION -->
-    <main class="sy-market w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8 overflow-hidden" id="listings-grid">
-      
-      <!-- Controls Header -->
-      <div class="space-y-6">
-        
-        <!-- Main Tabs (Projects for Sale vs Looking to Buy) -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4 min-w-0">
-          <div id="listing-tabs" class="flex items-center gap-2 w-full sm:w-auto max-w-full overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <button id="tab-for-sale" class="tab-btn active flex flex-shrink-0 items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-emerald-950 dark:text-emerald-300 bg-white dark:bg-emerald-500/20 border border-slate-200 dark:border-emerald-500/40 shadow-sm">
-              <i class="ph-bold ph-rocket text-emerald-600 dark:text-emerald-400 text-lg"></i>
-              <span id="t-tab-sale">Projects for Sale</span>
-              <span id="for-sale-count" class="px-2 py-0.5 rounded-full text-xs bg-slate-200 dark:bg-slate-800 font-extrabold">28</span>
-            </button>
-
-            <button id="tab-looking-to-buy" class="tab-btn flex flex-shrink-0 items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
-              <i class="ph-bold ph-target text-indigo-600 dark:text-indigo-400 text-lg"></i>
-              <span id="t-tab-wtb">Looking to Buy</span>
-              <span id="wtb-count" class="px-2 py-0.5 rounded-full text-xs bg-slate-200 dark:bg-slate-800 font-extrabold">16</span>
-            </button>
-          </div>
-
-          <!-- Search Bar -->
-          <div class="relative w-full sm:flex-1 sm:max-w-md">
-            <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-            <input type="text" id="global-search" placeholder="Search by project name or tech stack..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors shadow-sm">
-          </div>
-        </div>
-
-        <!-- Filter Pills & Sorting -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-          
-          <!-- Categories -->
-          <div class="flex items-center gap-2 w-full min-w-0 overflow-x-auto pb-2 no-scrollbar" id="category-pills">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1" id="t-filter-label">Filter:</span>
-            <button data-category="all" class="cat-chip active px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-900 text-white dark:bg-slate-800 border border-slate-700" id="t-cat-all">All</button>
-            <a href="/projects/category/ai" data-category="ai" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700" id="t-cat-ai">
-              <i class="ph-bold ph-brain text-purple-500 mr-1"></i>AI Projects
-            </a>
-            <a href="/projects/category/saas" data-category="saas" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700" id="t-cat-saas">
-              <i class="ph-bold ph-lightning text-amber-500 mr-1"></i>Micro SaaS
-            </a>
-            <a href="/projects/category/extension" data-category="extension" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700" id="t-cat-extension">
-              <i class="ph-bold ph-browsers text-blue-500 mr-1"></i>Chrome Ext
-            </a>
-            <a href="/projects/category/mobile" data-category="mobile" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700" id="t-cat-mobile">
-              <i class="ph-bold ph-device-mobile text-emerald-500 mr-1"></i>Mobile App
-            </a>
-            <a href="/projects/category/notion" data-category="notion" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700">
-              <i class="ph-bold ph-notebook text-slate-500 mr-1"></i>Notion Templates
-            </a>
-            <a href="/projects/category/ui-kit" data-category="ui-kit" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700">
-              <i class="ph-bold ph-palette text-pink-500 mr-1"></i>UI Kits
-            </a>
-            <a href="/projects/category/api" data-category="api" class="cat-chip px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700">
-              <i class="ph-bold ph-plugs-connected text-cyan-500 mr-1"></i>Developer APIs
-            </a>
-          </div>
-
-          <!-- Sorting -->
-          <div id="listing-sort-controls" class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <button id="save-search-btn" class="px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-extrabold flex items-center gap-1.5 hover:bg-emerald-500/20 transition-all whitespace-nowrap">
-              <i class="ph-bold ph-bell-plus text-sm"></i>
-              <span id="t-save-search">Save Search</span>
-            </button>
-            <button id="project-alerts-btn" class="relative px-3 py-2 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-xs font-bold flex items-center gap-1.5 hover:border-indigo-500 transition-all whitespace-nowrap">
-              <i class="ph-bold ph-bell-ringing text-indigo-500 text-sm"></i>
-              <span id="t-project-alerts">My Alerts</span>
-              <span id="project-alert-count" class="hidden min-w-5 h-5 px-1 rounded-full bg-indigo-600 text-white text-[10px] font-black items-center justify-center">0</span>
-            </button>
-            <span class="text-xs font-bold text-slate-400" id="t-sort-label">Sort:</span>
-            <select id="sort-select" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none">
-              <option value="newest" id="t-sort-newest">Newest First</option>
-              <option value="price-low" id="t-sort-low">Price: Low to High</option>
-              <option value="price-high" id="t-sort-high">Price: High to Low</option>
-              <option value="popular" id="t-sort-popular">Most Viewed</option>
-            </select>
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- Grid Header Info -->
-      <div class="space-y-1">
-        <h2 class="text-2xl font-black text-slate-900 dark:text-white" id="grid-title">Latest Projects for Sale</h2>
-        <p class="text-xs text-slate-500 dark:text-slate-400" id="grid-subtitle">Connect directly with owners. Searya does not charge a sales commission.</p>
-        <p class="text-[11px] text-slate-400" id="showcase-disclosure">Launch showcase profiles illustrate the listing experience; community submissions appear after review.</p>
-      </div>
-
-      <!-- SIDE BY SIDE SQUARE CARDS GRID -->
-      <div id="listings-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        <!-- Dynamic JS Square Cards Render Here -->
-      </div>
-
-      <!-- WEEKLY CURATED PROJECT PICKS -->
-      <section id="weekly-picks-section" class="sy-weekly relative overflow-hidden rounded-3xl border border-indigo-200 dark:border-indigo-500/20 bg-gradient-to-br from-white via-indigo-50/70 to-emerald-50/60 dark:from-[#0D131F] dark:via-indigo-950/25 dark:to-emerald-950/20 p-5 sm:p-8 space-y-6 shadow-sm">
-        <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none"></div>
-        <div class="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div class="space-y-2">
-            <span id="t-weekly-picks-kicker" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 text-[10px] font-black uppercase tracking-wider"><i class="ph-bold ph-sparkle"></i> This week's picks</span>
-            <h2 id="t-weekly-picks-title" class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">6 projects worth a closer look</h2>
-            <p id="t-weekly-picks-subtitle" class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Selected by recency, verification and buyer interest.</p>
-          </div>
-          <button id="weekly-alert-btn" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all whitespace-nowrap">
-            <i class="ph-bold ph-bell-simple-ringing"></i>
-            <span id="t-weekly-alert-btn">Create weekly alert</span>
-          </button>
-        </div>
-        <div id="weekly-picks-grid" class="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-      </section>
-
-
-    </main>
-
-    <!-- FREE LAUNCH SECTION -->
-    <section class="sy-pricing py-16 sm:py-20 bg-slate-100/70 dark:bg-[#060A12] border-t border-slate-200 dark:border-slate-800/80 transition-colors duration-300 relative overflow-hidden" id="pricing-section">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 relative z-10">
-        <div class="text-center max-w-3xl mx-auto space-y-3">
-          <span id="t-simple-pricing-kicker" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-extrabold">
-            Free during launch
-          </span>
-          <h2 id="t-simple-pricing-title" class="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-            Publish your project and connect with the right person.
-          </h2>
-          <p id="t-simple-pricing-subtitle" class="text-sm sm:text-base text-slate-600 dark:text-slate-400 font-medium">
-            Searya is free during launch. No card is required and no sales commission is charged.
-          </p>
-        </div>
-
-        <div id="simple-pricing-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
-          <article class="pricing-plan-card glass-card rounded-3xl border border-emerald-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
-            <span id="t-simple-free-role" class="text-[10px] font-black tracking-widest text-emerald-600 dark:text-emerald-400 mb-4">BUYER</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-binoculars"></i>
-            </div>
-            <h3 id="t-simple-free-title" class="text-xl font-black text-slate-900 dark:text-white">Free Buyer Account</h3>
-            <p id="t-simple-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Explore projects and talk to their owners</p>
-            <div class="my-6">
-              <span class="text-4xl font-black text-emerald-600 dark:text-emerald-400">10</span>
-              <span id="t-simple-free-period" class="text-xs text-slate-500"> new connections / 30 days</span>
-            </div>
-            <ul id="t-simple-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
-              <li>Browse every listing</li><li>10 new seller conversations</li><li>Unlimited messages in existing chats</li>
-            </ul>
-            <button id="simple-buyer-btn" class="mt-7 w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition-all">
-              Join Free
-            </button>
-          </article>
-
-          <article class="pricing-plan-card glass-card rounded-3xl border border-purple-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
-            <span id="t-simple-seller-free-role" class="text-[10px] font-black tracking-widest text-purple-600 dark:text-purple-400 mb-4">SELLER</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-storefront"></i>
-            </div>
-            <h3 id="t-simple-seller-free-title" class="text-xl font-black text-slate-900 dark:text-white">Free Seller Account</h3>
-            <p id="t-simple-seller-free-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Present your projects professionally</p>
-            <div class="my-6">
-              <span class="text-4xl font-black text-purple-600 dark:text-purple-400">3</span>
-              <span id="t-simple-seller-free-period" class="text-xs text-slate-500"> active listings</span>
-            </div>
-            <ul id="t-simple-seller-free-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
-              <li>3 active project listings</li><li>Receive buyer messages for free</li><li>Edit or delete your listings</li>
-            </ul>
-            <button id="simple-seller-free-btn" class="mt-7 w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-200 dark:border-slate-700 hover:border-purple-500 transition-all">
-              Post Free Listing
-            </button>
-          </article>
-
-          <article class="pricing-plan-card glass-card rounded-3xl border border-indigo-500/30 bg-white dark:bg-[#0D131F] p-6 flex flex-col shadow-sm">
-            <span class="text-[10px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mb-4">SEARYA</span>
-            <div class="pricing-plan-icon w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl mb-5">
-              <i class="ph-bold ph-chat-circle-dots"></i>
-            </div>
-            <h3 id="t-launch-chat-title" class="text-xl font-black text-slate-900 dark:text-white">A Safer Start</h3>
-            <p id="t-launch-chat-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Controlled introductions, unlimited follow-up</p>
-            <div class="my-6">
-              <span class="text-4xl font-black text-indigo-600 dark:text-indigo-400">$0</span>
-              <span id="t-launch-chat-period" class="text-xs text-slate-500"> during launch</span>
-            </div>
-            <ul id="t-launch-chat-list" class="space-y-3 text-sm text-slate-600 dark:text-slate-300 flex-1">
-              <li>Contact details protected for the first 6 messages</li><li>Reporting and user blocking</li><li>Admin listing review</li>
-            </ul>
-            <button id="launch-explore-btn" class="mt-7 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/20 transition-all">
-              Explore Listings
-            </button>
-          </article>
-        </div>
-
-        <p id="t-simple-pricing-note" class="text-center text-xs text-slate-500 dark:text-slate-400">
-          Free during launch · No card required · No sales commission
-        </p>
-      </div>
-    </section>
-
-
-    <!-- Bottom 4 Trust Badges Banner -->
-    <section class="sy-trust py-16 bg-white dark:bg-[#05080E] border-t border-slate-200 dark:border-slate-800 transition-colors duration-300">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          
-          <div class="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-xl flex-shrink-0">
-              <i class="ph-bold ph-chat-circle-text"></i>
-            </div>
-            <div>
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white" id="t-trust-f1-title">Unlimited Messaging</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed" id="t-trust-f1-desc">
-                Continue every active buyer or seller conversation without a message limit.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80">
-            <div class="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl flex-shrink-0">
-              <i class="ph-bold ph-shield-check"></i>
-            </div>
-            <div>
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white" id="t-trust-f2-title">Secure Communication</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed" id="t-trust-f2-desc">
-                Contact details stay private until both parties explicitly confirm a handshake.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl flex-shrink-0">
-              <i class="ph-bold ph-percent"></i>
-            </div>
-            <div>
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white" id="t-trust-f3-title">Zero Platform Fees</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed" id="t-trust-f3-desc">
-                Complete your transfer with the provider you choose. Searya charges no sales commission.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80">
-            <div class="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xl flex-shrink-0">
-              <i class="ph-bold ph-rocket-launch"></i>
-            </div>
-            <div>
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white" id="t-trust-f4-title">Targeted Audience</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed" id="t-trust-f4-desc">
-                Reach developers and buyers actively looking for digital projects.
-              </p>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-    </section>
-
-    <section id="feedback-section" class="relative overflow-hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#080C14] py-16">
-      <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_30%,rgba(99,102,241,0.12),transparent_34%),radial-gradient(circle_at_85%_70%,rgba(16,185,129,0.10),transparent_30%)]"></div>
-      <div class="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-900/80 shadow-xl p-7 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-7">
-          <div class="max-w-2xl">
-            <span class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400"><i class="ph-bold ph-chat-circle-dots text-base"></i> Help shape Searya</span>
-            <h2 class="mt-3 text-2xl sm:text-3xl font-black text-slate-950 dark:text-white">Have an idea, suggestion or problem to report?</h2>
-            <p class="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Tell us what would make Searya more useful for buyers and builders. Every message is reviewed directly by the founding team.</p>
-          </div>
-          <a id="feedback-email-link" href="mailto:basakatali71@gmail.com?subject=Searya%20Feedback&amp;body=Hi%20Searya%20team%2C%0A%0AMy%20feedback%3A%0A" class="group flex-shrink-0 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-emerald-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-1 hover:shadow-xl">
-            <i class="ph-bold ph-envelope-simple text-lg transition-transform group-hover:scale-110"></i>
-            Send Feedback
-          </a>
+    <section class="tools-section" id="tools">
+      <div class="shell">
+        <div class="section-heading"><div><span class="section-kicker">THE TOOLBOX</span><h2>Pick a job. Get it done.</h2></div><p>Every tool opens instantly and works on mobile or desktop.</p></div>
+        <div class="tool-cards">
+          <a class="tool-card" href="/qr-code-generator"><span class="tool-icon purple"><i class="ph-bold ph-qr-code"></i></span><span class="free-pill">FREE</span><h3>QR Code Generator</h3><p>Turn a URL, message, email or phone number into a downloadable QR code.</p><span class="tool-link">Create a QR code <i class="ph-bold ph-arrow-right"></i></span></a>
+          <a class="tool-card featured" href="/time-card-calculator"><span class="popular-pill">MOST USEFUL</span><span class="tool-icon orange"><i class="ph-bold ph-clock-countdown"></i></span><span class="free-pill">FREE</span><h3>Time Card Calculator</h3><p>Calculate daily hours, breaks, weekly pay and overtime without a spreadsheet.</p><span class="tool-link">Calculate work hours <i class="ph-bold ph-arrow-right"></i></span></a>
+          <a class="tool-card" href="/invoice-generator"><span class="tool-icon blue"><i class="ph-bold ph-file-text"></i></span><span class="free-pill">FREE</span><h3>Business Document Maker</h3><p>Create invoices, quotes and receipts with live totals and a printable layout.</p><span class="tool-link">Create a document <i class="ph-bold ph-arrow-right"></i></span></a>
         </div>
       </div>
     </section>
 
-    <!-- Footer Section -->
-    <footer class="sy-footer bg-slate-100 dark:bg-[#05080E] border-t border-slate-200 dark:border-slate-800 py-12 transition-colors duration-300">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
-          <div class="space-y-3 md:col-span-1">
-            <div class="sy-brand-lockup sy-brand-lockup-footer" aria-label="Searya">
-              <img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" class="sy-brand-logo-full" width="1250" height="359">
-            </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed" id="t-footer-tagline">
-              An independent marketplace where digital projects find their next founders.
-            </p>
+    <section class="tool-workspace" id="tool-workspace" hidden>
+      <div class="shell">
+        <a class="back-home" href="/"><i class="ph-bold ph-arrow-left"></i> All tools</a>
+
+        <article class="workspace" data-tool-panel="qr">
+          <header class="workspace-heading"><span class="tool-icon purple"><i class="ph-bold ph-qr-code"></i></span><div><span class="section-kicker">FREE ONLINE TOOL</span><h1>QR Code Generator</h1><p>Create a permanent, high-resolution QR code for any URL or text.</p></div></header>
+          <div class="workspace-grid qr-grid">
+            <form id="qr-form" class="control-card">
+              <label for="qr-content">URL or text</label><textarea id="qr-content" maxlength="1200" rows="5" placeholder="https://yourwebsite.com" required></textarea>
+              <div class="field-row"><label>QR color<input id="qr-dark" type="color" value="#111827"></label><label>Background<input id="qr-light" type="color" value="#ffffff"></label></div>
+              <button class="button primary full" type="submit"><i class="ph-bold ph-sparkle"></i> Generate QR code</button>
+              <p class="form-note"><i class="ph-bold ph-shield-check"></i> Static QR codes do not expire and contain no tracking redirect.</p>
+            </form>
+            <div class="result-card qr-result"><div id="qr-placeholder"><i class="ph-bold ph-qr-code"></i><p>Your QR code will appear here</p></div><img id="qr-image" alt="Generated QR code" hidden><div class="result-actions" id="qr-actions" hidden><button class="button dark" id="download-qr" type="button"><i class="ph-bold ph-download-simple"></i> Download SVG</button><button class="button secondary" id="copy-qr" type="button"><i class="ph-bold ph-copy"></i> Copy link</button></div></div>
           </div>
+        </article>
 
-          <div class="space-y-3">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white" id="t-footer-col-marketplace">Marketplace</h4>
-            <ul class="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-              <li><a href="#listings-grid" class="hover:text-emerald-500 transition-colors" id="t-footer-link-forsale">Projects for Sale</a></li>
-              <li><a href="#listings-grid" class="hover:text-emerald-500 transition-colors" id="t-footer-link-wtb">Looking to Buy Listings</a></li>
-              <li><a href="/guides" class="hover:text-indigo-500 transition-colors">Founder Guides</a></li>
-              <li><a href="/blog" class="hover:text-purple-500 transition-colors">Searya Blog</a></li>
-            </ul>
+        <article class="workspace" data-tool-panel="time">
+          <header class="workspace-heading"><span class="tool-icon orange"><i class="ph-bold ph-clock-countdown"></i></span><div><span class="section-kicker">FREE ONLINE TOOL</span><h1>Time Card & Work Hours Calculator</h1><p>Total a workweek, subtract breaks, calculate overtime and estimate gross pay.</p></div></header>
+          <div class="time-layout">
+            <div class="control-card table-card"><div class="table-scroll"><table class="time-table"><thead><tr><th>Day</th><th>Clock in</th><th>Clock out</th><th>Break (min)</th><th>Total</th></tr></thead><tbody id="time-rows"></tbody></table></div><button class="text-button" id="fill-example" type="button"><i class="ph-bold ph-magic-wand"></i> Fill example week</button></div>
+            <aside class="control-card pay-settings"><h3>Pay settings</h3><label>Hourly rate ($)<input id="hourly-rate" type="number" min="0" step="0.01" value="20"></label><label>Weekly overtime starts after<input id="overtime-after" type="number" min="1" max="168" step="0.5" value="40"></label><label>Overtime multiplier<input id="overtime-rate" type="number" min="1" max="5" step="0.1" value="1.5"></label><button class="button primary full" id="calculate-time" type="button">Calculate totals</button></aside>
           </div>
+          <div class="summary-grid" id="time-summary"><div><span>Regular hours</span><strong id="regular-hours">0h 00m</strong></div><div><span>Overtime</span><strong id="overtime-hours">0h 00m</strong></div><div><span>Total hours</span><strong id="total-hours">0h 00m</strong></div><div class="pay-total"><span>Estimated gross pay</span><strong id="gross-pay">$0.00</strong></div></div>
+          <div class="workspace-actions"><button class="button dark" id="download-timesheet" type="button"><i class="ph-bold ph-file-csv"></i> Download CSV</button><button class="button secondary" id="reset-time" type="button">Reset</button></div>
+        </article>
 
-          <div class="space-y-3">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white" id="t-footer-col-trust">Trust & Transfer</h4>
-            <ul class="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-              <li><a href="/blog/software-escrow-alternatives-for-small-deals" class="hover:text-emerald-500 transition-colors" id="t-footer-link-escrow">Escrow Safety Guide</a></li>
-              <li><a href="/legal/transfer-checklist.html" class="hover:text-emerald-500 transition-colors" id="t-footer-link-checklist">Handover Checklist</a></li>
-              <li><a href="/blog/safer-payment-practices-for-digital-project-acquisitions" class="hover:text-emerald-500 transition-colors" id="t-footer-link-contract">Safer Payment Guide</a></li>
-            </ul>
+        <article class="workspace" data-tool-panel="document">
+          <header class="workspace-heading"><span class="tool-icon blue"><i class="ph-bold ph-file-text"></i></span><div><span class="section-kicker">FREE ONLINE TOOL</span><h1 id="document-title">Invoice Generator</h1><p>Create a clean invoice, quote or receipt and save it as a PDF from your browser.</p></div></header>
+          <div class="document-layout">
+            <form id="document-form" class="control-card document-form">
+              <div class="field-row"><label>Document type<select id="doc-type"><option value="invoice">Invoice</option><option value="quote">Quote</option><option value="receipt">Receipt</option></select></label><label>Document #<input id="doc-number" value="INV-1001" maxlength="30"></label></div>
+              <div class="field-row"><label>Your business<input id="business-name" placeholder="Northstar Studio" maxlength="80"></label><label>Your email<input id="business-email" type="email" placeholder="hello@northstar.com" maxlength="100"></label></div>
+              <div class="field-row"><label>Bill to<input id="client-name" placeholder="Client or company" maxlength="80"></label><label>Client email<input id="client-email" type="email" placeholder="client@example.com" maxlength="100"></label></div>
+              <div class="field-row three"><label>Issue date<input id="issue-date" type="date"></label><label>Due date<input id="due-date" type="date"></label><label>Currency<select id="currency"><option value="$">USD — $</option><option value="€">EUR — €</option><option value="£">GBP — £</option><option value="₺">TRY — ₺</option></select></label></div>
+              <div class="line-items"><div class="line-head"><span>Description</span><span>Qty</span><span>Rate</span><span></span></div><div id="line-items"></div><button type="button" class="text-button" id="add-line"><i class="ph-bold ph-plus"></i> Add line item</button></div>
+              <div class="field-row"><label>Discount (%)<input id="discount" type="number" min="0" max="100" step="0.1" value="0"></label><label>Tax (%)<input id="tax" type="number" min="0" max="100" step="0.1" value="0"></label></div>
+              <label>Notes<textarea id="doc-notes" rows="3" maxlength="500" placeholder="Thank you for your business."></textarea></label>
+            </form>
+            <div class="document-preview-wrap"><div id="document-preview" class="document-preview"></div><button class="button primary full" id="print-document" type="button"><i class="ph-bold ph-printer"></i> Print or save as PDF</button></div>
           </div>
-
-          <div class="space-y-3 md:col-span-3 pt-5 border-t border-slate-200 dark:border-slate-800/80">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">Explore project categories</h4>
-            <nav class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-400" aria-label="Explore project categories">
-              <a href="/saas-for-sale" class="hover:text-emerald-500 transition-colors">SaaS Projects</a>
-              <a href="/micro-saas-for-sale" class="hover:text-emerald-500 transition-colors">Micro SaaS</a>
-              <a href="/mobile-apps-for-sale" class="hover:text-emerald-500 transition-colors">Mobile Apps</a>
-              <a href="/ai-tools-for-sale" class="hover:text-emerald-500 transition-colors">AI Tools</a>
-              <a href="/chrome-extensions-for-sale" class="hover:text-emerald-500 transition-colors">Chrome Extensions</a>
-              <a href="/websites-for-sale" class="hover:text-emerald-500 transition-colors">Web Projects</a>
-              <a href="/sell-your-digital-project" class="hover:text-indigo-500 transition-colors">List a Digital Project</a>
-            </nav>
-            <h4 class="mt-5 text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">Popular project searches</h4>
-            <nav class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-400" aria-label="Popular project searches">
-              <a href="/buy-micro-saas-under-5000" class="hover:text-emerald-500 transition-colors">Micro SaaS Under $5K</a>
-              <a href="/saas-projects-for-sale-by-owner" class="hover:text-emerald-500 transition-colors">SaaS by Owner</a>
-              <a href="/buy-source-code-from-developers" class="hover:text-emerald-500 transition-colors">Source Code Projects</a>
-              <a href="/buy-chrome-extension-business" class="hover:text-emerald-500 transition-colors">Chrome Extension Businesses</a>
-              <a href="/mobile-apps-with-source-code-for-sale" class="hover:text-emerald-500 transition-colors">Apps With Source Code</a>
-              <a href="/notion-templates-for-sale-marketplace" class="hover:text-emerald-500 transition-colors">Notion Template Projects</a>
-              <a href="/sell-saas-without-commission" class="hover:text-indigo-500 transition-colors">Sell SaaS With 0% Commission</a>
-              <a href="/where-to-sell-a-side-project" class="hover:text-indigo-500 transition-colors">Sell a Side Project</a>
-              <a href="/zero-commission-startup-marketplace" class="hover:text-indigo-500 transition-colors">0% Commission Marketplace</a>
-              <a href="/direct-founder-marketplace" class="hover:text-indigo-500 transition-colors">Direct Founder Marketplace</a>
-            </nav>
-          </div>
-
-        </div>
-
-        <aside id="marketplace-safety-warning" role="note" aria-labelledby="marketplace-safety-warning-title" class="rounded-3xl border border-amber-300/80 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/[0.07] p-5 sm:p-6 shadow-sm">
-          <div class="flex items-start gap-4">
-            <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-400/20 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300" aria-hidden="true">
-              <i class="ph-bold ph-warning-octagon text-2xl"></i>
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">Important safety warning</p>
-              <h2 id="marketplace-safety-warning-title" class="mt-1 text-base sm:text-lg font-black text-slate-950 dark:text-white">Searya only connects buyers and sellers.</h2>
-              <p class="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                Searya is not a party to any transaction, does not hold purchase funds and cannot guarantee a user's identity, ownership claims, source code, revenue or project quality. Before paying, verify the seller and the project yourself—preferably in person or through a live video call—and inspect the working product, source-code repository, ownership evidence and every account or asset included in the transfer.
-              </p>
-              <p class="mt-2 text-xs sm:text-sm font-bold leading-relaxed text-slate-900 dark:text-slate-100">
-                Do not send payment until you fully trust the seller, understand exactly what you will receive and have agreed to the transfer in writing. Use an independent escrow service whenever possible.
-              </p>
-              <p class="mt-2 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                Users are responsible for their own due diligence and transactions to the fullest extent permitted by applicable law. Nothing here limits rights or liabilities that cannot legally be excluded. Read the <a href="/legal/terms.html" class="font-bold underline decoration-amber-500 underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300">Terms of Use</a> and <a href="/legal/transfer-checklist.html" class="font-bold underline decoration-amber-500 underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300">Handover Checklist</a> before completing a deal.
-              </p>
-            </div>
-          </div>
-        </aside>
-
-        <div class="pt-8 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-500">
-          <span id="t-footer-rights">© 2026 Searya. All rights reserved.</span>
-          <div class="flex items-center gap-4">
-            <a href="/legal/privacy.html" id="footer-privacy-link" class="hover:underline">Privacy Policy</a>
-            <a href="/legal/terms.html" id="footer-terms-link" class="hover:underline">Terms of Use</a>
-            <a href="/legal/cookies.html" id="footer-cookies-link" class="hover:underline">Cookies</a>
-            <button id="cookie-settings-btn" class="hover:underline">Cookie Preferences</button>
-          </div>
-        </div>
-
+        </article>
       </div>
-    </footer>
+    </section>
 
-  </div>
+    <section class="how-section" id="how-it-works"><div class="shell"><div class="section-heading centered"><div><span class="section-kicker">BUILT FOR SPEED</span><h2>Useful before you sign up.</h2></div><p>We believe a business tool should prove its value first.</p></div><div class="steps"><div><span>01</span><i class="ph-bold ph-cursor-click"></i><h3>Open a tool</h3><p>Choose the job you need to finish. No onboarding maze.</p></div><div><span>02</span><i class="ph-bold ph-sliders-horizontal"></i><h3>Add your details</h3><p>Your inputs stay in the browser unless the tool must generate a file.</p></div><div><span>03</span><i class="ph-bold ph-download-simple"></i><h3>Use the result</h3><p>Download, print or share the finished output immediately.</p></div></div></div></section>
 
-  <!-- DEDICATED DIRECT MESSAGING DRAWER & MULTI-THREAD INBOX -->
-  <div id="inbox-drawer" class="fixed top-0 right-0 z-50 w-full sm:w-[480px] h-full bg-white dark:bg-[#0D131F] border-l border-slate-200 dark:border-slate-800 shadow-2xl transition-transform duration-300 translate-x-full flex flex-col">
-    <!-- Dynamic JS renders inbox threads sidebar & chat view here -->
-  </div>
+    <section class="pricing-section" id="pricing"><div class="shell"><div class="pricing-box"><div><span class="section-kicker light">LAUNCH ACCESS</span><h2>All core tools are free today.</h2><p>Use the generators without an account. Pro will add saved clients, branded templates, document history and team features later.</p></div><div class="price"><strong>$0</strong><span>during launch</span><a class="button light-button" href="/#tools">Start using the tools</a></div></div></div></section>
+  </main>
 
-  <!-- Modal Backdrop Overlay -->
-  <div id="modal-backdrop" class="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div id="modal-content" class="bg-white dark:bg-[#0D131F] border border-slate-200 dark:border-slate-800/90 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col my-auto shadow-2xl overflow-hidden animate-fade-in">
-    </div>
-  </div>
-
-  <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none"></div>
-
-  <section id="cookie-consent-banner" class="hidden fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[140] sm:max-w-md p-5 rounded-2xl bg-white/95 dark:bg-[#101725]/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 shadow-2xl" role="dialog" aria-label="Cookie preferences">
-    <div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0"><i class="ph-bold ph-shield-check text-xl"></i></div><div><h3 id="cookie-consent-title" class="font-black text-sm text-slate-900 dark:text-white">Your privacy preference</h3><p id="cookie-consent-text" class="text-xs leading-relaxed text-slate-500 dark:text-slate-400 mt-1">Essential cookies support sign-in. With permission, anonymous visits, actions and campaign conversions are measured.</p><a id="cookie-details-link" href="/legal/cookies.html" class="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-2 inline-block">View details</a></div></div>
-    <div class="grid grid-cols-2 gap-2 mt-4"><button id="cookie-essential-btn" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">Essential only</button><button id="cookie-accept-btn" class="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">Allow analytics</button></div>
-  </section>
-
-  <!-- Main Application Logic -->
-  <script type="module" src="/src/app.js?v=20260813-3"></script>
-
+  <footer><div class="shell footer-inner"><a class="brand footer-brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya" width="1250" height="359"><span>TOOLS</span></a><p>Fast, practical business tools for independent work.</p><div><a href="/legal/privacy.html">Privacy</a><a href="/legal/terms.html">Terms</a><a href="mailto:basakatali71@gmail.com">Feedback</a></div></div></footer>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/tools.js?v=20260816-1"></script>
 </body>
 </html>

@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@polar-sh/sdk": "^0.49.0",
-    "google-auth-library": "^10.9.1"
+    "google-auth-library": "^10.9.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@phosphor-icons/web": "^2.1.2",

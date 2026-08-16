@@ -6,6 +6,7 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
+import QRCode from 'qrcode';
 import { initialForSaleListings, initialWtbListings } from './src/data/seedListings.js';
 import { GUIDES, GUIDE_CATEGORIES, GUIDE_PUBLISHED_DATE } from './src/data/guides.js';
 import { DISCOVERY_PAGES, DISCOVERY_INDEX_THRESHOLD } from './src/data/discoveryPages.js';
@@ -18,7 +19,7 @@ import { submitSitemapToGoogle } from './src/services/googleSearchConsole.js';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC_STATIC_FILES = new Set([
   'index.html', 'admin.html', '404.html', 'favicon.ico',
-  'src/app.js', 'src/api.js', 'src/admin.js',
+  'src/app.js', 'src/api.js', 'src/admin.js', 'src/tools.js',
   'src/data/seedListings.js', 'src/data/mockData.js', 'src/data/translations.js'
 ].map(path => resolve(ROOT, path)));
 const PUBLIC_STATIC_DIRECTORIES = ['public', 'legal', 'src/assets', 'src/styles'].map(path => resolve(ROOT, path));
@@ -50,6 +51,7 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
+const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker'];
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -60,7 +62,7 @@ const CONTENT_SECURITY_POLICY = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: https://images.unsplash.com https://randomuser.me",
+  "img-src 'self' data: blob: https://images.unsplash.com https://randomuser.me",
   "connect-src 'self'",
   NODE_ENV === 'production' ? 'upgrade-insecure-requests' : ''
 ].filter(Boolean).join('; ');
@@ -1148,6 +1150,30 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE, launchLimits: { activeListings: LAUNCH_FREE_LISTING_LIMIT, newConnections: LAUNCH_FREE_CONNECTION_LIMIT, connectionWindowDays: LAUNCH_FREE_CONNECTION_WINDOW_DAYS }, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google') }, time: nowIso() });
   }
 
+  if (method === 'GET' && pathname === '/api/tools/qr') {
+    if (rateLimited(req, 'qr-tool', 180, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMITED', 'Please wait before creating more QR codes.');
+    const text = String(url.searchParams.get('text') || '').trim();
+    if (!text || text.length > 1200) return fail(res, 422, 'INVALID_QR_TEXT', 'Enter between 1 and 1,200 characters.');
+    const requestedDark = String(url.searchParams.get('dark') || '');
+    const requestedLight = String(url.searchParams.get('light') || '');
+    const dark = /^#[0-9a-f]{6}$/i.test(requestedDark) ? requestedDark : '#111827';
+    const light = /^#[0-9a-f]{6}$/i.test(requestedLight) ? requestedLight : '#ffffff';
+    const svg = await QRCode.toString(text, {
+      type: 'svg', errorCorrectionLevel: 'M', margin: 2, width: 768,
+      color: { dark, light }
+    });
+    const body = Buffer.from(svg);
+    res.writeHead(200, {
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Content-Length': body.length,
+      'Cache-Control': 'no-store',
+      'Content-Disposition': 'inline; filename="searya-qr-code.svg"',
+      ...securityHeaders()
+    });
+    res.end(body);
+    return;
+  }
+
   if (method === 'POST' && pathname === '/api/analytics/pageview') {
     if (rateLimited(req, 'pageview', 240, 60 * 60 * 1000)) return json(res, 202, { ok: true });
     const body = await readJson(req);
@@ -1853,8 +1879,16 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
-const SEO_TITLE = 'Searya — Buy & Sell Digital Projects | 0% Commission & Direct Messaging';
-const SEO_DESCRIPTION = 'Discover SaaS apps, Notion templates, and source code. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging.';
+const SEO_TITLE = 'Searya Tools — Free QR, Time Card & Invoice Tools';
+const SEO_DESCRIPTION = 'Create QR codes, calculate work hours, and make professional invoices, quotes and receipts. Fast, private and free to use.';
+const TOOL_PAGES = Object.freeze({
+  '/qr-code-generator': { title: 'Free QR Code Generator — Download SVG | Searya Tools', description: 'Create a permanent, high-resolution QR code for a URL or text. Customize colors and download a print-ready SVG for free.', name: 'QR Code Generator', feature: 'Create and download static QR codes' },
+  '/time-card-calculator': { title: 'Free Time Card Calculator with Overtime | Searya Tools', description: 'Calculate weekly work hours, subtract breaks, total overtime and estimate gross pay with a free online time card calculator.', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay' },
+  '/work-hours-calculator': { title: 'Free Work Hours Calculator with Breaks | Searya Tools', description: 'Calculate daily and weekly work hours, subtract lunch breaks, total overtime and download your timesheet as CSV.', name: 'Work Hours Calculator', feature: 'Calculate daily and weekly work hours' },
+  '/invoice-generator': { title: 'Free Invoice Generator — Print or Save PDF | Searya Tools', description: 'Make a professional invoice with automatic totals, taxes and discounts. Print it or save it as a PDF without creating an account.', name: 'Invoice Generator', feature: 'Create printable invoices with automatic totals' },
+  '/quote-generator': { title: 'Free Quote Generator — Professional PDF | Searya Tools', description: 'Create a professional customer quote with line items, tax, discounts and a print-ready PDF layout for free.', name: 'Quote Generator', feature: 'Create professional customer quotes' },
+  '/receipt-maker': { title: 'Free Receipt Maker — Create a Printable Receipt | Searya Tools', description: 'Create a clean business receipt with itemized totals and save it as a printable PDF from your browser.', name: 'Receipt Maker', feature: 'Create itemized printable receipts' }
+});
 const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',
   mobile: 'Mobile Apps',
@@ -2047,18 +2081,18 @@ function homepageProjectCard(row) {
   return `<article class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900"><a href="/projects/${encodeURIComponent(row.slug)}" class="block">${image ? `<img src="${escapeMarkup(image)}" alt="${escapeMarkup(title)} project preview" width="640" height="340" loading="eager" class="h-40 w-full object-cover">` : ''}<div class="space-y-3 p-5"><div class="flex items-center justify-between gap-3 text-[11px] font-bold uppercase tracking-wide text-slate-500"><span>${escapeMarkup(SEO_CATEGORIES[row.category] || row.category)}</span><span>${escapeMarkup(price)}</span></div><h3 class="text-lg font-black leading-tight text-slate-950 dark:text-white">${escapeMarkup(title)}</h3><p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">${escapeMarkup(description || 'Review the project details and connect directly with its owner.')}</p><span class="inline-flex text-sm font-extrabold text-emerald-600 dark:text-emerald-400">View project details →</span></div></a></article>`;
 }
 
-function homepageStructuredData(rows = []) {
+function homepageStructuredData() {
   return {
     '@context': 'https://schema.org',
     '@graph': [
       { '@type': 'Organization', '@id': `${PUBLIC_ORIGIN}/#organization`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, logo: { '@type': 'ImageObject', url: `${PUBLIC_ORIGIN}/public/searya-logo.png` } },
       { '@type': 'WebSite', '@id': `${PUBLIC_ORIGIN}/#website`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, publisher: { '@id': `${PUBLIC_ORIGIN}/#organization` }, description: SEO_DESCRIPTION },
-      { '@type': 'CollectionPage', '@id': `${PUBLIC_ORIGIN}/#marketplace`, name: 'Digital projects for sale and buyer requests', url: `${PUBLIC_ORIGIN}/`, isPartOf: { '@id': `${PUBLIC_ORIGIN}/#website` }, mainEntity: { '@type': 'ItemList', itemListElement: rows.map((row, index) => ({ '@type': 'ListItem', position: index + 1, name: row.title, url: `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(row.slug)}` })) } }
+      { '@type': 'ItemList', name: 'Free business tools', itemListElement: Object.entries(TOOL_PAGES).map(([path, page], index) => ({ '@type': 'ListItem', position: index + 1, name: page.name, url: `${PUBLIC_ORIGIN}${path}` })) }
     ]
   };
 }
 
-function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
+function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-1`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const safeTitle = escapeMarkup(title);
   const safeDescription = escapeMarkup(description);
@@ -2384,7 +2418,7 @@ const server = createServer(async (req, res) => {
       try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
       catch (error) { console.error('Sitemap listing query failed:', error); }
       const indexableDiscoveryPaths = [...discoveryInventory()].filter(([, value]) => value.indexable).map(([slug]) => `/discover/${slug}`);
-      const pages = ['/', ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, '/blog', ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
+      const pages = ['/', ...TOOL_PATHS, ...SEO_LANDING_PATHS, '/guides', ...GUIDE_PATHS, '/blog', ...indexableDiscoveryPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html', '/legal/transfer-checklist.html']
         .map(path => `<url><loc>${xmlUrl(path)}</loc></url>`).join('');
       const blogLastmods = BLOG_POSTS.map(post => `<url><loc>${xmlUrl(blogPath(post))}</loc><lastmod>${escapeMarkup(String(post.updatedAt || post.publishedDate).slice(0,10))}</lastmod></url>`).join('');
       const categories = Object.keys(SEO_CATEGORIES).map(category => `<url><loc>${xmlUrl(`/projects/category/${category}`)}</loc></url>`).join('');
@@ -2396,10 +2430,19 @@ const server = createServer(async (req, res) => {
     const legacyListingSlug = url.pathname === '/' ? url.searchParams.get('listing') : '';
     if (legacyListingSlug) return redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`);
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
-      let initialListings = [];
-      try { initialListings = db.prepare(`SELECT * FROM listings WHERE status='approved' AND type='sale' ORDER BY (boosted_until IS NOT NULL AND boosted_until>?) DESC, updated_at DESC LIMIT 8`).all(nowIso()); }
-      catch (error) { console.error('Homepage SEO listing query failed:', error); }
-      return htmlResponse(req, res, renderSeoPage({ initialListings, structuredData: homepageStructuredData(initialListings) }));
+      return htmlResponse(req, res, renderSeoPage({ structuredData: homepageStructuredData() }));
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && TOOL_PAGES[url.pathname]) {
+      const page = TOOL_PAGES[url.pathname];
+      const canonical = `${PUBLIC_ORIGIN}${url.pathname}`;
+      const structuredData = {
+        '@context': 'https://schema.org',
+        '@graph': [
+          { '@type': 'WebPage', name: page.name, description: page.description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya Tools', url: `${PUBLIC_ORIGIN}/` } },
+          { '@type': 'SoftwareApplication', name: page.name, applicationCategory: 'BusinessApplication', operatingSystem: 'Web', featureList: page.feature, offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } }
+        ]
+      };
+      return htmlResponse(req, res, renderSeoPage({ title: page.title, description: page.description, canonical, structuredData }));
     }
     const guideWithoutTrailingSlash = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
     if ((req.method === 'GET' || req.method === 'HEAD') && (guideWithoutTrailingSlash === '/guides' || GUIDES[guideWithoutTrailingSlash])) {

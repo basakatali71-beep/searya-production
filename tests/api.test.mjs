@@ -116,17 +116,18 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(await indexNowKey.text(), INDEXNOW_KEY);
 
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
-  assert.match(homepage, /<title>Searya — Buy &amp; Sell Digital Projects \| 0% Commission &amp; Direct Messaging<\/title>/);
-  assert.match(homepage, /<meta name="description" content="Discover SaaS apps, Notion templates, and source code\. Connect directly with founders with 0% platform fees, zero commissions, and direct messaging\.">/);
-  assert.match(homepage, /The 0% Commission Marketplace/);
-  assert.match(homepage, /for Digital Projects &amp; SaaS/);
-  assert.match(homepage, /<h2[^>]*id="t-hero-subtitle">Direct Founder-to-Buyer Messaging with Zero Transaction Fees<\/h2>/);
+  assert.match(homepage, /<title>Searya Tools — Free QR, Time Card &amp; Invoice Tools<\/title>/);
+  assert.match(homepage, /<meta name="description" content="Create QR codes, calculate work hours, and make professional invoices, quotes and receipts\. Fast, private and free to use\.">/);
+  assert.match(homepage, /Small business work,/);
+  assert.match(homepage, /finished faster\./);
+  assert.match(homepage, /No account required/);
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
   assert.match(homepage, /"@type":"Organization"/);
   assert.match(homepage, /"@type":"WebSite"/);
-  assert.match(homepage, /"@type":"CollectionPage"/);
   assert.match(homepage, /"@type":"ItemList"/);
-  assert.ok((homepage.match(/href="\/projects\//g) || []).length >= 8, 'homepage exposes crawlable project links without requiring JavaScript');
+  assert.match(homepage, /href="\/qr-code-generator"/);
+  assert.match(homepage, /href="\/time-card-calculator"/);
+  assert.match(homepage, /href="\/invoice-generator"/);
 
   const robots = await fetch(`${baseUrl}/robots.txt`).then(response => response.text());
   assert.match(robots, /Disallow: \/admin\.html/);
@@ -136,6 +137,9 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   const listing = listings.listings[0];
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
+  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker']) {
+    assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${path}`));
+  }
   assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com\\/projects\\/${listing.slug}`));
   assert.match(sitemap, /https:\/\/searya\.com\/projects\/category\/saas/);
   assert.doesNotMatch(sitemap, /\?listing=|\?sort=|utm_source/);
@@ -153,6 +157,24 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
 
   const missing = await fetch(`${baseUrl}/projects/not-a-public-project`);
   assert.equal(missing.status, 404);
+});
+
+test('business tools expose dedicated SEO pages and generate real QR SVG output', async () => {
+  const timePage = await fetch(`${baseUrl}/time-card-calculator`).then(response => response.text());
+  assert.match(timePage, /<title>Free Time Card Calculator with Overtime \| Searya Tools<\/title>/);
+  assert.match(timePage, /<link rel="canonical" href="https:\/\/searya\.com\/time-card-calculator">/);
+  assert.match(timePage, /"@type":"SoftwareApplication"/);
+  assert.match(timePage, /"price":"0"/);
+
+  const qrResponse = await fetch(`${baseUrl}/api/tools/qr?text=${encodeURIComponent('https://searya.com/')}`);
+  assert.equal(qrResponse.status, 200);
+  assert.match(qrResponse.headers.get('content-type') || '', /image\/svg\+xml/);
+  const qrSvg = await qrResponse.text();
+  assert.match(qrSvg, /^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(qrSvg, /<path/);
+
+  const invalidQr = await fetch(`${baseUrl}/api/tools/qr?text=`);
+  assert.equal(invalidQr.status, 422);
 });
 
 test('blog hub exposes all searchable articles, detail metadata and sitemap URLs', async () => {
