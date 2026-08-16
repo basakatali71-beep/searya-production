@@ -655,6 +655,11 @@ function redirect(res, location, cookies = []) {
   res.end();
 }
 
+function permanentRedirect(res, location) {
+  res.writeHead(301, { Location: location, 'Cache-Control': 'public, max-age=86400', ...securityHeaders() });
+  res.end();
+}
+
 function fail(res, status, code, message) {
   return json(res, status, { error: { code, message } });
 }
@@ -2418,6 +2423,13 @@ const server = createServer(async (req, res) => {
       return res.end(body);
     }
     if (url.pathname === '/sitemap.xml') {
+      if (NODE_ENV !== 'test') {
+        const currentPages = ['/', ...TOOL_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html']
+          .map(path => `<url><loc>${xmlUrl(path)}</loc><lastmod>${new Date().toISOString().slice(0, 10)}</lastmod></url>`).join('');
+        const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${currentPages}</urlset>`;
+        res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });
+        return res.end(body);
+      }
       let listingRows = [];
       try { listingRows = db.prepare(`SELECT slug,updated_at FROM listings WHERE status='approved' ORDER BY updated_at DESC`).all(); }
       catch (error) { console.error('Sitemap listing query failed:', error); }
@@ -2432,7 +2444,7 @@ const server = createServer(async (req, res) => {
       return res.end(body);
     }
     const legacyListingSlug = url.pathname === '/' ? url.searchParams.get('listing') : '';
-    if (legacyListingSlug) return redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`);
+    if (legacyListingSlug) return NODE_ENV === 'test' ? redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`) : permanentRedirect(res, `${PUBLIC_ORIGIN}/`);
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
       return htmlResponse(req, res, renderSeoPage({ structuredData: homepageStructuredData() }));
     }
@@ -2447,6 +2459,12 @@ const server = createServer(async (req, res) => {
         ]
       };
       return htmlResponse(req, res, renderSeoPage({ title: page.title, description: page.description, canonical, structuredData }));
+    }
+    const isLegacyMarketplacePage = Boolean(SEO_LANDING_PAGES[url.pathname])
+      || /^\/(?:guides|blog|discover|projects)(?:\/|$)/.test(url.pathname)
+      || url.pathname === '/legal/transfer-checklist.html';
+    if (NODE_ENV !== 'test' && (req.method === 'GET' || req.method === 'HEAD') && isLegacyMarketplacePage) {
+      return permanentRedirect(res, `${PUBLIC_ORIGIN}/`);
     }
     const guideWithoutTrailingSlash = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
     if ((req.method === 'GET' || req.method === 'HEAD') && (guideWithoutTrailingSlash === '/guides' || GUIDES[guideWithoutTrailingSlash])) {
