@@ -15,6 +15,7 @@ const TOOL_PATHS = {
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let qrObjectUrl = '';
 let cardQrObjectUrl = '';
+let cardPhotoObjectUrl = '';
 let cardQrTimer = null;
 let lastTimeResult = null;
 let toastTimer = null;
@@ -209,7 +210,8 @@ function businessCardValues() {
   return {
     name: $('#card-name').value.trim(), role: $('#card-role').value.trim(), company: $('#card-company').value.trim(),
     email: $('#card-email').value.trim(), phone: $('#card-phone').value.trim(), website: $('#card-website').value.trim(),
-    social: $('#card-social').value.trim(), bio: $('#card-bio').value.trim(), color: $('#card-color').value
+    linkedin: $('#card-linkedin').value.trim(), instagram: $('#card-instagram').value.trim(), location: $('#card-location').value.trim(),
+    bio: $('#card-bio').value.trim(), services: $('#card-services').value.trim(), color: $('#card-color').value, theme: $('#card-theme').value
   };
 }
 
@@ -223,7 +225,9 @@ function makeVcard(card=businessCardValues()) {
   if (card.email) lines.push(`EMAIL;TYPE=INTERNET:${vcardEscape(card.email)}`);
   if (card.phone) lines.push(`TEL;TYPE=CELL:${vcardEscape(card.phone)}`);
   if (card.website) lines.push(`URL:${vcardEscape(card.website)}`);
-  if (card.social) lines.push(`X-SOCIALPROFILE:${vcardEscape(card.social)}`);
+  if (card.linkedin) lines.push(`X-SOCIALPROFILE;TYPE=linkedin:${vcardEscape(card.linkedin)}`);
+  if (card.instagram) lines.push(`X-SOCIALPROFILE;TYPE=instagram:${vcardEscape(card.instagram)}`);
+  if (card.location) lines.push(`LABEL;TYPE=WORK:${vcardEscape(card.location)}`);
   if (card.bio) lines.push(`NOTE:${vcardEscape(card.bio)}`);
   lines.push('END:VCARD');
   return lines.filter(line => !line.endsWith(':')).join('\r\n');
@@ -245,15 +249,13 @@ function updateBusinessCard() {
   const card=businessCardValues();
   const initials=(card.name||'My Card').split(/\s+/).slice(0,2).map(word=>word[0]?.toUpperCase()||'').join('');
   const roleLine=[card.role,card.company].filter(Boolean).join(' · ') || 'Your professional headline';
-  const contactItems=[
-    card.email && `<span><i class="ph-bold ph-envelope-simple"></i>${escapeHtml(card.email)}</span>`,
-    card.phone && `<span><i class="ph-bold ph-phone"></i>${escapeHtml(card.phone)}</span>`,
-    card.website && `<span><i class="ph-bold ph-globe"></i>${escapeHtml(card.website.replace(/^https?:\/\//,''))}</span>`,
-    card.social && `<span><i class="ph-bold ph-link"></i>Social profile</span>`
-  ].filter(Boolean).join('');
+  const services=card.services.split(',').map(item=>item.trim()).filter(Boolean).slice(0,3);
+  const avatar=cardPhotoObjectUrl?`<img src="${cardPhotoObjectUrl}" alt="">`:escapeHtml(initials);
+  const socials=[card.website&&'<span class="profile-social"><i class="ph-bold ph-globe"></i></span>',card.linkedin&&'<span class="profile-social"><i class="ph-bold ph-linkedin-logo"></i></span>',card.instagram&&'<span class="profile-social"><i class="ph-bold ph-instagram-logo"></i></span>'].filter(Boolean).join('');
   const preview=$('#business-card-preview');
+  preview.className=`business-card-preview theme-${card.theme}`;
   preview.style.setProperty('--card-accent',card.color);
-  preview.innerHTML=`<div class="card-monogram">${escapeHtml(initials)}</div><div class="card-main"><h2>${escapeHtml(card.name||'Your name')}</h2><span>${escapeHtml(roleLine)}</span><p>${escapeHtml(card.bio||'Add a short introduction so people know how you can help.')}</p><div class="card-contact-list">${contactItems||'<span><i class="ph-bold ph-plus"></i>Add your contact details</span>'}</div></div>`;
+  preview.innerHTML=`<div class="profile-cover"></div><div class="profile-body"><div class="profile-avatar">${avatar}</div><div class="profile-name-row"><div><h2>${escapeHtml(card.name||'Your name')}</h2><p class="profile-role">${escapeHtml(roleLine)}</p>${card.location?`<span class="profile-location"><i class="ph-bold ph-map-pin"></i>${escapeHtml(card.location)}</span>`:''}</div><span class="profile-mark"><i class="ph-bold ph-sparkle"></i></span></div><p class="profile-bio">${escapeHtml(card.bio||'Add a short introduction so people know how you can help.')}</p><div class="profile-actions"><span class="profile-action primary"><i class="ph-bold ph-user-plus"></i>Save contact</span><span class="profile-action"><i class="ph-bold ph-chat-circle-dots"></i>Message</span><span class="profile-action"><i class="ph-bold ph-share-network"></i>Share</span></div>${services.length?`<section class="profile-section"><div class="profile-section-title"><strong>What I do</strong><span>${services.length} services</span></div><div class="profile-services">${services.map((service,index)=>`<div class="profile-service"><i class="ph-bold ${['ph-pen-nib','ph-layout','ph-chats-circle'][index]||'ph-sparkle'}"></i>${escapeHtml(service)}</div>`).join('')}</div></section>`:''}<section class="profile-section"><div class="profile-section-title"><strong>Connect</strong><span>Find me online</span></div><div class="profile-socials">${socials||'<span class="profile-social"><i class="ph-bold ph-plus"></i></span>'}</div></section><div class="profile-footer"><i class="ph-bold ph-sparkle"></i>Made with <b>Searya</b></div></div>`;
   try { localStorage.setItem('searya_business_card',JSON.stringify(card)); } catch {}
   clearTimeout(cardQrTimer); cardQrTimer=setTimeout(refreshCardQr,500);
 }
@@ -272,15 +274,34 @@ function downloadCardQr() {
   track('tool_exported',{tool:'digital_business_card',format:'qr_svg'});
 }
 
+async function shareBusinessCard() {
+  const card=businessCardValues();
+  const text=[card.name,[card.role,card.company].filter(Boolean).join(' at '),card.phone,card.email,card.website].filter(Boolean).join('\n');
+  try {
+    if (navigator.share) await navigator.share({title:`${card.name||'My'} digital business card`,text});
+    else { await navigator.clipboard.writeText(text); showToast('Contact details copied.'); }
+    track('tool_exported',{tool:'digital_business_card',format:'share'});
+  } catch (error) { if (error?.name!=='AbortError') showToast('Sharing is not available in this browser.'); }
+}
+
+function handleCardPhoto(event) {
+  const file=event.target.files?.[0]; if (!file) return;
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size>3*1024*1024) { event.target.value=''; return showToast('Choose a PNG, JPG or WebP image under 3 MB.'); }
+  if (cardPhotoObjectUrl) URL.revokeObjectURL(cardPhotoObjectUrl);
+  cardPhotoObjectUrl=URL.createObjectURL(file); updateBusinessCard();
+}
+
 function initializeBusinessCard() {
   const form=$('#business-card-form'); if (!form) return;
   try {
     const saved=JSON.parse(localStorage.getItem('searya_business_card')||'null');
-    const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',social:'card-social',bio:'card-bio',color:'card-color'};
+    const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',linkedin:'card-linkedin',instagram:'card-instagram',location:'card-location',bio:'card-bio',services:'card-services',color:'card-color',theme:'card-theme'};
     if (saved) Object.entries(fields).forEach(([key,id])=>{ if (typeof saved[key]==='string') $(`#${id}`).value=saved[key]; });
   } catch {}
   form.addEventListener('input',updateBusinessCard);
+  $('#card-photo').addEventListener('change',handleCardPhoto);
   $('#download-vcard').addEventListener('click',downloadVcard);
+  $('#share-card').addEventListener('click',shareBusinessCard);
   $('#download-card-qr').addEventListener('click',downloadCardQr);
   updateBusinessCard();
 }

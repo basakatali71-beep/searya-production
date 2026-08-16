@@ -31,7 +31,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/vendor/phosphor/regular/style.css?v=2.1.2">
   <link rel="stylesheet" href="/public/vendor/phosphor/bold/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/src/styles/tools.css?v=20260816-2">
+  <link rel="stylesheet" href="/src/styles/tools.css?v=20260816-4">
   <script id="searya-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Searya","url":"https://searya.com/","logo":"https://searya.com/public/searya-logo.png"},{"@type":"WebSite","name":"Searya Tools","url":"https://searya.com/"},{"@type":"SoftwareApplication","name":"Searya Business Tools","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}]}</script>
 </head>
 <body>
@@ -124,18 +124,21 @@
           <header class="workspace-heading"><span class="tool-icon green"><i class="ph-bold ph-identification-card"></i></span><div><span class="section-kicker">FREE ONLINE TOOL</span><h1>Digital Business Card Maker</h1><p>Create a professional contact card, vCard file and QR code in one place.</p></div></header>
           <div class="card-builder-layout">
             <form id="business-card-form" class="control-card card-form">
-              <div class="field-row"><label>Full name<input id="card-name" maxlength="70" placeholder="Alex Rivera" value="Alex Rivera"></label><label>Job title<input id="card-role" maxlength="70" placeholder="Independent Consultant" value="Independent Consultant"></label></div>
-              <div class="field-row"><label>Company<input id="card-company" maxlength="80" placeholder="Rivera Studio" value="Rivera Studio"></label><label>Accent color<input id="card-color" type="color" value="#7259e8"></label></div>
+              <div class="field-row"><label>Profile style<select id="card-theme"><option value="luxe">Luxe dark</option><option value="modern">Modern gradient</option><option value="minimal">Clean minimal</option><option value="bold">Bold creator</option></select></label><label>Accent color<input id="card-color" type="color" value="#7259e8"></label></div>
+              <label class="photo-upload">Profile photo or logo<input id="card-photo" type="file" accept="image/png,image/jpeg,image/webp"><span><i class="ph-bold ph-camera"></i><strong>Choose an image</strong><small>Square image, up to 3 MB</small></span></label>
+              <div class="field-row"><label>Full name<input id="card-name" maxlength="70" placeholder="Alex Rivera" value="Alex Rivera"></label><label>Job title<input id="card-role" maxlength="70" placeholder="Brand & Product Consultant" value="Brand & Product Consultant"></label></div>
+              <div class="field-row"><label>Company<input id="card-company" maxlength="80" placeholder="Rivera Studio" value="Rivera Studio"></label><label>Location<input id="card-location" maxlength="80" placeholder="New York, NY" value="New York, NY"></label></div>
               <div class="field-row"><label>Email<input id="card-email" type="email" maxlength="100" placeholder="alex@example.com"></label><label>Phone<input id="card-phone" type="tel" maxlength="30" placeholder="+1 555 123 4567"></label></div>
               <label>Website<input id="card-website" type="url" maxlength="180" placeholder="https://yourwebsite.com"></label>
-              <label>LinkedIn or social link<input id="card-social" type="url" maxlength="180" placeholder="https://linkedin.com/in/yourname"></label>
-              <label>Short introduction<textarea id="card-bio" maxlength="220" rows="3" placeholder="Tell people what you do and how you help.">Helping small businesses turn ideas into clear, practical digital experiences.</textarea></label>
+              <div class="field-row"><label>LinkedIn<input id="card-linkedin" type="url" maxlength="180" placeholder="https://linkedin.com/in/yourname"></label><label>Instagram<input id="card-instagram" type="url" maxlength="180" placeholder="https://instagram.com/yourname"></label></div>
+              <label>Short introduction<textarea id="card-bio" maxlength="220" rows="3" placeholder="Tell people what you do and how you help.">Helping ambitious small businesses turn complex ideas into clear digital brands and products.</textarea></label>
+              <label>Services <small>Separate with commas</small><input id="card-services" maxlength="180" placeholder="Brand strategy, Product design, Consulting" value="Brand strategy, Product design, Consulting"></label>
               <p class="form-note"><i class="ph-bold ph-shield-check"></i> Your contact details stay in this browser. The QR code stores the contact directly.</p>
             </form>
             <div class="card-preview-column">
-              <div id="business-card-preview" class="business-card-preview"></div>
+              <div class="phone-preview-shell"><div class="phone-speaker"></div><div id="business-card-preview" class="business-card-preview"></div><div class="phone-home"></div></div>
               <div class="card-qr-box"><div><strong>Contact QR code</strong><span>Scanning adds your details to a phone.</span></div><img id="card-qr-image" alt="Digital business card QR code"></div>
-              <div class="workspace-actions"><button class="button primary" id="download-vcard" type="button"><i class="ph-bold ph-download-simple"></i> Download vCard</button><button class="button secondary" id="download-card-qr" type="button"><i class="ph-bold ph-qr-code"></i> Download QR</button></div>
+              <div class="workspace-actions"><button class="button primary" id="download-vcard" type="button"><i class="ph-bold ph-user-plus"></i> Save contact</button><button class="button secondary" id="share-card" type="button"><i class="ph-bold ph-share-network"></i> Share</button><button class="button secondary" id="download-card-qr" type="button"><i class="ph-bold ph-qr-code"></i> QR</button></div>
             </div>
           </div>
         </article>
@@ -149,6 +152,6 @@
 
   <footer><div class="shell footer-inner"><a class="brand footer-brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya" width="1250" height="359"><span>TOOLS</span></a><p>Fast, practical business tools for independent work.</p><div><a href="/legal/privacy.html">Privacy</a><a href="/legal/terms.html">Terms</a><a href="mailto:basakatali71@gmail.com">Feedback</a></div></div></footer>
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/src/tools.js?v=20260816-2"></script>
+  <script type="module" src="/src/tools.js?v=20260816-3"></script>
 </body>
 </html>
