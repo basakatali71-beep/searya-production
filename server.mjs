@@ -2034,7 +2034,31 @@ function publicListingDescription(row) {
   return `Connect directly with the owner of ${row.title}. 0% platform commission and direct founder messaging. Arrange due diligence and transfer independently.`;
 }
 
-function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`, robots = 'index, follow, max-image-preview:large', structuredData = null } = {}) {
+function homepageProjectCard(row) {
+  const listing = listingFromRow(row);
+  const content = JSON.parse(row.content_json || '{}');
+  const title = listing.titleEn || row.title;
+  const description = cleanText(content.shortDescEn || content.descriptionEn || content.description || '', 145);
+  const rawImage = safeImageData(content.coverImage);
+  const image = /^https:\/\//i.test(rawImage) ? rawImage : '';
+  const price = row.type === 'wtb'
+    ? `$${Math.round(row.price_cents / 100).toLocaleString('en-US')} budget`
+    : `$${Math.round(row.price_cents / 100).toLocaleString('en-US')}`;
+  return `<article class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900"><a href="/projects/${encodeURIComponent(row.slug)}" class="block">${image ? `<img src="${escapeMarkup(image)}" alt="${escapeMarkup(title)} project preview" width="640" height="340" loading="eager" class="h-40 w-full object-cover">` : ''}<div class="space-y-3 p-5"><div class="flex items-center justify-between gap-3 text-[11px] font-bold uppercase tracking-wide text-slate-500"><span>${escapeMarkup(SEO_CATEGORIES[row.category] || row.category)}</span><span>${escapeMarkup(price)}</span></div><h3 class="text-lg font-black leading-tight text-slate-950 dark:text-white">${escapeMarkup(title)}</h3><p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">${escapeMarkup(description || 'Review the project details and connect directly with its owner.')}</p><span class="inline-flex text-sm font-extrabold text-emerald-600 dark:text-emerald-400">View project details →</span></div></a></article>`;
+}
+
+function homepageStructuredData(rows = []) {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'Organization', '@id': `${PUBLIC_ORIGIN}/#organization`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, logo: { '@type': 'ImageObject', url: `${PUBLIC_ORIGIN}/public/searya-logo.png` } },
+      { '@type': 'WebSite', '@id': `${PUBLIC_ORIGIN}/#website`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, publisher: { '@id': `${PUBLIC_ORIGIN}/#organization` }, description: SEO_DESCRIPTION },
+      { '@type': 'CollectionPage', '@id': `${PUBLIC_ORIGIN}/#marketplace`, name: 'Digital projects for sale and buyer requests', url: `${PUBLIC_ORIGIN}/`, isPartOf: { '@id': `${PUBLIC_ORIGIN}/#website` }, mainEntity: { '@type': 'ItemList', itemListElement: rows.map((row, index) => ({ '@type': 'ListItem', position: index + 1, name: row.title, url: `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(row.slug)}` })) } }
+    ]
+  };
+}
+
+function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const safeTitle = escapeMarkup(title);
   const safeDescription = escapeMarkup(description);
@@ -2054,6 +2078,9 @@ function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canon
     .replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${safeTitle}">`)
     .replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${safeDescription}">`)
     .replace(/<meta name="twitter:image" content="[^"]*">/, `<meta name="twitter:image" content="${safeImage}">`);
+  if (initialListings.length) {
+    html = html.replace('<!-- Dynamic JS Square Cards Render Here -->', initialListings.map(homepageProjectCard).join(''));
+  }
   if (structuredData) {
     const json = JSON.stringify(structuredData).replaceAll('<', '\\u003c');
     html = html.replace(/<script id="searya-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="searya-structured-data" type="application/ld+json">${json}</script>`);
@@ -2128,6 +2155,8 @@ function renderLandingPage(pathname) {
   const heroHeading = page.intent ? page.h1 : 'The 0% Commission Marketplace for Digital Projects & SaaS';
   const pageJsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': [
     { '@type': 'WebPage', name: heroHeading, description: pageDescription, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
+    { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Searya', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: page.h1, item: canonical }] },
+    ...(rows.length ? [{ '@type': 'ItemList', name: page.listingTitle, itemListElement: rows.map((row, index) => ({ '@type': 'ListItem', position: index + 1, name: row.title, url: `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(row.slug)}` })) }] : []),
     { '@type': 'FAQPage', mainEntity: faqSchema }
   ] }).replaceAll('<', '\\u003c');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(pageTitle)}</title><meta name="description" content="${escapeMarkup(pageDescription)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${canonical}"><meta property="og:type" content="website"><meta property="og:site_name" content="Searya"><meta property="og:locale" content="en_US"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${escapeMarkup(pageTitle)}"><meta property="og:description" content="${escapeMarkup(pageDescription)}"><meta property="og:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(pageTitle)}"><meta name="twitter:description" content="${escapeMarkup(pageDescription)}"><meta name="twitter:image" content="${PUBLIC_ORIGIN}/public/searya-social-preview-en.png?v=20260811-1"><link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/public/seo-landing.css?v=20260812-1"><script type="application/ld+json">${pageJsonLd}</script></head><body><header class="site-head"><div class="shell"><a class="brand" href="/" aria-label="Searya home"><img src="/src/assets/searya-logo.png?v=20260807-1" alt="Searya" width="1250" height="359"></a><nav class="nav" aria-label="Primary"><a href="/#listings-grid">Discover projects</a><a href="/sell-your-digital-project">For project owners</a><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></nav></div></header><main><section class="hero"><div class="shell"><p class="crumbs"><a href="/">Searya</a> / ${escapeMarkup(page.kicker)}</p><p class="eyebrow">${escapeMarkup(page.kicker)}${page.intent ? '' : ` · ${escapeMarkup(page.h1)}`}</p><h1>${escapeMarkup(heroHeading)}</h1><h2 class="intro fee-subheading">Direct Founder-to-Buyer Messaging with Zero Transaction Fees</h2><p class="intro">${escapeMarkup(page.intro)}</p><div class="hero-actions"><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a><a class="button secondary" href="/#listings-grid">Visit the marketplace</a></div></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Live on Searya</p><h2>${escapeMarkup(page.listingTitle)}</h2></div><p>These are public, approved Searya listings. Project information comes from the listing owner; verify important claims independently.</p></div>${listingContent}</div></section><section class="section"><div class="shell split"><article class="panel"><p class="eyebrow">What to know</p><h2>${escapeMarkup(categoryHeading)}</h2><p>${escapeMarkup(page.explanation)}</p></article><article class="panel"><p class="eyebrow">Searya's role</p><h2>Discovery and direct contact</h2><p>Searya helps project owners and potential buyers find one another and start conversations. It does not process transactions or payments and is not a party to agreements between users.</p></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">A simple process</p><h2>How Searya works</h2></div></div><div class="steps"><article class="step"><h3>Discover</h3><p>Browse relevant public projects or Looking to Buy requests based on your goals.</p></article><article class="step"><h3>Start a conversation</h3><p>Use Searya to contact the owner or potential buyer and ask specific questions.</p></article><article class="step"><h3>Verify independently</h3><p>Review identity, ownership, code and claims, then arrange any agreement outside Searya.</p></article></div></div></section><section class="section"><div class="shell split"><article class="panel"><h2>For potential buyers</h2><p>Compare project scope and technology, request evidence from owners and document exactly what a possible transfer would include.</p><a class="project-link" href="/#listings-grid">Explore the marketplace →</a></article><article class="panel"><h2>For project owners</h2><p>Publish an accurate listing that explains your product’s purpose, stage, technology, assets and known limitations.</p><a class="project-link" href="/sell-your-digital-project">Learn how to list a project →</a></article></div></section><section class="section"><div class="shell"><div class="section-head"><div><p class="eyebrow">Useful answers</p><h2>Frequently asked questions</h2></div></div><div class="faq">${page.faqs.map(([question, answer]) => `<details><summary>${escapeMarkup(question)}</summary><p>${escapeMarkup(answer)}</p></details>`).join('')}</div></div></section><section class="section"><div class="shell"><p class="eyebrow">Related paths</p><h2>Continue exploring</h2><div class="related">${related}<a href="/#listings-grid">All public projects</a></div>${discoveryLinks ? `<p class="eyebrow" style="margin-top:30px">Curated technology collections</p><div class="related">${discoveryLinks}</div>` : ""}</div></section><section class="section"><div class="shell cta"><h2>${escapeMarkup(ctaHeading)}</h2><p>${escapeMarkup(ctaText)}</p><a class="button" href="${primaryHref}">${escapeMarkup(primaryCta)}</a></div></section></main><footer class="site-foot"><div class="shell"><span>© 2026 Searya. Discovery and direct connection for digital projects.</span><nav><a href="/legal/terms.html">Terms</a><a href="/legal/privacy.html">Privacy</a><a href="/legal/transfer-checklist.html">Handover checklist</a></nav></div></footer></body></html>`;
@@ -2367,7 +2396,10 @@ const server = createServer(async (req, res) => {
     const legacyListingSlug = url.pathname === '/' ? url.searchParams.get('listing') : '';
     if (legacyListingSlug) return redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`);
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
-      return htmlResponse(req, res, renderSeoPage());
+      let initialListings = [];
+      try { initialListings = db.prepare(`SELECT * FROM listings WHERE status='approved' AND type='sale' ORDER BY (boosted_until IS NOT NULL AND boosted_until>?) DESC, updated_at DESC LIMIT 8`).all(nowIso()); }
+      catch (error) { console.error('Homepage SEO listing query failed:', error); }
+      return htmlResponse(req, res, renderSeoPage({ initialListings, structuredData: homepageStructuredData(initialListings) }));
     }
     const guideWithoutTrailingSlash = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
     if ((req.method === 'GET' || req.method === 'HEAD') && (guideWithoutTrailingSlash === '/guides' || GUIDES[guideWithoutTrailingSlash])) {
@@ -2421,9 +2453,14 @@ const server = createServer(async (req, res) => {
         dateModified: row.updated_at,
         isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` }
       };
+      const breadcrumbSchema = { '@type': 'BreadcrumbList', itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Searya', item: `${PUBLIC_ORIGIN}/` },
+        { '@type': 'ListItem', position: 2, name: SEO_CATEGORIES[row.category] || row.category, item: `${PUBLIC_ORIGIN}/projects/category/${encodeURIComponent(row.category)}` },
+        { '@type': 'ListItem', position: 3, name: row.title, item: canonical }
+      ] };
       const structuredData = row.type === 'sale' ? {
         '@context': 'https://schema.org',
-        '@graph': [webPageSchema, {
+        '@graph': [webPageSchema, breadcrumbSchema, {
           '@type': 'Product',
           '@id': `${canonical}#project`,
           name: row.title,
@@ -2441,7 +2478,7 @@ const server = createServer(async (req, res) => {
           },
           additionalProperty: { '@type': 'PropertyValue', name: 'Marketplace commission', value: '0%' }
         }]
-      } : { '@context': 'https://schema.org', ...webPageSchema };
+      } : { '@context': 'https://schema.org', '@graph': [webPageSchema, breadcrumbSchema] };
       return htmlResponse(req, res, renderSeoPage({
         title,
         description,

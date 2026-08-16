@@ -124,6 +124,9 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
   assert.match(homepage, /"@type":"Organization"/);
   assert.match(homepage, /"@type":"WebSite"/);
+  assert.match(homepage, /"@type":"CollectionPage"/);
+  assert.match(homepage, /"@type":"ItemList"/);
+  assert.ok((homepage.match(/href="\/projects\//g) || []).length >= 8, 'homepage exposes crawlable project links without requiring JavaScript');
 
   const robots = await fetch(`${baseUrl}/robots.txt`).then(response => response.text());
   assert.match(robots, /Disallow: \/admin\.html/);
@@ -142,6 +145,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.match(detail, new RegExp(`<meta name="description" content="Connect directly with the owner of ${listing.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. 0% platform commission and direct founder messaging\\. Arrange due diligence and transfer independently\\.">`));
   assert.match(detail, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com\\/projects\\/${listing.slug}">`));
   assert.match(detail, /"@type":"WebPage"/);
+  assert.match(detail, /"@type":"BreadcrumbList"/);
   assert.match(detail, /"@type":"Product"/);
   assert.match(detail, new RegExp(`"offers":\\{"@type":"Offer","url":"https:\\/\\/searya\\.com\\/projects\\/${listing.slug}","price":"${Number(listing.askingPrice).toFixed(2)}","priceCurrency":"USD"`));
   assert.match(detail, /"name":"Marketplace commission","value":"0%"/);
@@ -233,6 +237,8 @@ test('high-intent landing routes have unique metadata, visible FAQs and real fil
     assert.match(html, /<meta name="description" content="[^"]*0% platform commission and direct buyer messaging\.">/, route);
     assert.match(html, new RegExp(h1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), route);
     assert.match(html, /"@type":"FAQPage"/, route);
+    assert.match(html, /"@type":"BreadcrumbList"/, route);
+    if (/class="project-card"/.test(html)) assert.match(html, /"@type":"ItemList"/, route);
     assert.match(html, /<section class="section">[\s\S]*Frequently asked questions/, route);
     assert.doesNotMatch(html, /Buy now|Secure checkout|Transaction protection|guaranteed buyers|guaranteed sales/i, route);
     const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
