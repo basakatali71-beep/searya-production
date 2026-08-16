@@ -51,7 +51,7 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
-const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker'];
+const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card'];
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -1879,15 +1879,19 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
-const SEO_TITLE = 'Searya Tools — Free QR, Time Card & Invoice Tools';
-const SEO_DESCRIPTION = 'Create QR codes, calculate work hours, and make professional invoices, quotes and receipts. Fast, private and free to use.';
+const SEO_TITLE = 'Searya Tools — Digital Business Cards, QR & Invoice Tools';
+const SEO_DESCRIPTION = 'Create a digital business card, QR code, time card, invoice, quote or receipt. Use free business tools and upgrade once to unlock the complete Searya workspace.';
 const TOOL_PAGES = Object.freeze({
   '/qr-code-generator': { title: 'Free QR Code Generator — Download SVG | Searya Tools', description: 'Create a permanent, high-resolution QR code for a URL or text. Customize colors and download a print-ready SVG for free.', name: 'QR Code Generator', feature: 'Create and download static QR codes' },
   '/time-card-calculator': { title: 'Free Time Card Calculator with Overtime | Searya Tools', description: 'Calculate weekly work hours, subtract breaks, total overtime and estimate gross pay with a free online time card calculator.', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay' },
   '/work-hours-calculator': { title: 'Free Work Hours Calculator with Breaks | Searya Tools', description: 'Calculate daily and weekly work hours, subtract lunch breaks, total overtime and download your timesheet as CSV.', name: 'Work Hours Calculator', feature: 'Calculate daily and weekly work hours' },
   '/invoice-generator': { title: 'Free Invoice Generator — Print or Save PDF | Searya Tools', description: 'Make a professional invoice with automatic totals, taxes and discounts. Print it or save it as a PDF without creating an account.', name: 'Invoice Generator', feature: 'Create printable invoices with automatic totals' },
   '/quote-generator': { title: 'Free Quote Generator — Professional PDF | Searya Tools', description: 'Create a professional customer quote with line items, tax, discounts and a print-ready PDF layout for free.', name: 'Quote Generator', feature: 'Create professional customer quotes' },
-  '/receipt-maker': { title: 'Free Receipt Maker — Create a Printable Receipt | Searya Tools', description: 'Create a clean business receipt with itemized totals and save it as a printable PDF from your browser.', name: 'Receipt Maker', feature: 'Create itemized printable receipts' }
+  '/receipt-maker': { title: 'Free Receipt Maker — Create a Printable Receipt | Searya Tools', description: 'Create a clean business receipt with itemized totals and save it as a printable PDF from your browser.', name: 'Receipt Maker', feature: 'Create itemized printable receipts' },
+  '/digital-business-card': { title: 'Free Digital Business Card Maker with QR Code | Searya', description: 'Create a professional digital business card, downloadable vCard and scannable contact QR code for free. No design experience required.', name: 'Digital Business Card Maker', feature: 'Create a digital business card, vCard and contact QR code' },
+  '/digital-business-card-maker': { title: 'Digital Business Card Maker — Free vCard & QR | Searya', description: 'Build a free digital business card with your contact details, company, website and social profile, then download a vCard and QR code.', name: 'Digital Business Card Maker', feature: 'Build and export a professional digital contact card' },
+  '/qr-business-card': { title: 'Free QR Business Card Generator | Searya Tools', description: 'Make a QR business card that lets customers save your phone, email, website and company details directly to their contacts.', name: 'QR Business Card Generator', feature: 'Generate a scannable QR business card' },
+  '/virtual-business-card': { title: 'Free Virtual Business Card Maker | Searya Tools', description: 'Create and preview a professional virtual business card, then export your contact details as a vCard and QR code.', name: 'Virtual Business Card Maker', feature: 'Create a virtual business card and downloadable contact file' }
 });
 const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',
@@ -2092,7 +2096,7 @@ function homepageStructuredData() {
   };
 }
 
-function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-1`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
+function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-2`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const safeTitle = escapeMarkup(title);
   const safeDescription = escapeMarkup(description);

@@ -6,10 +6,16 @@ const TOOL_PATHS = {
   '/work-hours-calculator': 'time',
   '/invoice-generator': 'document',
   '/quote-generator': 'document',
-  '/receipt-maker': 'document'
+  '/receipt-maker': 'document',
+  '/digital-business-card': 'card',
+  '/digital-business-card-maker': 'card',
+  '/qr-business-card': 'card',
+  '/virtual-business-card': 'card'
 };
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let qrObjectUrl = '';
+let cardQrObjectUrl = '';
+let cardQrTimer = null;
 let lastTimeResult = null;
 let toastTimer = null;
 
@@ -199,6 +205,86 @@ function initializeDocument() {
   updateDocumentPreview();
 }
 
+function businessCardValues() {
+  return {
+    name: $('#card-name').value.trim(), role: $('#card-role').value.trim(), company: $('#card-company').value.trim(),
+    email: $('#card-email').value.trim(), phone: $('#card-phone').value.trim(), website: $('#card-website').value.trim(),
+    social: $('#card-social').value.trim(), bio: $('#card-bio').value.trim(), color: $('#card-color').value
+  };
+}
+
+function vcardEscape(value='') {
+  return String(value).replaceAll('\\','\\\\').replaceAll('\n','\\n').replaceAll(';','\\;').replaceAll(',','\\,');
+}
+
+function makeVcard(card=businessCardValues()) {
+  const lines=['BEGIN:VCARD','VERSION:3.0',`FN:${vcardEscape(card.name||'My business card')}`];
+  if (card.role || card.company) lines.push(`TITLE:${vcardEscape(card.role)}`,`ORG:${vcardEscape(card.company)}`);
+  if (card.email) lines.push(`EMAIL;TYPE=INTERNET:${vcardEscape(card.email)}`);
+  if (card.phone) lines.push(`TEL;TYPE=CELL:${vcardEscape(card.phone)}`);
+  if (card.website) lines.push(`URL:${vcardEscape(card.website)}`);
+  if (card.social) lines.push(`X-SOCIALPROFILE:${vcardEscape(card.social)}`);
+  if (card.bio) lines.push(`NOTE:${vcardEscape(card.bio)}`);
+  lines.push('END:VCARD');
+  return lines.filter(line => !line.endsWith(':')).join('\r\n');
+}
+
+async function refreshCardQr() {
+  const image=$('#card-qr-image');
+  if (!image) return;
+  try {
+    const response=await fetch(`/api/tools/qr?text=${encodeURIComponent(makeVcard())}&dark=%23172033&light=%23ffffff`);
+    if (!response.ok) throw new Error('QR code could not be generated.');
+    const blob=await response.blob();
+    if (cardQrObjectUrl) URL.revokeObjectURL(cardQrObjectUrl);
+    cardQrObjectUrl=URL.createObjectURL(blob); image.src=cardQrObjectUrl;
+  } catch { image.removeAttribute('src'); }
+}
+
+function updateBusinessCard() {
+  const card=businessCardValues();
+  const initials=(card.name||'My Card').split(/\s+/).slice(0,2).map(word=>word[0]?.toUpperCase()||'').join('');
+  const roleLine=[card.role,card.company].filter(Boolean).join(' · ') || 'Your professional headline';
+  const contactItems=[
+    card.email && `<span><i class="ph-bold ph-envelope-simple"></i>${escapeHtml(card.email)}</span>`,
+    card.phone && `<span><i class="ph-bold ph-phone"></i>${escapeHtml(card.phone)}</span>`,
+    card.website && `<span><i class="ph-bold ph-globe"></i>${escapeHtml(card.website.replace(/^https?:\/\//,''))}</span>`,
+    card.social && `<span><i class="ph-bold ph-link"></i>Social profile</span>`
+  ].filter(Boolean).join('');
+  const preview=$('#business-card-preview');
+  preview.style.setProperty('--card-accent',card.color);
+  preview.innerHTML=`<div class="card-monogram">${escapeHtml(initials)}</div><div class="card-main"><h2>${escapeHtml(card.name||'Your name')}</h2><span>${escapeHtml(roleLine)}</span><p>${escapeHtml(card.bio||'Add a short introduction so people know how you can help.')}</p><div class="card-contact-list">${contactItems||'<span><i class="ph-bold ph-plus"></i>Add your contact details</span>'}</div></div>`;
+  try { localStorage.setItem('searya_business_card',JSON.stringify(card)); } catch {}
+  clearTimeout(cardQrTimer); cardQrTimer=setTimeout(refreshCardQr,500);
+}
+
+function downloadVcard() {
+  const card=businessCardValues();
+  const anchor=document.createElement('a');
+  anchor.href=URL.createObjectURL(new Blob([makeVcard(card)],{type:'text/vcard;charset=utf-8'}));
+  anchor.download=`${(card.name||'searya-contact').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'searya-contact'}.vcf`;
+  anchor.click(); URL.revokeObjectURL(anchor.href); track('tool_exported',{tool:'digital_business_card',format:'vcard'});
+}
+
+function downloadCardQr() {
+  if (!cardQrObjectUrl) return showToast('Your contact QR code is still being prepared.');
+  const anchor=document.createElement('a'); anchor.href=cardQrObjectUrl; anchor.download='searya-business-card-qr.svg'; anchor.click();
+  track('tool_exported',{tool:'digital_business_card',format:'qr_svg'});
+}
+
+function initializeBusinessCard() {
+  const form=$('#business-card-form'); if (!form) return;
+  try {
+    const saved=JSON.parse(localStorage.getItem('searya_business_card')||'null');
+    const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',social:'card-social',bio:'card-bio',color:'card-color'};
+    if (saved) Object.entries(fields).forEach(([key,id])=>{ if (typeof saved[key]==='string') $(`#${id}`).value=saved[key]; });
+  } catch {}
+  form.addEventListener('input',updateBusinessCard);
+  $('#download-vcard').addEventListener('click',downloadVcard);
+  $('#download-card-qr').addEventListener('click',downloadCardQr);
+  updateBusinessCard();
+}
+
 function initialize() {
   routeTool();
   $('#qr-form')?.addEventListener('submit',generateQr);
@@ -210,6 +296,7 @@ function initialize() {
   $('#reset-time')?.addEventListener('click',resetTime);
   $('#download-timesheet')?.addEventListener('click',downloadTimesheet);
   initializeDocument();
+  initializeBusinessCard();
   $$('a[href^="/"]').forEach(link=>link.addEventListener('click',()=>track('navigation_clicked',{href:link.getAttribute('href')})));
 }
 

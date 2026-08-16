@@ -52,13 +52,13 @@ test('Launch legal copy does not contain unfinished placeholders', () => {
 test('The homepage explains the free tools and local-first document handling', () => {
   assert.match(pageSource, /No account required/);
   assert.match(pageSource, /Your document data stays in this browser/);
-  assert.match(pageSource, /All core tools are free today/);
+  assert.match(pageSource, /One plan unlocks every tool/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
-  assert.match(pageSource, /<title>Searya Tools — Free QR, Time Card & Invoice Tools<\/title>/);
+  assert.match(pageSource, /<title>Searya Tools — Digital Business Cards, QR & Invoice Tools<\/title>/);
   assert.match(pageSource, /property="og:locale" content="en_US"/);
-  assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-tools-preview\.png\?v=20260816-1"/);
+  assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-tools-preview\.png\?v=20260816-2"/);
   assert.match(pageSource, /property="og:image:width" content="1200"/);
   assert.match(pageSource, /property="og:image:height" content="630"/);
 });
@@ -74,13 +74,16 @@ test('The homepage exposes the core tools as crawlable links', () => {
   assert.match(pageSource, /href="\/qr-code-generator"/);
   assert.match(pageSource, /href="\/time-card-calculator"/);
   assert.match(pageSource, /href="\/invoice-generator"/);
+  assert.match(pageSource, /href="\/digital-business-card"/);
 });
 
-test('The tool workspace includes the three functional launch surfaces', () => {
+test('The tool workspace includes the four functional launch surfaces', () => {
   assert.match(pageSource, /id="qr-form"/);
   assert.match(pageSource, /id="time-rows"/);
   assert.match(pageSource, /id="document-form"/);
   assert.match(pageSource, /id="print-document"/);
+  assert.match(pageSource, /id="business-card-form"/);
+  assert.match(pageSource, /id="download-vcard"/);
 });
 
 test('The tool homepage has clear navigation and launch pricing', () => {
@@ -88,6 +91,8 @@ test('The tool homepage has clear navigation and launch pricing', () => {
   assert.match(pageSource, /href="\/#how-it-works"/);
   assert.match(pageSource, /href="\/#pricing"/);
   assert.match(pageSource, /\$0/);
+  assert.match(pageSource, /\$7\.99/);
+  assert.match(pageSource, /One plan unlocks every tool/);
 });
 
 test('The homepage contains no marketplace samples or fake traction claims', () => {

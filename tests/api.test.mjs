@@ -116,8 +116,8 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(await indexNowKey.text(), INDEXNOW_KEY);
 
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
-  assert.match(homepage, /<title>Searya Tools — Free QR, Time Card &amp; Invoice Tools<\/title>/);
-  assert.match(homepage, /<meta name="description" content="Create QR codes, calculate work hours, and make professional invoices, quotes and receipts\. Fast, private and free to use\.">/);
+  assert.match(homepage, /<title>Searya Tools — Digital Business Cards, QR &amp; Invoice Tools<\/title>/);
+  assert.match(homepage, /<meta name="description" content="Create a digital business card, QR code, time card, invoice, quote or receipt\. Use free business tools and upgrade once to unlock the complete Searya workspace\.">/);
   assert.match(homepage, /Small business work,/);
   assert.match(homepage, /finished faster\./);
   assert.match(homepage, /No account required/);
@@ -128,6 +128,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.match(homepage, /href="\/qr-code-generator"/);
   assert.match(homepage, /href="\/time-card-calculator"/);
   assert.match(homepage, /href="\/invoice-generator"/);
+  assert.match(homepage, /href="\/digital-business-card"/);
 
   const robots = await fetch(`${baseUrl}/robots.txt`).then(response => response.text());
   assert.match(robots, /Disallow: \/admin\.html/);
@@ -137,7 +138,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   const listing = listings.listings[0];
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
-  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker']) {
+  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card']) {
     assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${path}`));
   }
   assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com\\/projects\\/${listing.slug}`));
