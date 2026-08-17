@@ -51,7 +51,7 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
-const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card'];
+const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator'];
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -274,6 +274,18 @@ db.exec(`
     used_at TEXT,
     created_at TEXT NOT NULL
   ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS tool_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    data_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS tool_items_user_updated ON tool_items(user_id, updated_at DESC);
 `);
 
 if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'email_verified')) {
@@ -282,6 +294,15 @@ if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name ===
 }
 if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'boost_credits')) {
   db.exec('ALTER TABLE users ADD COLUMN boost_credits INTEGER NOT NULL DEFAULT 0;');
+}
+if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'plan')) {
+  db.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free';");
+}
+if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'plan_status')) {
+  db.exec("ALTER TABLE users ADD COLUMN plan_status TEXT NOT NULL DEFAULT 'inactive';");
+}
+if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'plan_renews_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN plan_renews_at TEXT;');
 }
 if (!db.prepare('PRAGMA table_info(listings)').all().some(column => column.name === 'boosted_until')) {
   db.exec('ALTER TABLE listings ADD COLUMN boosted_until TEXT;');
@@ -311,13 +332,17 @@ for (const [column, definition] of [
 const packages = Object.freeze({
   buyer_connections_10: { key: 'buyer_connections_10', name: '10 Buyer Connections', amountCents: 900, buyerConnections: 10 },
   seller_listings_3: { key: 'seller_listings_3', name: '3 Seller Listings', amountCents: 900, sellerListingCredits: 3 },
-  seller_vip_10: { key: 'seller_vip_10', name: 'Seller Pro Launch Pack', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 }
+  seller_vip_10: { key: 'seller_vip_10', name: 'Seller Pro Launch Pack', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 },
+  tools_pro_monthly: { key: 'tools_pro_monthly', name: 'Searya Pro Monthly', amountCents: 799, plan: 'pro', durationDays: 35 },
+  tools_pro_yearly: { key: 'tools_pro_yearly', name: 'Searya Pro Yearly', amountCents: 6900, plan: 'pro', durationDays: 370 }
 });
 
 const polarProductEnvironments = Object.freeze({
   buyer_connections_10: 'POLAR_PRODUCT_BUYER_CONNECTIONS_10',
   seller_listings_3: 'POLAR_PRODUCT_SELLER_LISTINGS_3',
-  seller_vip_10: 'POLAR_PRODUCT_SELLER_VIP_10'
+  seller_vip_10: 'POLAR_PRODUCT_SELLER_VIP_10',
+  tools_pro_monthly: 'POLAR_PRODUCT_TOOLS_PRO_MONTHLY',
+  tools_pro_yearly: 'POLAR_PRODUCT_TOOLS_PRO_YEARLY'
 });
 
 function nowIso() {
@@ -383,13 +408,16 @@ const BEHAVIOR_EVENT_NAMES = new Set([
   'listing_submit_attempted', 'listing_submit_succeeded', 'listing_submit_failed',
   'conversation_attempted', 'conversation_started_client', 'conversation_failed',
   'exit_feedback_shown', 'exit_feedback_submitted', 'exit_feedback_dismissed', 'ui_error',
-  'discovery_page_view', 'discovery_project_click', 'discovery_seller_cta_click', 'discovery_buyer_cta_click'
+  'discovery_page_view', 'discovery_project_click', 'discovery_seller_cta_click', 'discovery_buyer_cta_click',
+  'tool_opened', 'tool_completed', 'tool_exported', 'tool_saved', 'pricing_viewed',
+  'checkout_started', 'checkout_failed', 'account_opened', 'navigation_clicked', 'auth_help_requested'
 ]);
 
 const BEHAVIOR_METADATA_KEYS = new Set([
   'sessionId', 'path', 'device', 'tab', 'query', 'resultCount', 'category', 'sort',
   'listingId', 'listingTitle', 'listingType', 'action', 'mode', 'role', 'step',
-  'reason', 'code', 'source', 'durationSeconds', 'discoverySlug'
+  'reason', 'code', 'source', 'durationSeconds', 'discoverySlug', 'tool', 'format',
+  'plan', 'href', 'itemType', 'hours', 'amount'
 ]);
 
 function cleanBehaviorMetadata(value = {}) {
@@ -585,6 +613,7 @@ function launchFreeConnectionsRemaining(userId) {
 function publicUser(row) {
   if (!row) return null;
   const freeLaunchUser = LAUNCH_FREE_MODE && !row.is_admin;
+  const planActive = row.plan === 'pro' && row.plan_status === 'active' && (!row.plan_renews_at || row.plan_renews_at > nowIso());
   return {
     id: row.id,
     email: row.email || null,
@@ -598,6 +627,9 @@ function publicUser(row) {
     sellerListingCredits: freeLaunchUser ? 0 : row.seller_listing_credits,
     sellerVipCredits: row.seller_vip_credits,
     boostCredits: row.boost_credits,
+    plan: planActive ? 'pro' : 'free',
+    planStatus: planActive ? 'active' : 'inactive',
+    planRenewsAt: planActive ? row.plan_renews_at : null,
     createdAt: row.created_at,
     launchFree: LAUNCH_FREE_MODE
   };
@@ -944,6 +976,13 @@ async function createDatabaseBackup() {
 function grantPackage(userId, packageKey) {
   const pack = packages[packageKey];
   if (!pack) return false;
+  if (pack.plan) {
+    const user = db.prepare('SELECT plan_renews_at FROM users WHERE id=?').get(userId);
+    const currentEnd = user?.plan_renews_at && new Date(user.plan_renews_at).getTime() > Date.now() ? new Date(user.plan_renews_at).getTime() : Date.now();
+    const renewsAt = new Date(currentEnd + Number(pack.durationDays || 31) * 86400000).toISOString();
+    db.prepare("UPDATE users SET plan=?,plan_status='active',plan_renews_at=? WHERE id=?").run(pack.plan, renewsAt, userId);
+    return true;
+  }
   db.prepare(`UPDATE users SET buyer_connections=buyer_connections+?, seller_listing_credits=seller_listing_credits+?, seller_vip_credits=seller_vip_credits+?, boost_credits=boost_credits+? WHERE id=?`).run(pack.buyerConnections || 0, pack.sellerListingCredits || 0, pack.sellerVipCredits || 0, pack.boostCredits || 0, userId);
   return true;
 }
@@ -954,10 +993,13 @@ function polarProductId(packageKey) {
 }
 
 function polarPaymentConfigured() {
+  const requiredKeys = NODE_ENV === 'test'
+    ? ['buyer_connections_10', 'seller_listings_3', 'seller_vip_10']
+    : ['tools_pro_monthly', 'tools_pro_yearly'];
   return Boolean(
     process.env.POLAR_ACCESS_TOKEN &&
     process.env.POLAR_WEBHOOK_SECRET &&
-    Object.keys(packages).every(packageKey => polarProductId(packageKey))
+    requiredKeys.every(packageKey => polarProductId(packageKey))
   );
 }
 
@@ -1001,20 +1043,33 @@ function fulfillPolarOrder(order) {
   if (purchase.user_id !== userId || purchase.package_key !== packageKey) return { fulfilled: false, reason: 'metadata_mismatch' };
   if (order.productId !== polarProductId(packageKey)) return { fulfilled: false, reason: 'product_mismatch' };
   if (String(order.currency || '').toLowerCase() !== 'usd' || Number(order.subtotalAmount) !== pack.amountCents) return { fulfilled: false, reason: 'amount_mismatch' };
+  const orderId = cleanText(order.id || '', 160);
+  if (!orderId) return { fulfilled: false, reason: 'missing_order_id' };
+  const duplicate = db.prepare(`SELECT id FROM purchases WHERE provider_ref=? AND status='paid'`).get(orderId);
+  if (duplicate) return { fulfilled: true, granted: false, purchaseId: duplicate.id, userId: purchase.user_id, packageKey: purchase.package_key };
   let granted = false;
+  let fulfilledPurchaseId = purchase.id;
   db.exec('BEGIN IMMEDIATE');
   try {
-    const update = db.prepare(`UPDATE purchases SET status='paid',provider_ref=?,updated_at=? WHERE id=? AND status<>'paid'`).run(order.id || null, nowIso(), purchase.id);
-    if (update.changes === 1) {
+    if (purchase.status === 'paid') {
+      fulfilledPurchaseId = randomUUID();
+      const createdAt = nowIso();
+      db.prepare(`INSERT INTO purchases(id,user_id,package_key,amount_cents,currency,status,provider_ref,created_at,updated_at) VALUES(?,?,?,?,?,'paid',?,?,?)`).run(fulfilledPurchaseId, purchase.user_id, purchase.package_key, pack.amountCents, 'usd', orderId, createdAt, createdAt);
       grantPackage(purchase.user_id, purchase.package_key);
       granted = true;
+    } else {
+      const update = db.prepare(`UPDATE purchases SET status='paid',provider_ref=?,updated_at=? WHERE id=? AND status<>'paid'`).run(orderId, nowIso(), purchase.id);
+      if (update.changes === 1) {
+        grantPackage(purchase.user_id, purchase.package_key);
+        granted = true;
+      }
     }
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
   }
-  return { fulfilled: true, granted, purchaseId: purchase.id, userId: purchase.user_id, packageKey: purchase.package_key };
+  return { fulfilled: true, granted, purchaseId: fulfilledPurchaseId, userId: purchase.user_id, packageKey: purchase.package_key };
 }
 
 function seedData() {
@@ -1163,8 +1218,9 @@ async function handleApi(req, res, url) {
     const requestedLight = String(url.searchParams.get('light') || '');
     const dark = /^#[0-9a-f]{6}$/i.test(requestedDark) ? requestedDark : '#111827';
     const light = /^#[0-9a-f]{6}$/i.test(requestedLight) ? requestedLight : '#ffffff';
+    const hasLogo = url.searchParams.get('logo') === '1';
     const svg = await QRCode.toString(text, {
-      type: 'svg', errorCorrectionLevel: 'M', margin: 2, width: 768,
+      type: 'svg', errorCorrectionLevel: hasLogo ? 'H' : 'M', margin: 2, width: 768,
       color: { dark, light }
     });
     const body = Buffer.from(svg);
@@ -1307,6 +1363,47 @@ async function handleApi(req, res, url) {
 
   if (method === 'GET' && pathname === '/api/auth/me') {
     return json(res, 200, { user: publicUser(getUser(req)) });
+  }
+
+  if (method === 'GET' && pathname === '/api/tools/items') {
+    const user = requireUser(req, res); if (!user) return;
+    const rows = db.prepare(`SELECT id,item_type AS itemType,title,data_json AS dataJson,created_at AS createdAt,updated_at AS updatedAt FROM tool_items WHERE user_id=? ORDER BY updated_at DESC LIMIT 250`).all(user.id);
+    return json(res, 200, { items: rows.map(row => ({ ...row, data: JSON.parse(row.dataJson || '{}'), dataJson: undefined })) });
+  }
+
+  if (method === 'POST' && pathname === '/api/tools/items') {
+    const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `tool-save:${user.id}`, 120, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before saving more items.');
+    const body = await readJson(req, MAX_LISTING_JSON_BYTES);
+    const itemType = cleanText(body.itemType, 60);
+    const allowedTypes = new Set(['digital-card', 'qr-code', 'invoice', 'quote', 'receipt', 'timesheet', 'email-signature', 'expense-tracker', 'profit-margin']);
+    const title = cleanText(body.title, 100);
+    const data = body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : null;
+    const dataJson = data ? JSON.stringify(data) : '';
+    if (!allowedTypes.has(itemType) || title.length < 2 || !dataJson || dataJson.length > MAX_IMAGE_DATA_CHARACTERS) return fail(res, 422, 'INVALID_TOOL_ITEM', 'Choose a valid item and title.');
+    const current = db.prepare('SELECT COUNT(*) AS count FROM tool_items WHERE user_id=?').get(user.id).count;
+    const plan = publicUser(user).plan;
+    const limit = plan === 'pro' ? 250 : 5;
+    if (current >= limit) return fail(res, 409, 'SAVE_LIMIT', plan === 'pro' ? 'Your saved-item limit has been reached.' : 'Free accounts can save up to five items. Upgrade to Pro for a larger workspace.');
+    const id = randomUUID(); const createdAt = nowIso();
+    db.prepare('INSERT INTO tool_items(id,user_id,item_type,title,data_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run(id, user.id, itemType, title, dataJson, createdAt, createdAt);
+    return json(res, 201, { item: { id, itemType, title, data, createdAt, updatedAt: createdAt } });
+  }
+
+  const toolItemMatch = pathname.match(/^\/api\/tools\/items\/([^/]+)$/);
+  if (method === 'DELETE' && toolItemMatch) {
+    const user = requireUser(req, res); if (!user) return;
+    const result = db.prepare('DELETE FROM tool_items WHERE id=? AND user_id=?').run(decodeURIComponent(toolItemMatch[1]), user.id);
+    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Saved item not found.');
+    return json(res, 200, { ok: true });
+  }
+
+  if (method === 'GET' && pathname === '/api/account/dashboard') {
+    const user = requireUser(req, res); if (!user) return;
+    const account = publicUser(user);
+    const savedByType = db.prepare('SELECT item_type AS itemType,COUNT(*) AS count FROM tool_items WHERE user_id=? GROUP BY item_type ORDER BY count DESC').all(user.id);
+    const purchases = db.prepare(`SELECT id,package_key AS packageKey,amount_cents AS amountCents,currency,status,created_at AS createdAt FROM purchases WHERE user_id=? AND package_key LIKE 'tools_%' ORDER BY created_at DESC LIMIT 20`).all(user.id);
+    return json(res, 200, { account, savedCount: savedByType.reduce((sum, row) => sum + row.count, 0), savedByType, purchases });
   }
 
   if (method === 'GET' && pathname === '/api/me/listings') {
@@ -1644,7 +1741,10 @@ async function handleApi(req, res, url) {
     return json(res, 201, { message: { id, sender: 'me', text, textEn: text, time: 'Now' } });
   }
 
-  if (method === 'GET' && pathname === '/api/packages') return json(res, 200, { packages: LAUNCH_FREE_MODE ? [] : Object.values(packages), mode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE });
+  if (method === 'GET' && pathname === '/api/packages') {
+    const available = NODE_ENV === 'test' ? Object.values(packages) : [packages.tools_pro_monthly, packages.tools_pro_yearly];
+    return json(res, 200, { packages: PAYMENT_MODE === 'disabled' ? [] : available, mode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE, configured: polarPaymentConfigured() });
+  }
 
   if (method === 'POST' && pathname === '/api/packages/checkout') {
     const user = requireUser(req, res); if (!user) return;
@@ -1652,6 +1752,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const pack = packages[body.packageKey];
     if (!pack) return fail(res, 404, 'PACKAGE_NOT_FOUND', 'Plan not found.');
+    if (NODE_ENV === 'production' && !pack.plan) return fail(res, 404, 'PACKAGE_NOT_FOUND', 'Plan not found.');
     const purchaseId = randomUUID();
     const createdAt = nowIso();
     db.prepare('INSERT INTO purchases(id,user_id,package_key,amount_cents,currency,status,created_at,updated_at) VALUES(?,?,?,?,\'usd\',\'pending\',?,?)').run(purchaseId, user.id, pack.key, pack.amountCents, createdAt, createdAt);
@@ -1769,18 +1870,30 @@ async function handleApi(req, res, url) {
     const campaignEvents = db.prepare(`SELECT source,medium,campaign,event_name AS eventName,COUNT(DISTINCT visitor_id) AS total FROM analytics_events WHERE created_at>=? GROUP BY source,medium,campaign,event_name`).all(thirtyDaysIso.toISOString());
     const campaignMap = new Map();
     const campaignKey = row => `${row.source}\u0000${row.medium}\u0000${row.campaign}`;
-    for (const row of campaignVisits) campaignMap.set(campaignKey(row), { source: row.source, medium: row.medium, campaign: row.campaign, visitors: row.visitors, signups: 0, listings: 0, conversations: 0 });
+    for (const row of campaignVisits) campaignMap.set(campaignKey(row), { source: row.source, medium: row.medium, campaign: row.campaign, visitors: row.visitors, signups: 0, listings: 0, conversations: 0, toolStarts: 0, checkouts: 0 });
     for (const row of campaignEvents) {
       const key = campaignKey(row);
-      const item = campaignMap.get(key) || { source: row.source, medium: row.medium, campaign: row.campaign, visitors: 0, signups: 0, listings: 0, conversations: 0 };
+      const item = campaignMap.get(key) || { source: row.source, medium: row.medium, campaign: row.campaign, visitors: 0, signups: 0, listings: 0, conversations: 0, toolStarts: 0, checkouts: 0 };
       if (row.eventName === 'signup_completed') item.signups = row.total;
       if (row.eventName === 'listing_created') item.listings = row.total;
       if (row.eventName === 'conversation_started') item.conversations = row.total;
+      if (row.eventName === 'tool_opened') item.toolStarts = row.total;
+      if (row.eventName === 'checkout_started') item.checkouts = row.total;
       campaignMap.set(key, item);
     }
     const campaigns = [...campaignMap.values()].sort((a, b) => b.visitors - a.visitors || b.signups - a.signups).slice(0, 30);
     const measuredEventCount = eventName => db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM analytics_events WHERE event_name=? AND created_at>=?').get(eventName, thirtyDaysIso.toISOString()).count;
     const behavior = behaviorAnalytics(thirtyDaysIso.toISOString(), presenceCutoff);
+    const toolUsage = db.prepare(`SELECT COALESCE(json_extract(metadata_json,'$.tool'),'unknown') AS tool,event_name AS eventName,COUNT(*) AS total,COUNT(DISTINCT visitor_id) AS users FROM analytics_events WHERE created_at>=? AND event_name IN ('tool_opened','tool_completed','tool_exported','tool_saved') GROUP BY tool,event_name ORDER BY total DESC`).all(thirtyDaysIso.toISOString());
+    const toolMap = new Map();
+    for (const row of toolUsage) {
+      const item = toolMap.get(row.tool) || { tool: row.tool, opened: 0, completed: 0, exported: 0, saved: 0, users: 0 };
+      const key = { tool_opened: 'opened', tool_completed: 'completed', tool_exported: 'exported', tool_saved: 'saved' }[row.eventName];
+      if (key) item[key] = row.total;
+      item.users = Math.max(item.users, row.users);
+      toolMap.set(row.tool, item);
+    }
+    const recentToolActivity = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.source,ae.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('tool_opened','tool_completed','tool_exported','tool_saved','signup_completed','checkout_started','checkout_failed') ORDER BY ae.created_at DESC LIMIT 80`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
     return json(res, 200, {
       counts: {
         pendingListings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='pending'`).get().count,
@@ -1793,7 +1906,10 @@ async function handleApi(req, res, url) {
         pageViews7d: db.prepare('SELECT COUNT(*) AS count FROM page_views WHERE created_at>=?').get(sevenDaysIso.toISOString()).count,
         listings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE user_id NOT LIKE 'seed-%'`).get().count,
         paidPurchases: db.prepare(`SELECT COUNT(*) AS count FROM purchases WHERE status='paid'`).get().count,
-        revenueCents: db.prepare(`SELECT COALESCE(SUM(amount_cents),0) AS total FROM purchases WHERE status='paid'`).get().total
+        revenueCents: db.prepare(`SELECT COALESCE(SUM(amount_cents),0) AS total FROM purchases WHERE status='paid' AND package_key LIKE 'tools_%'`).get().total,
+        activeSubscribers: db.prepare("SELECT COUNT(*) AS count FROM users WHERE plan='pro' AND plan_status='active' AND (plan_renews_at IS NULL OR plan_renews_at>?)").get(nowIso()).count,
+        savedItems: db.prepare('SELECT COUNT(*) AS count FROM tool_items').get().count,
+        toolCompletionsToday: db.prepare("SELECT COUNT(*) AS count FROM analytics_events WHERE event_name='tool_completed' AND created_at>=?").get(todayIso).count
       },
       daily,
       analytics: {
@@ -1808,16 +1924,19 @@ async function handleApi(req, res, url) {
         funnel: {
           visitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(thirtyDaysIso.toISOString()).count,
           signups: measuredEventCount('signup_completed'),
-          listings: measuredEventCount('listing_created'),
-          conversations: measuredEventCount('conversation_started')
+          toolStarts: measuredEventCount('tool_opened'),
+          toolCompletions: measuredEventCount('tool_completed'),
+          checkouts: measuredEventCount('checkout_started')
         },
         campaigns,
-        behavior
+        behavior,
+        tools: [...toolMap.values()].sort((a, b) => b.opened - a.opened),
+        recentActivity: recentToolActivity
       },
       pendingListings: db.prepare(`SELECT * FROM listings WHERE status='pending' ORDER BY priority_review DESC,created_at`).all().map(listingFromRow),
       recentListings: db.prepare(`SELECT l.*,u.name AS owner_name,u.email AS owner_email FROM listings l JOIN users u ON u.id=l.user_id WHERE l.user_id NOT LIKE 'seed-%' ORDER BY l.created_at DESC LIMIT 50`).all().map(row => ({ ...listingFromRow(row), ownerName: row.owner_name, ownerEmail: row.owner_email })),
-      users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,buyer_connections AS buyerConnections,seller_listing_credits AS sellerListingCredits,seller_vip_credits AS sellerVipCredits,boost_credits AS boostCredits,created_at AS createdAt,last_seen_at AS lastSeenAt FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 100`).all(),
-      purchases: db.prepare(`SELECT p.id,p.package_key AS packageKey,p.amount_cents AS amountCents,p.currency,p.status,p.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM purchases p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC LIMIT 100`).all(),
+      users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,plan,plan_status AS planStatus,plan_renews_at AS planRenewsAt,created_at AS createdAt,last_seen_at AS lastSeenAt,(SELECT COUNT(*) FROM tool_items ti WHERE ti.user_id=users.id) AS savedItems FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 200`).all(),
+      purchases: db.prepare(`SELECT p.id,p.package_key AS packageKey,p.amount_cents AS amountCents,p.currency,p.status,p.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM purchases p JOIN users u ON u.id=p.user_id WHERE p.package_key LIKE 'tools_%' ORDER BY p.created_at DESC LIMIT 100`).all(),
       reports: db.prepare(`SELECT r.id,r.target_type AS targetType,r.target_id AS targetId,r.reason,r.status,r.created_at AS createdAt,reporter.name AS reporterName,reporter.email AS reporterEmail,COALESCE(l.title,target.name,r.target_id) AS targetLabel FROM reports r JOIN users reporter ON reporter.id=r.reporter_id LEFT JOIN listings l ON r.target_type='listing' AND l.id=r.target_id LEFT JOIN users target ON r.target_type='user' AND target.id=r.target_id ORDER BY r.created_at DESC LIMIT 100`).all(),
       seedMessageThreads: db.prepare(`SELECT t.id,t.listing_id AS listingId,t.updated_at AS updatedAt,l.title,u.name AS visitorName,u.email AS visitorEmail FROM threads t JOIN listings l ON l.id=t.listing_id JOIN users u ON u.id=CASE WHEN t.user_a=? THEN t.user_b ELSE t.user_a END WHERE l.user_id LIKE 'seed-%' AND (t.user_a=? OR t.user_b=?) ORDER BY t.updated_at DESC LIMIT 100`).all(user.id, user.id, user.id).map(thread => ({
         ...thread,
@@ -1896,7 +2015,10 @@ const TOOL_PAGES = Object.freeze({
   '/digital-business-card': { title: 'Free Digital Business Card Maker with QR Code | Searya', description: 'Create a professional digital business card, downloadable vCard and scannable contact QR code for free. No design experience required.', name: 'Digital Business Card Maker', feature: 'Create a digital business card, vCard and contact QR code' },
   '/digital-business-card-maker': { title: 'Digital Business Card Maker — Free vCard & QR | Searya', description: 'Build a free digital business card with your contact details, company, website and social profile, then download a vCard and QR code.', name: 'Digital Business Card Maker', feature: 'Build and export a professional digital contact card' },
   '/qr-business-card': { title: 'Free QR Business Card Generator | Searya Tools', description: 'Make a QR business card that lets customers save your phone, email, website and company details directly to their contacts.', name: 'QR Business Card Generator', feature: 'Generate a scannable QR business card' },
-  '/virtual-business-card': { title: 'Free Virtual Business Card Maker | Searya Tools', description: 'Create and preview a professional virtual business card, then export your contact details as a vCard and QR code.', name: 'Virtual Business Card Maker', feature: 'Create a virtual business card and downloadable contact file' }
+  '/virtual-business-card': { title: 'Free Virtual Business Card Maker | Searya Tools', description: 'Create and preview a professional virtual business card, then export your contact details as a vCard and QR code.', name: 'Virtual Business Card Maker', feature: 'Create a virtual business card and downloadable contact file' },
+  '/email-signature-generator': { title: 'Free Email Signature Generator with Logo | Searya', description: 'Create a professional HTML email signature with your photo, logo, contact details and brand colors. Copy it into Gmail or Outlook.', name: 'Email Signature Generator', feature: 'Create and copy a branded HTML email signature' },
+  '/expense-tracker': { title: 'Free Business Expense Tracker — Download CSV | Searya', description: 'Track business expenses by date and category, see instant totals and download a clean CSV without installing accounting software.', name: 'Business Expense Tracker', feature: 'Track and export categorized business expenses' },
+  '/profit-margin-calculator': { title: 'Free Profit Margin & Markup Calculator | Searya Tools', description: 'Calculate profit, margin, markup and the selling price you need to hit a target margin with a free business calculator.', name: 'Profit Margin Calculator', feature: 'Calculate profit margin, markup and target selling price' }
 });
 const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',

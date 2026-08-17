@@ -1,3 +1,5 @@
+import { SearyaApi } from './api.js';
+
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const TOOL_PATHS = {
@@ -10,15 +12,26 @@ const TOOL_PATHS = {
   '/digital-business-card': 'card',
   '/digital-business-card-maker': 'card',
   '/qr-business-card': 'card',
-  '/virtual-business-card': 'card'
+  '/virtual-business-card': 'card',
+  '/email-signature-generator': 'signature',
+  '/expense-tracker': 'expenses',
+  '/profit-margin-calculator': 'margin'
 };
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let qrObjectUrl = '';
 let cardQrObjectUrl = '';
 let cardPhotoObjectUrl = '';
+let cardPhotoData = '';
+let cardLogoData = '';
+let qrLogoData = '';
+let signaturePhotoData = '';
+let signatureLogoData = '';
 let cardQrTimer = null;
 let lastTimeResult = null;
 let toastTimer = null;
+let currentUser = null;
+let presenceTimer = null;
+const presenceSessionId = crypto.randomUUID();
 
 function escapeHtml(value='') {
   return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
@@ -37,6 +50,19 @@ function track(eventName, metadata={}) {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ eventName, metadata }), keepalive:true
   }).catch(() => {});
+}
+
+function fileToDataUrl(file, maxBytes=1024*1024) {
+  return new Promise((resolve,reject) => {
+    if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > maxBytes) return reject(new Error(`Choose a PNG, JPG or WebP image under ${Math.round(maxBytes/1024/1024)} MB.`));
+    const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result||'')); reader.onerror=()=>reject(new Error('The image could not be read.')); reader.readAsDataURL(file);
+  });
+}
+
+function addLogoToQrSvg(svgText, logoData) {
+  if (!logoData) return svgText;
+  const logo=`<rect x="294" y="294" width="180" height="180" rx="34" fill="#fff"/><image href="${logoData.replaceAll('&','&amp;').replaceAll('"','&quot;')}" x="318" y="318" width="132" height="132" preserveAspectRatio="xMidYMid meet"/>`;
+  return svgText.replace('</svg>',`${logo}</svg>`);
 }
 
 function routeTool() {
@@ -60,14 +86,15 @@ async function generateQr(event) {
   event?.preventDefault();
   const content = $('#qr-content').value.trim();
   if (!content) return showToast('Enter a URL or some text first.');
-  const url = `/api/tools/qr?text=${encodeURIComponent(content)}&dark=${encodeURIComponent($('#qr-dark').value)}&light=${encodeURIComponent($('#qr-light').value)}`;
+  const url = `/api/tools/qr?text=${encodeURIComponent(content)}&dark=${encodeURIComponent($('#qr-dark').value)}&light=${encodeURIComponent($('#qr-light').value)}${qrLogoData?'&logo=1':''}`;
   const button = $('#qr-form button[type=submit]');
   button.disabled = true;
   button.textContent = 'Generating…';
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error((await response.json().catch(()=>null))?.error?.message || 'QR code could not be generated.');
-    const blob = await response.blob();
+    let blob = await response.blob();
+    if (qrLogoData) blob = new Blob([addLogoToQrSvg(await blob.text(),qrLogoData)],{type:'image/svg+xml'});
     if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
     qrObjectUrl = URL.createObjectURL(blob);
     $('#qr-image').src = qrObjectUrl;
@@ -129,7 +156,7 @@ function calculateTime({silent=false}={}) {
   $('#overtime-hours').textContent = formatMinutes(overtimeMinutes);
   $('#total-hours').textContent = formatMinutes(totalMinutes);
   $('#gross-pay').textContent = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(pay);
-  lastTimeResult = {entries,regularMinutes,overtimeMinutes,totalMinutes,hourlyRate,multiplier,pay};
+  lastTimeResult = {entries,regularMinutes,overtimeMinutes,totalMinutes,hourlyRate,multiplier,overtimeAfter:overtimeThreshold/60,pay};
   if (!silent) { showToast('Workweek calculated.'); track('tool_completed',{tool:'time_card',hours:(totalMinutes/60).toFixed(2)}); }
 }
 
@@ -211,7 +238,8 @@ function businessCardValues() {
     name: $('#card-name').value.trim(), role: $('#card-role').value.trim(), company: $('#card-company').value.trim(),
     email: $('#card-email').value.trim(), phone: $('#card-phone').value.trim(), website: $('#card-website').value.trim(),
     linkedin: $('#card-linkedin').value.trim(), instagram: $('#card-instagram').value.trim(), location: $('#card-location').value.trim(),
-    bio: $('#card-bio').value.trim(), services: $('#card-services').value.trim(), color: $('#card-color').value, theme: $('#card-theme').value
+    bio: $('#card-bio').value.trim(), services: $('#card-services').value.trim(), color: $('#card-color').value, theme: $('#card-theme').value,
+    ctaType: $('#card-cta-type').value, ctaLink: $('#card-cta-link').value.trim(), photo: cardPhotoData, logo: cardLogoData
   };
 }
 
@@ -237,9 +265,10 @@ async function refreshCardQr() {
   const image=$('#card-qr-image');
   if (!image) return;
   try {
-    const response=await fetch(`/api/tools/qr?text=${encodeURIComponent(makeVcard())}&dark=%23172033&light=%23ffffff`);
+    const response=await fetch(`/api/tools/qr?text=${encodeURIComponent(makeVcard())}&dark=%23172033&light=%23ffffff${cardLogoData?'&logo=1':''}`);
     if (!response.ok) throw new Error('QR code could not be generated.');
-    const blob=await response.blob();
+    let blob=await response.blob();
+    if(cardLogoData)blob=new Blob([addLogoToQrSvg(await blob.text(),cardLogoData)],{type:'image/svg+xml'});
     if (cardQrObjectUrl) URL.revokeObjectURL(cardQrObjectUrl);
     cardQrObjectUrl=URL.createObjectURL(blob); image.src=cardQrObjectUrl;
   } catch { image.removeAttribute('src'); }
@@ -250,12 +279,15 @@ function updateBusinessCard() {
   const initials=(card.name||'My Card').split(/\s+/).slice(0,2).map(word=>word[0]?.toUpperCase()||'').join('');
   const roleLine=[card.role,card.company].filter(Boolean).join(' · ') || 'Your professional headline';
   const services=card.services.split(',').map(item=>item.trim()).filter(Boolean).slice(0,3);
-  const avatar=cardPhotoObjectUrl?`<img src="${cardPhotoObjectUrl}" alt="">`:escapeHtml(initials);
+  const avatar=cardPhotoData?`<img src="${cardPhotoData}" alt="">`:escapeHtml(initials);
+  const logo=cardLogoData?`<img class="profile-brand-logo" src="${cardLogoData}" alt="${escapeHtml(card.company||'Company')} logo">`:`<span class="profile-mark"><i class="ph-bold ph-sparkle"></i></span>`;
+  const professionLabels={realtor:'Property advisor',consultant:'Strategy & growth',healthcare:'Patient care',legal:'Trusted counsel',creative:'Selected work',trades:'Licensed service',fitness:'Performance coaching',hospitality:'Guest experience',tech:'Products & technology'};
+  const ctaLabels={book:'Book a meeting',call:'Call now',email:'Send email',website:'Visit website'};
   const socials=[card.website&&'<span class="profile-social"><i class="ph-bold ph-globe"></i></span>',card.linkedin&&'<span class="profile-social"><i class="ph-bold ph-linkedin-logo"></i></span>',card.instagram&&'<span class="profile-social"><i class="ph-bold ph-instagram-logo"></i></span>'].filter(Boolean).join('');
   const preview=$('#business-card-preview');
   preview.className=`business-card-preview theme-${card.theme}`;
   preview.style.setProperty('--card-accent',card.color);
-  preview.innerHTML=`<div class="profile-cover"></div><div class="profile-body"><div class="profile-avatar">${avatar}</div><div class="profile-name-row"><div><h2>${escapeHtml(card.name||'Your name')}</h2><p class="profile-role">${escapeHtml(roleLine)}</p>${card.location?`<span class="profile-location"><i class="ph-bold ph-map-pin"></i>${escapeHtml(card.location)}</span>`:''}</div><span class="profile-mark"><i class="ph-bold ph-sparkle"></i></span></div><p class="profile-bio">${escapeHtml(card.bio||'Add a short introduction so people know how you can help.')}</p><div class="profile-actions"><span class="profile-action primary"><i class="ph-bold ph-user-plus"></i>Save contact</span><span class="profile-action"><i class="ph-bold ph-chat-circle-dots"></i>Message</span><span class="profile-action"><i class="ph-bold ph-share-network"></i>Share</span></div>${services.length?`<section class="profile-section"><div class="profile-section-title"><strong>What I do</strong><span>${services.length} services</span></div><div class="profile-services">${services.map((service,index)=>`<div class="profile-service"><i class="ph-bold ${['ph-pen-nib','ph-layout','ph-chats-circle'][index]||'ph-sparkle'}"></i>${escapeHtml(service)}</div>`).join('')}</div></section>`:''}<section class="profile-section"><div class="profile-section-title"><strong>Connect</strong><span>Find me online</span></div><div class="profile-socials">${socials||'<span class="profile-social"><i class="ph-bold ph-plus"></i></span>'}</div></section><div class="profile-footer"><i class="ph-bold ph-sparkle"></i>Made with <b>Searya</b></div></div>`;
+  preview.innerHTML=`<div class="profile-cover"><span>${escapeHtml(professionLabels[card.theme]||'Professional profile')}</span></div><div class="profile-body"><div class="profile-topline"><div class="profile-avatar">${avatar}</div>${logo}</div><div class="profile-name-row"><div><h2>${escapeHtml(card.name||'Your name')}</h2><p class="profile-role">${escapeHtml(roleLine)}</p>${card.location?`<span class="profile-location"><i class="ph-bold ph-map-pin"></i>${escapeHtml(card.location)}</span>`:''}</div></div><p class="profile-bio">${escapeHtml(card.bio||'Add a short introduction so people know how you can help.')}</p><div class="profile-primary-cta"><i class="ph-bold ${card.ctaType==='call'?'ph-phone':card.ctaType==='email'?'ph-envelope':card.ctaType==='website'?'ph-globe':'ph-calendar-check'}"></i>${escapeHtml(ctaLabels[card.ctaType]||'Connect')}</div><div class="profile-actions"><span class="profile-action primary"><i class="ph-bold ph-user-plus"></i>Save contact</span><span class="profile-action"><i class="ph-bold ph-chat-circle-dots"></i>Message</span><span class="profile-action"><i class="ph-bold ph-share-network"></i>Share</span></div>${services.length?`<section class="profile-section"><div class="profile-section-title"><strong>How I can help</strong><span>${services.length} services</span></div><div class="profile-services">${services.map((service,index)=>`<div class="profile-service"><i class="ph-bold ${['ph-check-circle','ph-star','ph-lightning'][index]||'ph-sparkle'}"></i>${escapeHtml(service)}</div>`).join('')}</div></section>`:''}<section class="profile-section"><div class="profile-section-title"><strong>Connect</strong><span>Find me online</span></div><div class="profile-socials">${socials||'<span class="profile-social"><i class="ph-bold ph-plus"></i></span>'}</div></section><div class="profile-footer"><i class="ph-bold ph-sparkle"></i>Made with <b>Searya</b></div></div>`;
   try { localStorage.setItem('searya_business_card',JSON.stringify(card)); } catch {}
   clearTimeout(cardQrTimer); cardQrTimer=setTimeout(refreshCardQr,500);
 }
@@ -284,29 +316,164 @@ async function shareBusinessCard() {
   } catch (error) { if (error?.name!=='AbortError') showToast('Sharing is not available in this browser.'); }
 }
 
-function handleCardPhoto(event) {
+async function handleCardImage(event,type='photo') {
   const file=event.target.files?.[0]; if (!file) return;
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size>3*1024*1024) { event.target.value=''; return showToast('Choose a PNG, JPG or WebP image under 3 MB.'); }
-  if (cardPhotoObjectUrl) URL.revokeObjectURL(cardPhotoObjectUrl);
-  cardPhotoObjectUrl=URL.createObjectURL(file); updateBusinessCard();
+  try {
+    const data=await fileToDataUrl(file,1024*1024);
+    if(type==='photo') cardPhotoData=data; else cardLogoData=data;
+    updateBusinessCard();
+  } catch(error) { event.target.value=''; showToast(error.message); }
 }
 
 function initializeBusinessCard() {
   const form=$('#business-card-form'); if (!form) return;
   try {
     const saved=JSON.parse(localStorage.getItem('searya_business_card')||'null');
-    const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',linkedin:'card-linkedin',instagram:'card-instagram',location:'card-location',bio:'card-bio',services:'card-services',color:'card-color',theme:'card-theme'};
+    const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',linkedin:'card-linkedin',instagram:'card-instagram',location:'card-location',bio:'card-bio',services:'card-services',color:'card-color',theme:'card-theme',ctaType:'card-cta-type',ctaLink:'card-cta-link'};
     if (saved) Object.entries(fields).forEach(([key,id])=>{ if (typeof saved[key]==='string') $(`#${id}`).value=saved[key]; });
+    if(saved?.photo)cardPhotoData=saved.photo;
+    if(saved?.logo)cardLogoData=saved.logo;
   } catch {}
   form.addEventListener('input',updateBusinessCard);
-  $('#card-photo').addEventListener('change',handleCardPhoto);
+  $('#card-photo').addEventListener('change',event=>handleCardImage(event,'photo'));
+  $('#card-logo').addEventListener('change',event=>handleCardImage(event,'logo'));
   $('#download-vcard').addEventListener('click',downloadVcard);
   $('#share-card').addEventListener('click',shareBusinessCard);
   $('#download-card-qr').addEventListener('click',downloadCardQr);
   updateBusinessCard();
 }
 
-function initialize() {
+function signatureValues() {
+  return {name:$('#signature-name').value.trim(),role:$('#signature-role').value.trim(),company:$('#signature-company').value.trim(),email:$('#signature-email').value.trim(),phone:$('#signature-phone').value.trim(),website:$('#signature-website').value.trim(),color:$('#signature-color').value,photo:signaturePhotoData,logo:signatureLogoData};
+}
+
+function signatureMarkup(values=signatureValues()) {
+  const photo=values.photo?`<img src="${values.photo}" width="72" height="72" style="display:block;width:72px;height:72px;border-radius:16px;object-fit:cover" alt="">`:'';
+  const logo=values.logo?`<img src="${values.logo}" height="24" style="display:block;max-width:110px;height:24px;object-fit:contain;margin-top:10px" alt="${escapeHtml(values.company)}">`:'';
+  return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;color:#172033"><tr>${photo?`<td style="padding-right:16px;vertical-align:top">${photo}</td>`:''}<td style="border-left:3px solid ${values.color};padding-left:16px"><strong style="font-size:17px;line-height:1.3">${escapeHtml(values.name||'Your Name')}</strong><div style="font-size:12px;color:#667085;margin:3px 0 9px">${escapeHtml([values.role,values.company].filter(Boolean).join(' · '))}</div><div style="font-size:11px;line-height:1.7">${values.email?`<a style="color:${values.color};text-decoration:none" href="mailto:${escapeHtml(values.email)}">${escapeHtml(values.email)}</a>`:''}${values.phone?` &nbsp;·&nbsp; <a style="color:${values.color};text-decoration:none" href="tel:${escapeHtml(values.phone)}">${escapeHtml(values.phone)}</a>`:''}${values.website?`<br><a style="color:${values.color};text-decoration:none" href="${escapeHtml(values.website)}">${escapeHtml(values.website.replace(/^https?:\/\//,''))}</a>`:''}</div>${logo}</td></tr></table>`;
+}
+
+function updateSignature() { if($('#signature-preview')) $('#signature-preview').innerHTML=signatureMarkup(); }
+
+async function initializeSignature() {
+  if(!$('#signature-form'))return;
+  $('#signature-form').addEventListener('input',updateSignature);
+  $('#signature-photo').addEventListener('change',async event=>{try{signaturePhotoData=await fileToDataUrl(event.target.files?.[0]);updateSignature();}catch(error){showToast(error.message);}});
+  $('#signature-logo').addEventListener('change',async event=>{try{signatureLogoData=await fileToDataUrl(event.target.files?.[0]);updateSignature();}catch(error){showToast(error.message);}});
+  $('#copy-signature').addEventListener('click',async()=>{
+    const html=signatureMarkup();
+    try {
+      if(window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([`${signatureValues().name}\n${signatureValues().role}\n${signatureValues().email}`],{type:'text/plain'})})]);
+      else await navigator.clipboard.writeText(html);
+      showToast('Email signature copied.');track('tool_completed',{tool:'email_signature'});track('tool_exported',{tool:'email_signature',format:'html'});
+    } catch { showToast('Copy is unavailable. Select the preview and copy it manually.'); }
+  });
+  updateSignature();
+}
+
+function addExpenseRow(data={}) {
+  const row=document.createElement('tr');
+  row.innerHTML=`<td><input class="expense-date" type="date" value="${escapeHtml(data.date||new Date().toISOString().slice(0,10))}" aria-label="Expense date"></td><td><select class="expense-category" aria-label="Expense category">${['Software','Marketing','Travel','Office','Contractors','Meals','Other'].map(value=>`<option${data.category===value?' selected':''}>${value}</option>`).join('')}</select></td><td><input class="expense-description" maxlength="100" placeholder="What was this for?" value="${escapeHtml(data.description||'')}"></td><td><input class="expense-amount" type="number" min="0" step="0.01" value="${Number(data.amount||0)}" aria-label="Expense amount"></td><td><button class="remove-expense" type="button" aria-label="Remove expense"><i class="ph-bold ph-trash"></i></button></td>`;
+  row.querySelectorAll('input,select').forEach(input=>input.addEventListener('input',updateExpenses));
+  row.querySelector('.remove-expense').addEventListener('click',()=>{row.remove();updateExpenses();});
+  $('#expense-rows').append(row);updateExpenses();
+}
+
+function expenseValues(){return $$('.expense-table tbody tr').map(row=>({date:row.querySelector('.expense-date').value,category:row.querySelector('.expense-category').value,description:row.querySelector('.expense-description').value.trim(),amount:Math.max(0,Number(row.querySelector('.expense-amount').value)||0)}));}
+function updateExpenses(){
+  if(!$('#expense-total'))return;
+  const items=expenseValues();const total=items.reduce((sum,item)=>sum+item.amount,0);const categories={};items.forEach(item=>categories[item.category]=(categories[item.category]||0)+item.amount);const top=Object.entries(categories).sort((a,b)=>b[1]-a[1])[0];
+  $('#expense-total').textContent=money(total,'$');$('#expense-top-category').textContent=top?.[0]||'—';$('#expense-count').textContent=items.length;$('#expense-average').textContent=money(items.length?total/items.length:0,'$');
+}
+function initializeExpenses(){
+  if(!$('#expense-rows'))return;addExpenseRow({category:'Software',description:'Business software',amount:29});addExpenseRow({category:'Marketing',description:'Advertising',amount:75});
+  $('#add-expense').addEventListener('click',()=>addExpenseRow());
+  $('#clear-expenses').addEventListener('click',()=>{$('#expense-rows').innerHTML='';addExpenseRow();});
+  $('#download-expenses').addEventListener('click',()=>{const rows=[['Date','Category','Description','Amount'],...expenseValues().map(item=>[item.date,item.category,item.description,item.amount.toFixed(2)])];const csv=rows.map(row=>row.map(cell=>`"${String(cell).replaceAll('"','""')}"`).join(',')).join('\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const anchor=document.createElement('a');anchor.href=url;anchor.download='searya-business-expenses.csv';anchor.click();URL.revokeObjectURL(url);track('tool_completed',{tool:'expense_tracker'});track('tool_exported',{tool:'expense_tracker',format:'csv'});});
+}
+
+function calculateMargin(event){event?.preventDefault();const cost=Math.max(0,Number($('#margin-cost').value)||0);const price=Math.max(0,Number($('#margin-price').value)||0);const target=Math.min(99.9,Math.max(0,Number($('#target-margin').value)||0));const profit=price-cost;const margin=price?profit/price*100:0;const markup=cost?profit/cost*100:0;const targetPrice=target<100?cost/(1-target/100):0;$('#margin-profit').textContent=money(profit,'$');$('#margin-percent').textContent=`${margin.toFixed(1)}%`;$('#markup-percent').textContent=`${markup.toFixed(1)}%`;$('#target-price').textContent=money(targetPrice,'$');$('#margin-insight').textContent=profit<0?'Your selling price is below cost. Raise the price or reduce the cost.':`Each sale keeps ${money(profit,'$')} after direct cost, before overhead and tax.`;if(event)track('tool_completed',{tool:'profit_margin'});}
+function initializeMargin(){if(!$('#margin-form'))return;$('#margin-form').addEventListener('submit',calculateMargin);$('#margin-form').addEventListener('input',()=>calculateMargin());calculateMargin();}
+
+function authTab(mode='login'){$$('[data-auth-tab]').forEach(button=>button.classList.toggle('active',button.dataset.authTab===mode));$('#login-form').hidden=mode!=='login';$('#register-form').hidden=mode!=='register';$('#auth-title').textContent=mode==='register'?'Create your free workspace':'Welcome back';$('#auth-message').textContent='';}
+function openAuth(mode='login'){$('#auth-modal').hidden=false;authTab(mode);document.body.classList.add('modal-open');track('auth_started',{mode});}
+function closeAuth(){$('#auth-modal').hidden=true;document.body.classList.remove('modal-open');}
+
+async function refreshAccount(){
+  try{currentUser=(await SearyaApi.me()).user;}catch{currentUser=null;}
+  const button=$('#account-button');button.querySelector('span').textContent=currentUser?currentUser.name.split(' ')[0]:'Sign in';button.classList.toggle('signed-in',Boolean(currentUser));
+  return currentUser;
+}
+
+async function openAccount(){
+  if(!currentUser)return openAuth('login');
+  track('account_opened');$('#account-drawer').hidden=false;document.body.classList.add('modal-open');$('#account-name').textContent=currentUser.name;
+  await loadSavedItems();
+}
+function closeAccount(){$('#account-drawer').hidden=true;document.body.classList.remove('modal-open');}
+
+async function loadSavedItems(){
+  if(!currentUser)return;
+  try{const [dashboard,itemsPayload]=await Promise.all([SearyaApi.accountDashboard(),SearyaApi.toolItems()]);currentUser=dashboard.account;$('#account-summary').innerHTML=`<div><span>Plan</span><strong>${currentUser.plan==='pro'?'Pro':'Free'}</strong></div><div><span>Saved items</span><strong>${dashboard.savedCount}</strong></div>`;$('#account-upgrade').hidden=currentUser.plan==='pro';const items=itemsPayload.items||[];$('#saved-items').innerHTML=items.length?items.map(item=>`<article><button class="saved-open" type="button" data-saved-id="${item.id}"><i class="ph-bold ph-file"></i><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.itemType.replaceAll('-',' '))} · ${new Date(item.updatedAt).toLocaleDateString('en-US')}</small></span></button><button class="saved-delete" type="button" data-delete-saved="${item.id}" aria-label="Delete"><i class="ph-bold ph-trash"></i></button></article>`).join(''):`<div class="empty-state"><i class="ph-bold ph-folder-open"></i><p>Save a card, document or calculator result to see it here.</p></div>`;window.searyaSavedItems=items;}catch(error){showToast(error.message);}
+}
+
+function currentToolKey(){return TOOL_PATHS[location.pathname.replace(/\/$/,'')]||'';}
+function toolSnapshot(){
+  const key=currentToolKey();
+  if(key==='card')return{itemType:'digital-card',title:`${businessCardValues().name||'Digital'} business card`,data:businessCardValues()};
+  if(key==='qr')return{itemType:'qr-code',title:`QR — ${$('#qr-content').value.trim().slice(0,45)||'Untitled'}`,data:{content:$('#qr-content').value,dark:$('#qr-dark').value,light:$('#qr-light').value,logo:qrLogoData}};
+  if(key==='document'){const doc=documentValues();return{itemType:doc.type,title:`${doc.type[0].toUpperCase()+doc.type.slice(1)} ${doc.number||''}`.trim(),data:doc};}
+  if(key==='time')return{itemType:'timesheet',title:`Timesheet — ${new Date().toLocaleDateString('en-US')}`,data:lastTimeResult||{}};
+  if(key==='signature')return{itemType:'email-signature',title:`${signatureValues().name||'Email'} signature`,data:signatureValues()};
+  if(key==='expenses')return{itemType:'expense-tracker',title:`Expenses — ${new Date().toLocaleDateString('en-US')}`,data:{items:expenseValues()}};
+  if(key==='margin')return{itemType:'profit-margin',title:'Profit margin calculation',data:{cost:$('#margin-cost').value,price:$('#margin-price').value,target:$('#target-margin').value}};
+  return null;
+}
+
+async function saveCurrentTool(){if(!currentUser)return openAuth('register');const snapshot=toolSnapshot();if(!snapshot)return showToast('Open a tool before saving.');try{await SearyaApi.saveToolItem(snapshot);showToast('Saved to your workspace.');track('tool_saved',{tool:snapshot.itemType});if(!$('#account-drawer').hidden)await loadSavedItems();}catch(error){showToast(error.message);}}
+
+async function startCheckout(packageKey){
+  if(!currentUser){openAuth('register');return;}
+  track('checkout_started',{plan:packageKey});
+  try{const result=await SearyaApi.checkout(packageKey);if(result.checkoutUrl)location.href=result.checkoutUrl;else{await refreshAccount();showToast('Your Pro plan is active.');}}catch(error){track('checkout_failed',{plan:packageKey,code:error.code});showToast(error.code==='FREE_LAUNCH_ACTIVE'||error.code==='PAYMENT_NOT_CONFIGURED'?'Secure payments are being connected. Please try again soon.':error.message);}
+}
+
+function initializeAuth(){
+  $$('[data-auth-open]').forEach(button=>button.addEventListener('click',()=>openAuth(button.dataset.authOpen)));
+  $$('[data-modal-close]').forEach(button=>button.addEventListener('click',closeAuth));$$('[data-auth-tab]').forEach(button=>button.addEventListener('click',()=>authTab(button.dataset.authTab)));
+  $('#account-button').addEventListener('click',openAccount);$$('[data-account-close]').forEach(button=>button.addEventListener('click',closeAccount));$('#save-current-item').addEventListener('click',saveCurrentTool);$('#save-tool-top')?.addEventListener('click',saveCurrentTool);$('#logout-button').addEventListener('click',async()=>{await SearyaApi.logout();currentUser=null;closeAccount();await refreshAccount();showToast('Signed out.');});
+  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.login(values);currentUser=result.user;closeAuth();await refreshAccount();showToast('Welcome back.');track('auth_completed',{mode:'login'});}catch(error){$('#auth-message').textContent=error.message;track('auth_failed',{mode:'login',code:error.code});}finally{button.disabled=false;}});
+  $('#forgot-password')?.addEventListener('click',async()=>{const email=$('#login-form input[name="email"]').value.trim();if(!email){$('#auth-message').textContent='Enter your email above first.';return;}try{await SearyaApi.forgotPassword(email);$('#auth-message').textContent='If an account exists, a secure reset link is on its way.';track('auth_help_requested',{mode:'password_reset'});}catch(error){$('#auth-message').textContent=error.message;}});
+  $('#register-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.register({...values,role:'both'});if(result.verificationRequired){$('#auth-message').textContent='Check your inbox and verify your email. Then come back and sign in.';authTab('login');$('#auth-message').textContent='Check your inbox and verify your email. Then sign in.';}else{currentUser=result.user;closeAuth();await refreshAccount();showToast('Your workspace is ready.');}track('auth_completed',{mode:'register'});}catch(error){$('#auth-message').textContent=error.message;track('auth_failed',{mode:'register',code:error.code});}finally{button.disabled=false;}});
+  document.addEventListener('click',async event=>{const checkout=event.target.closest('[data-checkout]');if(checkout){checkout.disabled=true;await startCheckout(checkout.dataset.checkout);checkout.disabled=false;return;}const remove=event.target.closest('[data-delete-saved]');if(remove){await SearyaApi.deleteToolItem(remove.dataset.deleteSaved);await loadSavedItems();return;}const open=event.target.closest('[data-saved-id]');if(open){const item=(window.searyaSavedItems||[]).find(entry=>entry.id===open.dataset.savedId);if(item){sessionStorage.setItem('searya_restore_item',JSON.stringify(item));const routes={'digital-card':'/digital-business-card','qr-code':'/qr-code-generator',invoice:'/invoice-generator',quote:'/quote-generator',receipt:'/receipt-maker',timesheet:'/time-card-calculator','email-signature':'/email-signature-generator','expense-tracker':'/expense-tracker','profit-margin':'/profit-margin-calculator'};location.href=routes[item.itemType]||'/';}}});
+}
+
+function applyRestoredItem(){
+  let item;try{item=JSON.parse(sessionStorage.getItem('searya_restore_item')||'null');sessionStorage.removeItem('searya_restore_item');}catch{}if(!item?.data)return;const data=item.data;const key=currentToolKey();
+  if(key==='card'){const fields={name:'card-name',role:'card-role',company:'card-company',email:'card-email',phone:'card-phone',website:'card-website',linkedin:'card-linkedin',instagram:'card-instagram',location:'card-location',bio:'card-bio',services:'card-services',color:'card-color',theme:'card-theme',ctaType:'card-cta-type',ctaLink:'card-cta-link'};Object.entries(fields).forEach(([prop,id])=>{if(data[prop]!=null)$(`#${id}`).value=data[prop];});cardPhotoData=data.photo||'';cardLogoData=data.logo||'';updateBusinessCard();}
+  if(key==='qr'){$('#qr-content').value=data.content||'';$('#qr-dark').value=data.dark||'#111827';$('#qr-light').value=data.light||'#ffffff';qrLogoData=data.logo||'';}
+  if(key==='document'){
+    const fields={type:'doc-type',number:'doc-number',business:'business-name',businessEmail:'business-email',client:'client-name',clientEmail:'client-email',issueDate:'issue-date',dueDate:'due-date',currency:'currency',discountRate:'discount',taxRate:'tax',notes:'doc-notes'};
+    Object.entries(fields).forEach(([prop,id])=>{if(data[prop]!=null)$(`#${id}`).value=data[prop];});
+    $('#line-items').innerHTML='';(Array.isArray(data.items)&&data.items.length?data.items:[{description:'Professional services',quantity:1,rate:0}]).forEach(row=>addLineItem(row.description,row.quantity,row.rate));syncDocumentType();updateDocumentPreview();
+  }
+  if(key==='time'&&Array.isArray(data.entries)){
+    const entries=new Map(data.entries.map(entry=>[entry.day,entry]));
+    $$('tr[data-day]').forEach(row=>{const entry=entries.get(row.dataset.day);if(!entry)return;row.querySelector('.clock-in').value=entry.start||'';row.querySelector('.clock-out').value=entry.end||'';row.querySelector('.break-min').value=entry.breakMinutes||0;});
+    $('#hourly-rate').value=data.hourlyRate??20;$('#overtime-rate').value=data.multiplier??1.5;$('#overtime-after').value=data.overtimeAfter??40;calculateTime({silent:true});
+  }
+  if(key==='signature'){const fields={name:'signature-name',role:'signature-role',company:'signature-company',email:'signature-email',phone:'signature-phone',website:'signature-website',color:'signature-color'};Object.entries(fields).forEach(([prop,id])=>{if(data[prop]!=null)$(`#${id}`).value=data[prop];});signaturePhotoData=data.photo||'';signatureLogoData=data.logo||'';updateSignature();}
+  if(key==='expenses'&&Array.isArray(data.items)){$('#expense-rows').innerHTML='';data.items.forEach(addExpenseRow);}
+  if(key==='margin'){$('#margin-cost').value=data.cost||0;$('#margin-price').value=data.price||0;$('#target-margin').value=data.target||0;calculateMargin();}
+  showToast('Saved item restored.');
+}
+
+async function initializeTelemetry(){
+  try{await SearyaApi.trackPageView(`${location.pathname}${location.search}`,document.referrer);await SearyaApi.trackPresence(presenceSessionId,'enter',location.pathname,innerWidth<640?'mobile':innerWidth<1000?'tablet':'desktop');presenceTimer=setInterval(()=>SearyaApi.trackPresence(presenceSessionId,'heartbeat',location.pathname,innerWidth<640?'mobile':innerWidth<1000?'tablet':'desktop').catch(()=>{}),30000);addEventListener('pagehide',()=>{clearInterval(presenceTimer);navigator.sendBeacon?.('/api/analytics/presence',new Blob([JSON.stringify({sessionId:presenceSessionId,action:'leave',path:location.pathname,device:innerWidth<640?'mobile':'desktop'})],{type:'application/json'}));});}catch{}
+}
+
+async function initialize() {
+  await initializeTelemetry();
   routeTool();
   $('#qr-form')?.addEventListener('submit',generateQr);
   $('#download-qr')?.addEventListener('click',downloadQr);
@@ -318,6 +485,11 @@ function initialize() {
   $('#download-timesheet')?.addEventListener('click',downloadTimesheet);
   initializeDocument();
   initializeBusinessCard();
+  initializeSignature();initializeExpenses();initializeMargin();initializeAuth();
+  $('#qr-logo')?.addEventListener('change',async event=>{try{qrLogoData=await fileToDataUrl(event.target.files?.[0]);showToast('Logo added. Generate the QR code to preview it.');}catch(error){showToast(error.message);}});
+  await refreshAccount();applyRestoredItem();
+  if(new URLSearchParams(location.search).get('verified')==='1')showToast('Email verified. Your account is ready.');
+  if(new URLSearchParams(location.search).get('payment')==='success'){await refreshAccount();showToast('Payment confirmed. Welcome to Searya Pro.');}
   $$('a[href^="/"]').forEach(link=>link.addEventListener('click',()=>track('navigation_clicked',{href:link.getAttribute('href')})));
 }
 

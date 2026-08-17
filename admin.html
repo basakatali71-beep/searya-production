@@ -1,69 +1,37 @@
 <!doctype html>
-<html lang="tr" class="dark">
+<html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <title>Searya Yönetim Paneli</title>
-  <link rel="icon" href="/favicon.ico?v=20260812-1" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32.png?v=20260812-1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/public/apple-touch-icon.png?v=20260812-1">
-  <link rel="stylesheet" href="/src/styles/admin.css?v=20260812-3">
-  <link rel="stylesheet" href="/src/styles/admin-behavior.css?v=20260812-1">
-  <link rel="stylesheet" href="/src/styles/admin-messages.css?v=20260813-1">
-  <style>.utm-example{margin:-4px 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#080d16;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.utm-example code{color:#a9bfff}.funnel{margin-bottom:0}.live-card{border-color:rgba(50,210,150,.3);background:linear-gradient(145deg,rgba(20,49,47,.92),rgba(11,17,28,.98))}.live-card h2{display:flex;align-items:center;gap:8px}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(50,210,150,.12);animation:livePulse 1.8s ease-in-out infinite}.live-metrics{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0}.live-metrics .metric{background:rgba(8,12,20,.44)}.metric-live strong{color:#5ee0ad}@keyframes livePulse{50%{opacity:.5;box-shadow:0 0 0 8px rgba(50,210,150,0)}}@media(max-width:620px){.live-metrics{grid-template-columns:1fr}.live-card .card-head>span{display:none}}</style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+  <title>Searya Yönetim Paneli — Tools Merkezi</title>
+  <link rel="icon" href="/favicon.ico?v=20260816-1"><link rel="stylesheet" href="/public/vendor/phosphor/regular/style.css?v=2.1.2"><link rel="stylesheet" href="/public/vendor/phosphor/bold/style.css?v=2.1.2"><link rel="stylesheet" href="/src/styles/admin.css?v=20260816-4">
 </head>
 <body>
   <aside>
-    <a class="brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya"></a>
-    <p class="eyebrow">YÖNETİM PANELİ</p>
+    <a class="brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya"></a><p class="eyebrow">YÖNETİM MERKEZİ</p>
     <nav>
-      <button class="active" data-section="dashboard">Genel Bakış</button>
-      <button data-section="behavior">Ziyaretçi Davranışları</button>
-      <button data-section="analytics">Reklam Analizi</button>
-      <button data-section="listings">İlanlar <span id="pending-badge">0</span></button>
-      <button data-section="users">Kullanıcılar</button>
-      <button data-section="purchases">Paket Satışları</button>
-      <button data-section="reports">Şikâyetler <span id="report-badge">0</span></button>
-      <button data-section="seed-messages">Örnek İlan Mesajları <span id="seed-message-badge">0</span></button>
+      <button class="active" data-section="dashboard"><i class="ph-bold ph-squares-four"></i>Genel bakış</button>
+      <button data-section="tools"><i class="ph-bold ph-chart-bar"></i>Araç kullanımı</button>
+      <button data-section="acquisition"><i class="ph-bold ph-megaphone"></i>Trafik ve dönüşüm</button>
+      <button data-section="users"><i class="ph-bold ph-users"></i>Kullanıcılar</button>
+      <button data-section="memberships"><i class="ph-bold ph-credit-card"></i>Üyelikler</button>
+      <button data-section="activity"><i class="ph-bold ph-pulse"></i>Canlı hareketler</button>
     </nav>
-    <a class="back" href="/">← Siteye dön</a>
+    <div class="admin-status"><i></i><span>Sistem çevrimiçi</span></div><a class="back" href="/">← Siteye dön</a>
   </aside>
   <main>
-    <header><div><p class="eyebrow">SEARYA</p><h1 id="page-title">Genel Bakış</h1></div><button id="refresh-btn">Verileri yenile</button></header>
+    <header><div><p class="eyebrow">SEARYA TOOLS</p><h1 id="page-title">Genel bakış</h1><p id="page-subtitle">Gerçek kullanıcı, araç ve gelir verileri</p></div><button id="refresh-btn"><i class="ph-bold ph-arrows-clockwise"></i> Yenile</button></header>
     <div id="notice" class="notice">Veriler yükleniyor…</div>
     <section id="dashboard" class="panel active">
-      <article class="card live-card"><div class="card-head"><div><h2><i class="live-dot"></i> Canlı ziyaretçi takibi</h2><span>Analitik izni veren ziyaretçiler · 15 saniyede bir yenilenir</span></div><span id="live-updated">—</span></div><div id="live-metrics" class="metrics live-metrics"></div></article>
-      <div id="metrics" class="metrics"></div>
-      <article class="card chart-card"><div class="card-head"><h2>Son 7 gün</h2><span>Ziyaretler ve kayıtlar</span></div><div id="chart" class="chart"></div></article>
-      <div class="split"><article class="card"><div class="card-head"><h2>Onay bekleyen ilanlar</h2></div><div id="pending-preview"></div></article><article class="card"><div class="card-head"><h2>Açık şikâyetler</h2></div><div id="report-preview"></div></article></div>
+      <article class="card live-card"><div class="card-head"><div><h2><i class="live-dot"></i> Canlı ziyaretçi takibi</h2><span>Şu an sitede olan, son iki dakikadaki gerçek anonim oturumlar</span></div><span id="live-updated">—</span></div><div id="live-metrics" class="metrics live-metrics"></div></article>
+      <div id="metrics" class="metrics overview-metrics"></div>
+      <article class="card"><div class="card-head"><div><h2>Son 7 gün</h2><span>Benzersiz ziyaretçi ve yeni kayıtlar</span></div><div class="legend"><i></i>Ziyaretçi <i></i>Kayıt</div></div><div id="chart" class="chart"></div></article>
+      <div class="split"><article class="card"><div class="card-head"><div><h2>En çok kullanılan araçlar</h2><span>Son 30 gün</span></div></div><div id="dashboard-tools" class="insight-list"></div></article><article class="card"><div class="card-head"><div><h2>Dönüşüm özeti</h2><span>Ziyaretten üyeliğe</span></div></div><div id="dashboard-funnel" class="funnel-stack"></div></article></div>
     </section>
-    <section id="behavior" class="panel">
-      <div id="behavior-metrics" class="metrics"></div>
-      <div class="split behavior-split">
-        <article class="card"><div class="card-head"><div><h2>En çok görüntülenen ilanlar</h2><span>Son 30 gündeki ilan açılışları</span></div></div><div id="behavior-listings" class="insight-list"></div></article>
-        <article class="card"><div class="card-head"><div><h2>Arama analizleri</h2><span>Aramalar temizlenir; form değerleri kaydedilmez</span></div></div><div id="behavior-searches" class="insight-list"></div></article>
-      </div>
-      <div class="split behavior-split">
-        <article class="card"><div class="card-head"><div><h2>Ziyaretçiler neden ayrılıyor?</h2><span>İsteğe bağlı çıkış geri bildirimi</span></div></div><div id="behavior-exits" class="insight-list"></div></article>
-        <article class="card"><div class="card-head"><div><h2>Terk sinyalleri</h2><span>Kesin neden değil, davranışsal göstergelerdir</span></div></div><div id="behavior-dropoffs" class="insight-list"></div></article>
-      </div>
-      <div class="split behavior-split">
-        <article class="card"><div class="card-head"><div><h2>Popüler hareketler</h2><span>En sık gerçekleşen etkileşimler</span></div></div><div id="behavior-actions" class="insight-list"></div></article>
-        <article class="card"><div class="card-head"><div><h2>Cihazlar</h2><span>Oturum bazında cihaz türleri</span></div></div><div id="behavior-devices" class="insight-list"></div></article>
-      </div>
-      <article class="card"><div class="card-head"><div><h2>Son ziyaretçi yolculukları</h2><span>Giriş yapılmadıkça anonimdir · Şifreler, mesajlar ve form içerikleri kaydedilmez</span></div></div><div id="behavior-journeys" class="journey-list"></div></article>
-    </section>
-    <section id="analytics" class="panel">
-      <div class="card"><div class="card-head"><div><h2>30 günlük dönüşüm hunisi</h2><span>Yalnızca analitik izni veren ziyaretçiler</span></div></div><div id="funnel-metrics" class="metrics funnel"></div></div>
-      <div class="card"><div class="card-head"><div><h2>Kampanya performansı</h2><span>X reklam bağlantılarında UTM parametrelerini kullanın</span></div></div><div class="utm-example">Örnek: <code>https://searya.com/?utm_source=x&amp;utm_medium=paid&amp;utm_campaign=seller_launch</code></div><div class="table-wrap"><table><thead><tr><th>Kaynak</th><th>Ortam</th><th>Kampanya</th><th>Ziyaretçiler</th><th>Kayıtlar</th><th>İlanlar</th><th>Görüşmeler</th></tr></thead><tbody id="campaign-table"></tbody></table></div></div>
-    </section>
-    <section id="listings" class="panel"><div class="card"><div class="card-head"><h2>Tüm ilanlar</h2><input data-search="listing-table" placeholder="İlanlarda ara…"></div><div class="table-wrap"><table><thead><tr><th>İlan</th><th>Sahibi</th><th>Fiyat</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="listing-table"></tbody></table></div></div></section>
-    <section id="users" class="panel"><div class="card"><div class="card-head"><h2>Kullanıcılar</h2><input data-search="user-table" placeholder="Kullanıcılarda ara…"></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Rol</th><th>Haklar</th><th>Son görülme</th><th>İşlem</th></tr></thead><tbody id="user-table"></tbody></table></div></div></section>
-    <section id="purchases" class="panel"><div class="card"><div class="card-head"><h2>Paket satışları</h2></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="purchase-table"></tbody></table></div></div></section>
-    <section id="reports" class="panel"><div class="card"><div class="card-head"><h2>Şikâyetler</h2></div><div class="table-wrap"><table><thead><tr><th>Bildiren</th><th>Hedef</th><th>Neden</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="report-table"></tbody></table></div></div></section>
-    <section id="seed-messages" class="panel"><div class="card"><div class="card-head"><div><h2>Örnek ilanlara gelen mesajlar</h2><span>Yanıtlar Searya yönetimi adına gönderilir.</span></div></div><div id="seed-message-list" class="admin-conversations"></div></div></section>
+    <section id="tools" class="panel"><div id="tool-metrics" class="metrics"></div><article class="card"><div class="card-head"><div><h2>Araç performansı</h2><span>Açılış, tamamlama, dışa aktarma ve kayıt sayıları</span></div></div><div class="table-wrap"><table><thead><tr><th>Araç</th><th>Açıldı</th><th>Tamamlandı</th><th>Dışa aktarıldı</th><th>Kaydedildi</th><th>Tamamlama oranı</th></tr></thead><tbody id="tool-table"></tbody></table></div></article></section>
+    <section id="acquisition" class="panel"><div id="funnel-metrics" class="metrics"></div><article class="card"><div class="card-head"><div><h2>Kampanya performansı</h2><span>Google Ads ve X bağlantılarında UTM kullanın</span></div></div><div class="utm-example">Örnek: <code>https://searya.com/?utm_source=google&amp;utm_medium=cpc&amp;utm_campaign=business_tools</code></div><div class="table-wrap"><table><thead><tr><th>Kaynak</th><th>Ortam</th><th>Kampanya</th><th>Ziyaretçiler</th><th>Kayıtlar</th><th>Araç kullanan</th><th>Ödeme başlangıcı</th></tr></thead><tbody id="campaign-table"></tbody></table></div></article></section>
+    <section id="users" class="panel"><article class="card"><div class="card-head"><div><h2>Kullanıcılar</h2><span>Kayıt, plan, kayıtlı iş ve son görülme</span></div><input data-search="user-table" placeholder="Kullanıcı ara…"></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Plan</th><th>Kayıtlı işler</th><th>Kayıt tarihi</th><th>Son görülme</th><th>Durum</th></tr></thead><tbody id="user-table"></tbody></table></div></article></section>
+    <section id="memberships" class="panel"><div id="membership-metrics" class="metrics"></div><article class="card"><div class="card-head"><div><h2>Ödeme geçmişi</h2><span>Yalnızca Searya Tools üyelikleri</span></div></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody id="purchase-table"></tbody></table></div></article></section>
+    <section id="activity" class="panel"><article class="card"><div class="card-head"><div><h2>Ziyaretçi Davranışları</h2><span>Son kullanıcı hareketleri; şifreler ve form içerikleri kaydedilmez</span></div></div><div id="activity-feed" class="activity-feed"></div></article></section>
   </main>
-  <script type="module" src="/src/admin.js?v=20260813-1"></script>
-</body>
-</html>
+  <script type="module" src="/src/admin.js?v=20260816-4"></script>
+</body></html>
