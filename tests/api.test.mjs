@@ -138,7 +138,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   const listing = listings.listings[0];
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
-  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card']) {
+  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']) {
     assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${path}`));
   }
   assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com\\/projects\\/${listing.slug}`));
@@ -166,6 +166,14 @@ test('business tools expose dedicated SEO pages and generate real QR SVG output'
   assert.match(timePage, /<link rel="canonical" href="https:\/\/searya\.com\/time-card-calculator">/);
   assert.match(timePage, /"@type":"SoftwareApplication"/);
   assert.match(timePage, /"price":"0"/);
+
+  for (const path of ['/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']) {
+    const response = await fetch(`${baseUrl}${path}`);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com${path}">`));
+    assert.match(html, /"@type":"SoftwareApplication"/);
+  }
 
   const qrResponse = await fetch(`${baseUrl}/api/tools/qr?text=${encodeURIComponent('https://searya.com/')}`);
   assert.equal(qrResponse.status, 200);

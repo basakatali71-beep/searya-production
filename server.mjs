@@ -19,7 +19,7 @@ import { submitSitemapToGoogle } from './src/services/googleSearchConsole.js';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC_STATIC_FILES = new Set([
   'index.html', 'admin.html', '404.html', 'favicon.ico',
-  'src/app.js', 'src/api.js', 'src/admin.js', 'src/tools.js',
+  'src/app.js', 'src/api.js', 'src/admin.js', 'src/tools.js', 'src/tool-calculations.js',
   'src/data/seedListings.js', 'src/data/mockData.js', 'src/data/translations.js'
 ].map(path => resolve(ROOT, path)));
 const PUBLIC_STATIC_DIRECTORIES = ['public', 'legal', 'src/assets', 'src/styles'].map(path => resolve(ROOT, path));
@@ -51,7 +51,7 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
-const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator'];
+const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator'];
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -2018,7 +2018,12 @@ const TOOL_PAGES = Object.freeze({
   '/virtual-business-card': { title: 'Free Virtual Business Card Maker | Searya Tools', description: 'Create and preview a professional virtual business card, then export your contact details as a vCard and QR code.', name: 'Virtual Business Card Maker', feature: 'Create a virtual business card and downloadable contact file' },
   '/email-signature-generator': { title: 'Free Email Signature Generator with Logo | Searya', description: 'Create a professional HTML email signature with your photo, logo, contact details and brand colors. Copy it into Gmail or Outlook.', name: 'Email Signature Generator', feature: 'Create and copy a branded HTML email signature' },
   '/expense-tracker': { title: 'Free Business Expense Tracker — Download CSV | Searya', description: 'Track business expenses by date and category, see instant totals and download a clean CSV without installing accounting software.', name: 'Business Expense Tracker', feature: 'Track and export categorized business expenses' },
-  '/profit-margin-calculator': { title: 'Free Profit Margin & Markup Calculator | Searya Tools', description: 'Calculate profit, margin, markup and the selling price you need to hit a target margin with a free business calculator.', name: 'Profit Margin Calculator', feature: 'Calculate profit margin, markup and target selling price' }
+  '/profit-margin-calculator': { title: 'Free Profit Margin & Markup Calculator | Searya Tools', description: 'Calculate profit, margin, markup and the selling price you need to hit a target margin with a free business calculator.', name: 'Profit Margin Calculator', feature: 'Calculate profit margin, markup and target selling price' },
+  '/sales-tax-calculator': { title: 'Free Sales Tax Calculator — Add or Reverse Tax | Searya', description: 'Add sales tax to a price or work backward from a tax-inclusive total. Enter your own rate and get an instant itemized result.', name: 'Sales Tax Calculator', feature: 'Add sales tax or reverse-calculate a pre-tax price' },
+  '/estimate-generator': { title: 'Free Estimate Generator — Print or Save PDF | Searya', description: 'Create a professional customer estimate with your logo, line items, tax, discount, notes and terms, then print or save it as PDF.', name: 'Estimate Generator', feature: 'Create printable customer estimates with automatic totals' },
+  '/job-cost-calculator': { title: 'Free Job Cost Calculator for Small Business | Searya', description: 'Calculate materials, labor, overhead, total job cost, markup and a suggested customer price with a free job costing tool.', name: 'Job Cost Calculator', feature: 'Calculate complete job cost and suggested customer price' },
+  '/hourly-rate-calculator': { title: 'Freelance Hourly Rate Calculator | Searya Tools', description: 'Calculate a sustainable freelance hourly rate from income goals, business expenses, taxes, working weeks and billable hours.', name: 'Hourly Rate Calculator', feature: 'Calculate a sustainable freelance or consulting hourly rate' },
+  '/break-even-calculator': { title: 'Free Break-Even Calculator — Units & Revenue | Searya', description: 'Calculate contribution margin, break-even units and break-even revenue from fixed costs, variable cost and selling price.', name: 'Break-Even Calculator', feature: 'Calculate break-even units, contribution margin and revenue' }
 });
 const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',
