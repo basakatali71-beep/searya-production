@@ -51,7 +51,20 @@ const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
 const LAUNCH_FREE_CONNECTION_WINDOW_DAYS = 30;
-const TOOL_PATHS = ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator'];
+const TOOL_PATHS = Object.freeze(['/qr-code-generator', '/time-card-calculator', '/invoice-generator', '/digital-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']);
+const TOOL_ALIASES = Object.freeze({
+  '/work-hours-calculator': '/time-card-calculator',
+  '/quote-generator': '/invoice-generator',
+  '/receipt-maker': '/invoice-generator',
+  '/digital-business-card-maker': '/digital-business-card',
+  '/qr-business-card': '/digital-business-card',
+  '/virtual-business-card': '/digital-business-card'
+});
+const TOOL_PANEL_KEYS = Object.freeze({
+  '/qr-code-generator': 'qr', '/time-card-calculator': 'time', '/invoice-generator': 'document', '/digital-business-card': 'card',
+  '/email-signature-generator': 'signature', '/expense-tracker': 'expenses', '/profit-margin-calculator': 'margin', '/sales-tax-calculator': 'salesTax',
+  '/estimate-generator': 'estimate', '/job-cost-calculator': 'jobCost', '/hourly-rate-calculator': 'hourlyRate', '/break-even-calculator': 'breakEven'
+});
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -690,6 +703,13 @@ function redirect(res, location, cookies = []) {
 function permanentRedirect(res, location) {
   res.writeHead(301, { Location: location, 'Cache-Control': 'public, max-age=86400', ...securityHeaders() });
   res.end();
+}
+
+function goneResponse(req, res) {
+  const body = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,follow"><title>Content Removed | Searya</title></head><body><main><h1>This content is no longer available</h1><p>Searya is now a small-business tools platform. Explore the current tools from the homepage.</p><p><a href="/tools">Browse Searya Tools</a></p></main></body></html>';
+  const buffer = Buffer.from(body);
+  res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': buffer.length, 'Cache-Control': 'public, max-age=3600', 'X-Robots-Tag': 'noindex, follow', ...securityHeaders({ html: true }) });
+  if (req.method !== 'HEAD') res.end(buffer); else res.end();
 }
 
 function fail(res, status, code, message) {
@@ -2003,27 +2023,27 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
-const SEO_TITLE = 'Searya Tools — Digital Business Cards, QR & Invoice Tools';
-const SEO_DESCRIPTION = 'Create a digital business card, QR code, time card, invoice, quote or receipt. Use free business tools and upgrade once to unlock the complete Searya workspace.';
+const SEO_TITLE = 'Free Small Business Tools — Calculators & Documents | Searya';
+const SEO_DESCRIPTION = 'Use 12 free small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity. No account required.';
 const TOOL_PAGES = Object.freeze({
-  '/qr-code-generator': { title: 'Free QR Code Generator — Download SVG | Searya Tools', description: 'Create a permanent, high-resolution QR code for a URL or text. Customize colors and download a print-ready SVG for free.', name: 'QR Code Generator', feature: 'Create and download static QR codes' },
-  '/time-card-calculator': { title: 'Free Time Card Calculator with Overtime | Searya Tools', description: 'Calculate weekly work hours, subtract breaks, total overtime and estimate gross pay with a free online time card calculator.', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay' },
+  '/qr-code-generator': { title: 'Free QR Code Generator — Custom SVG Download | Searya', description: 'Create a free permanent QR code for a URL, message, email or phone number. Add brand colors or a logo and download a high-resolution SVG.', h1: 'Free QR Code Generator', name: 'QR Code Generator', feature: 'Create and download static QR codes' },
+  '/time-card-calculator': { title: 'Free Time Card Calculator — Hours & Overtime | Searya', description: 'Calculate hours worked, subtract lunch breaks, total weekly overtime and estimate gross pay with a free time card calculator.', h1: 'Free Time Card & Work Hours Calculator', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay' },
   '/work-hours-calculator': { title: 'Free Work Hours Calculator with Breaks | Searya Tools', description: 'Calculate daily and weekly work hours, subtract lunch breaks, total overtime and download your timesheet as CSV.', name: 'Work Hours Calculator', feature: 'Calculate daily and weekly work hours' },
-  '/invoice-generator': { title: 'Free Invoice Generator — Print or Save PDF | Searya Tools', description: 'Make a professional invoice with automatic totals, taxes and discounts. Print it or save it as a PDF without creating an account.', name: 'Invoice Generator', feature: 'Create printable invoices with automatic totals' },
+  '/invoice-generator': { title: 'Free Invoice Generator — Print or Save PDF | Searya', description: 'Create a free professional invoice, quote or receipt with line items, automatic totals, tax and discounts, then print or save it as PDF.', h1: 'Free Invoice & Business Document Generator', name: 'Invoice Generator', feature: 'Create printable invoices, quotes and receipts with automatic totals' },
   '/quote-generator': { title: 'Free Quote Generator — Professional PDF | Searya Tools', description: 'Create a professional customer quote with line items, tax, discounts and a print-ready PDF layout for free.', name: 'Quote Generator', feature: 'Create professional customer quotes' },
   '/receipt-maker': { title: 'Free Receipt Maker — Create a Printable Receipt | Searya Tools', description: 'Create a clean business receipt with itemized totals and save it as a printable PDF from your browser.', name: 'Receipt Maker', feature: 'Create itemized printable receipts' },
-  '/digital-business-card': { title: 'Free Digital Business Card Maker with QR Code | Searya', description: 'Create a professional digital business card, downloadable vCard and scannable contact QR code for free. No design experience required.', name: 'Digital Business Card Maker', feature: 'Create a digital business card, vCard and contact QR code' },
+  '/digital-business-card': { title: 'Free Digital Business Card Maker with QR Code | Searya', description: 'Create a free digital business card with professional templates, contact buttons, downloadable vCard, brand logo and scannable QR code.', h1: 'Free Digital Business Card Maker', name: 'Digital Business Card Maker', feature: 'Create a digital business card, vCard and contact QR code' },
   '/digital-business-card-maker': { title: 'Digital Business Card Maker — Free vCard & QR | Searya', description: 'Build a free digital business card with your contact details, company, website and social profile, then download a vCard and QR code.', name: 'Digital Business Card Maker', feature: 'Build and export a professional digital contact card' },
   '/qr-business-card': { title: 'Free QR Business Card Generator | Searya Tools', description: 'Make a QR business card that lets customers save your phone, email, website and company details directly to their contacts.', name: 'QR Business Card Generator', feature: 'Generate a scannable QR business card' },
   '/virtual-business-card': { title: 'Free Virtual Business Card Maker | Searya Tools', description: 'Create and preview a professional virtual business card, then export your contact details as a vCard and QR code.', name: 'Virtual Business Card Maker', feature: 'Create a virtual business card and downloadable contact file' },
-  '/email-signature-generator': { title: 'Free Email Signature Generator with Logo | Searya', description: 'Create a professional HTML email signature with your photo, logo, contact details and brand colors. Copy it into Gmail or Outlook.', name: 'Email Signature Generator', feature: 'Create and copy a branded HTML email signature' },
-  '/expense-tracker': { title: 'Free Business Expense Tracker — Download CSV | Searya', description: 'Track business expenses by date and category, see instant totals and download a clean CSV without installing accounting software.', name: 'Business Expense Tracker', feature: 'Track and export categorized business expenses' },
-  '/profit-margin-calculator': { title: 'Free Profit Margin & Markup Calculator | Searya Tools', description: 'Calculate profit, margin, markup and the selling price you need to hit a target margin with a free business calculator.', name: 'Profit Margin Calculator', feature: 'Calculate profit margin, markup and target selling price' },
-  '/sales-tax-calculator': { title: 'Free Sales Tax Calculator — Add or Reverse Tax | Searya', description: 'Add sales tax to a price or work backward from a tax-inclusive total. Enter your own rate and get an instant itemized result.', name: 'Sales Tax Calculator', feature: 'Add sales tax or reverse-calculate a pre-tax price' },
-  '/estimate-generator': { title: 'Free Estimate Generator — Print or Save PDF | Searya', description: 'Create a professional customer estimate with your logo, line items, tax, discount, notes and terms, then print or save it as PDF.', name: 'Estimate Generator', feature: 'Create printable customer estimates with automatic totals' },
-  '/job-cost-calculator': { title: 'Free Job Cost Calculator for Small Business | Searya', description: 'Calculate materials, labor, overhead, total job cost, markup and a suggested customer price with a free job costing tool.', name: 'Job Cost Calculator', feature: 'Calculate complete job cost and suggested customer price' },
-  '/hourly-rate-calculator': { title: 'Freelance Hourly Rate Calculator | Searya Tools', description: 'Calculate a sustainable freelance hourly rate from income goals, business expenses, taxes, working weeks and billable hours.', name: 'Hourly Rate Calculator', feature: 'Calculate a sustainable freelance or consulting hourly rate' },
-  '/break-even-calculator': { title: 'Free Break-Even Calculator — Units & Revenue | Searya', description: 'Calculate contribution margin, break-even units and break-even revenue from fixed costs, variable cost and selling price.', name: 'Break-Even Calculator', feature: 'Calculate break-even units, contribution margin and revenue' }
+  '/email-signature-generator': { title: 'Free Email Signature Generator with Logo | Searya', description: 'Create a free professional HTML email signature with your photo, logo, contact details and brand colors, then copy it into Gmail or Outlook.', h1: 'Free Email Signature Generator', name: 'Email Signature Generator', feature: 'Create and copy a branded HTML email signature' },
+  '/expense-tracker': { title: 'Free Business Expense Tracker — Export CSV | Searya', description: 'Track business expenses by date and category, review totals and averages, and download a clean CSV without installing accounting software.', h1: 'Free Business Expense Tracker', name: 'Business Expense Tracker', feature: 'Track and export categorized business expenses' },
+  '/profit-margin-calculator': { title: 'Free Profit Margin & Markup Calculator | Searya', description: 'Calculate profit per sale, gross margin, markup and the selling price required for a target margin with a free pricing calculator.', h1: 'Free Profit Margin & Markup Calculator', name: 'Profit Margin Calculator', feature: 'Calculate profit margin, markup and target selling price' },
+  '/sales-tax-calculator': { title: 'Free Sales Tax Calculator — Tax & Total | Searya', description: 'Calculate sales tax and total price or reverse-calculate the subtotal from a tax-inclusive amount using the exact rate you enter.', h1: 'Free Sales Tax Calculator', name: 'Sales Tax Calculator', feature: 'Add sales tax or reverse-calculate a pre-tax price' },
+  '/estimate-generator': { title: 'Free Estimate Generator for Small Businesses | Searya', description: 'Create a free professional business or contractor estimate with your logo, line items, tax, discount, notes and terms, then save it as PDF.', h1: 'Free Estimate Generator', name: 'Estimate Generator', feature: 'Create printable customer estimates with automatic totals' },
+  '/job-cost-calculator': { title: 'Free Job Cost Calculator for Contractors | Searya', description: 'Calculate materials, labor, additional costs, overhead, markup, gross margin and a suggested customer price for a job.', h1: 'Free Job Cost Calculator', name: 'Job Cost Calculator', feature: 'Calculate complete job cost and suggested customer price' },
+  '/hourly-rate-calculator': { title: 'Free Hourly Rate Calculator for Freelancers | Searya', description: 'Calculate a sustainable freelance or contractor hourly rate from income goals, expenses, tax allowance and available billable hours.', h1: 'Free Hourly Rate Calculator', name: 'Hourly Rate Calculator', feature: 'Calculate a sustainable freelance or consulting hourly rate' },
+  '/break-even-calculator': { title: 'Free Break-Even Calculator for Small Businesses | Searya', description: 'Calculate contribution margin, exact and whole break-even units, and break-even revenue from your fixed and variable costs.', h1: 'Free Break-Even Calculator', name: 'Break-Even Calculator', feature: 'Calculate break-even units, contribution margin and revenue' }
 });
 const SEO_CATEGORIES = Object.freeze({
   saas: 'SaaS Projects',
@@ -2223,12 +2243,27 @@ function homepageStructuredData() {
     '@graph': [
       { '@type': 'Organization', '@id': `${PUBLIC_ORIGIN}/#organization`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, logo: { '@type': 'ImageObject', url: `${PUBLIC_ORIGIN}/public/searya-logo.png` } },
       { '@type': 'WebSite', '@id': `${PUBLIC_ORIGIN}/#website`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, publisher: { '@id': `${PUBLIC_ORIGIN}/#organization` }, description: SEO_DESCRIPTION },
-      { '@type': 'ItemList', name: 'Free business tools', itemListElement: Object.entries(TOOL_PAGES).map(([path, page], index) => ({ '@type': 'ListItem', position: index + 1, name: page.name, url: `${PUBLIC_ORIGIN}${path}` })) }
+      { '@type': 'ItemList', name: 'Free business tools', itemListElement: TOOL_PATHS.map((path, index) => ({ '@type': 'ListItem', position: index + 1, name: TOOL_PAGES[path].name, url: `${PUBLIC_ORIGIN}${path}` })) }
     ]
   };
 }
 
-function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-2`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [] } = {}) {
+function applyPrimaryHeading(html, { panelKey = '', directory = false, pricing = false } = {}) {
+  html = html.replace(/<h1(\s[^>]*)?>/g, '<h2$1>').replaceAll('</h1>', '</h2>');
+  if (panelKey) {
+    const panelPattern = new RegExp(`(<article class="workspace" data-tool-panel="${panelKey}">[\\s\\S]*?<header class="workspace-heading">[\\s\\S]*?)<h2([^>]*)>([\\s\\S]*?)<\\/h2>`);
+    html = html.replace(panelPattern, '$1<h1$2>$3</h1>');
+  } else if (directory) {
+    html = html.replace(/(<section class="tools-section" id="tools">[\s\S]*?)<h2>(Pick a job\. Get it done\.)<\/h2>/, '$1<h1>$2</h1>');
+  } else if (pricing) {
+    html = html.replace(/(<section class="pricing-section" id="pricing">[\s\S]*?)<h2>(Start free\. Save everything with Pro\.)<\/h2>/, '$1<h1>$2</h1>');
+  } else {
+    html = html.replace(/(<section class="hero" id="home-hero">[\s\S]*?)<h2>([\s\S]*?)<\/h2>/, '$1<h1>$2</h1>');
+  }
+  return html;
+}
+
+function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canonical = `${PUBLIC_ORIGIN}/`, type = 'website', image = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-2`, robots = 'index, follow, max-image-preview:large', structuredData = null, initialListings = [], panelKey = '', directory = false, pricing = false, breadcrumbName = '', primaryH1 = '' } = {}) {
   let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const safeTitle = escapeMarkup(title);
   const safeDescription = escapeMarkup(description);
@@ -2255,7 +2290,14 @@ function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canon
     const json = JSON.stringify(structuredData).replaceAll('<', '\\u003c');
     html = html.replace(/<script id="searya-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="searya-structured-data" type="application/ld+json">${json}</script>`);
   }
-  return html;
+  if (panelKey && breadcrumbName) {
+    html = html.replace(`<article class="workspace" data-tool-panel="${panelKey}">`, `<article class="workspace" data-tool-panel="${panelKey}"><nav class="tool-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span>›</span><a href="/tools">Tools</a><span>›</span><span aria-current="page">${escapeMarkup(breadcrumbName)}</span></nav>`);
+  }
+  if (panelKey && primaryH1) {
+    const headingPattern = new RegExp(`(<article class="workspace" data-tool-panel="${panelKey}">[\\s\\S]*?<header class="workspace-heading">[\\s\\S]*?<h1[^>]*>)[\\s\\S]*?(<\\/h1>)`);
+    html = html.replace(headingPattern, `$1${escapeMarkup(primaryH1)}$2`);
+  }
+  return applyPrimaryHeading(html, { panelKey, directory, pricing });
 }
 
 function htmlResponse(req, res, body, status = 200) {
@@ -2551,7 +2593,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/sitemap.xml') {
       if (NODE_ENV !== 'test') {
-        const currentPages = ['/', ...TOOL_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html']
+        const currentPages = ['/', '/tools', '/pricing', ...TOOL_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html']
           .map(path => `<url><loc>${xmlUrl(path)}</loc><lastmod>${new Date().toISOString().slice(0, 10)}</lastmod></url>`).join('');
         const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${currentPages}</urlset>`;
         res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600' });
@@ -2571,27 +2613,59 @@ const server = createServer(async (req, res) => {
       return res.end(body);
     }
     const legacyListingSlug = url.pathname === '/' ? url.searchParams.get('listing') : '';
-    if (legacyListingSlug) return NODE_ENV === 'test' ? redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`) : permanentRedirect(res, `${PUBLIC_ORIGIN}/`);
+    if (legacyListingSlug) return NODE_ENV === 'test' ? redirect(res, `${PUBLIC_ORIGIN}/projects/${encodeURIComponent(legacyListingSlug)}`) : goneResponse(req, res);
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/index.html') {
+      return permanentRedirect(res, `${PUBLIC_ORIGIN}/`);
+    }
+    const canonicalPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
+    if ((req.method === 'GET' || req.method === 'HEAD') && (canonicalPath === '/tools' || canonicalPath === '/pricing' || TOOL_PATHS.includes(canonicalPath) || Boolean(TOOL_ALIASES[canonicalPath]))) {
+      return permanentRedirect(res, `${PUBLIC_ORIGIN}${canonicalPath}`);
+    }
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/') {
       return htmlResponse(req, res, renderSeoPage({ structuredData: homepageStructuredData() }));
     }
-    if ((req.method === 'GET' || req.method === 'HEAD') && TOOL_PAGES[url.pathname]) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && TOOL_ALIASES[url.pathname]) {
+      return permanentRedirect(res, `${PUBLIC_ORIGIN}${TOOL_ALIASES[url.pathname]}`);
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/tools') {
+      const canonical = `${PUBLIC_ORIGIN}/tools`;
+      const title = 'Free Small Business Tools Directory | Searya';
+      const description = 'Explore 12 free small business calculators, document generators, time and expense tools, QR utilities and professional identity tools from Searya.';
+      const structuredData = { '@context': 'https://schema.org', '@graph': [
+        { '@type': 'CollectionPage', name: 'Free Small Business Tools', description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
+        { '@type': 'ItemList', name: 'Searya business tools', itemListElement: TOOL_PATHS.map((path, index) => ({ '@type': 'ListItem', position: index + 1, name: TOOL_PAGES[path].name, url: `${PUBLIC_ORIGIN}${path}` })) },
+        { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Tools', item: canonical }] }
+      ] };
+      return htmlResponse(req, res, renderSeoPage({ title, description, canonical, structuredData, directory: true }));
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/pricing') {
+      const canonical = `${PUBLIC_ORIGIN}/pricing`;
+      const title = 'Searya Pricing — Free Small Business Tools & Pro';
+      const description = 'Start with Searya’s free small business tools, then compare the optional Pro workspace for saved documents, cards, trackers and brand controls.';
+      const structuredData = { '@context': 'https://schema.org', '@graph': [
+        { '@type': 'WebPage', name: 'Searya Pricing', description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya', url: `${PUBLIC_ORIGIN}/` } },
+        { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Pricing', item: canonical }] }
+      ] };
+      return htmlResponse(req, res, renderSeoPage({ title, description, canonical, structuredData, pricing: true }));
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && TOOL_PATHS.includes(url.pathname)) {
       const page = TOOL_PAGES[url.pathname];
       const canonical = `${PUBLIC_ORIGIN}${url.pathname}`;
       const structuredData = {
         '@context': 'https://schema.org',
         '@graph': [
           { '@type': 'WebPage', name: page.name, description: page.description, url: canonical, isPartOf: { '@type': 'WebSite', name: 'Searya Tools', url: `${PUBLIC_ORIGIN}/` } },
-          { '@type': 'SoftwareApplication', name: page.name, applicationCategory: 'BusinessApplication', operatingSystem: 'Web', featureList: page.feature, offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } }
+          { '@type': 'SoftwareApplication', name: page.name, description: page.description, url: canonical, applicationCategory: 'BusinessApplication', operatingSystem: 'Web', browserRequirements: 'Requires a modern web browser', featureList: page.feature, offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } },
+          { '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: `${PUBLIC_ORIGIN}/` }, { '@type': 'ListItem', position: 2, name: 'Tools', item: `${PUBLIC_ORIGIN}/tools` }, { '@type': 'ListItem', position: 3, name: page.name, item: canonical }] }
         ]
       };
-      return htmlResponse(req, res, renderSeoPage({ title: page.title, description: page.description, canonical, structuredData }));
+      return htmlResponse(req, res, renderSeoPage({ title: page.title, description: page.description, canonical, structuredData, panelKey: TOOL_PANEL_KEYS[url.pathname], breadcrumbName: page.name, primaryH1: page.h1 }));
     }
     const isLegacyMarketplacePage = Boolean(SEO_LANDING_PAGES[url.pathname])
       || /^\/(?:guides|blog|discover|projects)(?:\/|$)/.test(url.pathname)
       || url.pathname === '/legal/transfer-checklist.html';
     if (NODE_ENV !== 'test' && (req.method === 'GET' || req.method === 'HEAD') && isLegacyMarketplacePage) {
-      return permanentRedirect(res, `${PUBLIC_ORIGIN}/`);
+      return goneResponse(req, res);
     }
     const guideWithoutTrailingSlash = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : '';
     if ((req.method === 'GET' || req.method === 'HEAD') && (guideWithoutTrailingSlash === '/guides' || GUIDES[guideWithoutTrailingSlash])) {

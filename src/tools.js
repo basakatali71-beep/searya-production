@@ -72,7 +72,16 @@ function addLogoToQrSvg(svgText, logoData) {
 }
 
 function routeTool() {
-  const key = TOOL_PATHS[location.pathname.replace(/\/$/,'')];
+  const pathname=location.pathname.replace(/\/$/,'')||'/';
+  if(pathname==='/tools'){
+    $('#home-hero').hidden=true;$('#how-it-works').hidden=true;$('#pricing').hidden=true;$('#tool-workspace').hidden=true;$('#tools').hidden=false;
+    return;
+  }
+  if(pathname==='/pricing'){
+    $('#home-hero').hidden=true;$('#how-it-works').hidden=true;$('#tools').hidden=true;$('#tool-workspace').hidden=true;$('#pricing').hidden=false;
+    return;
+  }
+  const key = TOOL_PATHS[pathname];
   if (!key) return;
   $('#home-hero').hidden = true;
   $('#tools').hidden = true;
@@ -199,7 +208,7 @@ function addLineItem(description='',quantity=1,rate=0) {
 
 function syncDocumentType() {
   const type=$('#doc-type').value;
-  const names={invoice:'Invoice Generator',quote:'Quote Generator',receipt:'Receipt Maker'};
+  const names={invoice:'Free Invoice & Business Document Generator',quote:'Free Quote Generator',receipt:'Free Receipt Maker'};
   $('#document-title').textContent=names[type];
   const prefixes={invoice:'INV',quote:'QUO',receipt:'REC'};
   if (!$('#doc-number').value || /^(INV|QUO|REC)-/.test($('#doc-number').value)) $('#doc-number').value=`${prefixes[type]}-1001`;

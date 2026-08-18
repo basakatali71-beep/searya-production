@@ -116,9 +116,9 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(await indexNowKey.text(), INDEXNOW_KEY);
 
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
-  assert.match(homepage, /<title>Searya Tools — Digital Business Cards, QR &amp; Invoice Tools<\/title>/);
-  assert.match(homepage, /<meta name="description" content="Create a digital business card, QR code, time card, invoice, quote or receipt\. Use free business tools and upgrade once to unlock the complete Searya workspace\.">/);
-  assert.match(homepage, /Small business work,/);
+  assert.match(homepage, /<title>Free Small Business Tools — Calculators &amp; Documents \| Searya<\/title>/);
+  assert.match(homepage, /<meta name="description" content="Use 12 free small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity\. No account required\.">/);
+  assert.match(homepage, /Free small business tools,/);
   assert.match(homepage, /finished faster\./);
   assert.match(homepage, /No account required/);
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
@@ -138,7 +138,7 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   const listings = await fetch(`${baseUrl}/api/listings?type=sale`).then(response => response.json());
   const listing = listings.listings[0];
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
-  for (const path of ['/qr-code-generator', '/time-card-calculator', '/work-hours-calculator', '/invoice-generator', '/quote-generator', '/receipt-maker', '/digital-business-card', '/digital-business-card-maker', '/qr-business-card', '/virtual-business-card', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']) {
+  for (const path of ['/qr-code-generator', '/time-card-calculator', '/invoice-generator', '/digital-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']) {
     assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com${path}`));
   }
   assert.match(sitemap, new RegExp(`https:\\/\\/searya\\.com\\/projects\\/${listing.slug}`));
@@ -162,10 +162,13 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
 
 test('business tools expose dedicated SEO pages and generate real QR SVG output', async () => {
   const timePage = await fetch(`${baseUrl}/time-card-calculator`).then(response => response.text());
-  assert.match(timePage, /<title>Free Time Card Calculator with Overtime \| Searya Tools<\/title>/);
+  assert.match(timePage, /<title>Free Time Card Calculator — Hours &amp; Overtime \| Searya<\/title>/);
   assert.match(timePage, /<link rel="canonical" href="https:\/\/searya\.com\/time-card-calculator">/);
   assert.match(timePage, /"@type":"SoftwareApplication"/);
   assert.match(timePage, /"price":"0"/);
+  assert.equal((timePage.match(/<h1(?:\s[^>]*)?>/g) || []).length, 1);
+  assert.match(timePage, /class="tool-breadcrumb"/);
+  assert.match(timePage, /"@type":"BreadcrumbList"/);
 
   for (const path of ['/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator']) {
     const response = await fetch(`${baseUrl}${path}`);
@@ -184,6 +187,48 @@ test('business tools expose dedicated SEO pages and generate real QR SVG output'
 
   const invalidQr = await fetch(`${baseUrl}/api/tools/qr?text=`);
   assert.equal(invalidQr.status, 422);
+});
+
+test('current tool inventory has unique metadata, one H1, breadcrumbs and clean canonical redirects', async () => {
+  const tools = ['/qr-code-generator', '/time-card-calculator', '/invoice-generator', '/digital-business-card', '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator', '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator'];
+  const titles = new Set();
+  const descriptions = new Set();
+  for (const path of tools) {
+    const response = await fetch(`${baseUrl}${path}?utm_source=test`);
+    assert.equal(response.status, 200, path);
+    const html = await response.text();
+    assert.equal((html.match(/<h1(?:\s[^>]*)?>/g) || []).length, 1, `${path} must have one H1`);
+    assert.match(html, /class="tool-breadcrumb"/, path);
+    assert.match(html, /class="tool-guide"/, path);
+    assert.match(html, /"@type":"SoftwareApplication"/, path);
+    assert.match(html, /"@type":"BreadcrumbList"/, path);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\\/\\/searya\\.com${path}">`), path);
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+    const description = html.match(/<meta name="description" content="([^"]+)">/)?.[1];
+    assert.ok(title && !titles.has(title), `${path} must have a unique title`);
+    assert.ok(description && !descriptions.has(description), `${path} must have a unique description`);
+    titles.add(title);
+    descriptions.add(description);
+  }
+
+  const directory = await fetch(`${baseUrl}/tools`).then(response => response.text());
+  assert.equal((directory.match(/<h1(?:\s[^>]*)?>/g) || []).length, 1);
+  assert.match(directory, /<title>Free Small Business Tools Directory \| Searya<\/title>/);
+  for (const path of tools) assert.match(directory, new RegExp(`href="${path}"`));
+
+  const pricing = await fetch(`${baseUrl}/pricing`).then(response => response.text());
+  assert.equal((pricing.match(/<h1(?:\s[^>]*)?>/g) || []).length, 1);
+  assert.match(pricing, /<link rel="canonical" href="https:\/\/searya\.com\/pricing">/);
+
+  const aliases = new Map([
+    ['/work-hours-calculator', '/time-card-calculator'], ['/quote-generator', '/invoice-generator'], ['/receipt-maker', '/invoice-generator'],
+    ['/digital-business-card-maker', '/digital-business-card'], ['/qr-business-card', '/digital-business-card'], ['/virtual-business-card', '/digital-business-card']
+  ]);
+  for (const [alias, target] of aliases) {
+    const response = await fetch(`${baseUrl}${alias}`, { redirect: 'manual' });
+    assert.equal(response.status, 301, alias);
+    assert.equal(response.headers.get('location'), `https://searya.com${target}`, alias);
+  }
 });
 
 test('blog hub exposes all searchable articles, detail metadata and sitemap URLs', async () => {

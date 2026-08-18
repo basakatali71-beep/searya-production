@@ -11,6 +11,7 @@
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexnow:submit-sitemap": "node scripts/submit-indexnow.mjs --sitemap",
     "google:submit-sitemap": "node scripts/submit-google-sitemap.mjs",
+    "audit:seo": "node scripts/audit-seo.mjs",
     "dev": "NODE_ENV=development PAYMENT_MODE=demo node --env-file-if-exists=.env --watch server.mjs",
     "check": "npm run build:css && node --check server.mjs && node --check src/app.js && node --check src/admin.js && node --test tests/*.test.mjs"
   },

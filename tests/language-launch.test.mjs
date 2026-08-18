@@ -44,7 +44,7 @@ test('Dead fake-success and paid legacy sections are not shipped', () => {
 test('Launch legal copy does not contain unfinished placeholders', () => {
   assert.match(privacySource, /export or permanently delete your account data from My Account/);
   assert.doesNotMatch(privacySource, /before launch|will be added|details are finalized/i);
-  assert.match(termsSource, /Buyer due diligence and payment safety/);
+  assert.match(termsSource, /Accuracy and professional review/);
   assert.match(termsSource, /To the fullest extent permitted by applicable law/);
   assert.doesNotMatch(termsSource, /launch-stage informational draft/i);
 });
@@ -56,7 +56,7 @@ test('The homepage explains the free tools and local-first document handling', (
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
-  assert.match(pageSource, /<title>Searya Tools — Digital Business Cards, QR & Invoice Tools<\/title>/);
+  assert.match(pageSource, /<title>Free Small Business Tools — Calculators &amp; Documents \| Searya<\/title>/);
   assert.match(pageSource, /property="og:locale" content="en_US"/);
   assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-tools-preview\.png\?v=20260816-2"/);
   assert.match(pageSource, /property="og:image:width" content="1200"/);
@@ -89,7 +89,7 @@ test('The tool workspace includes the four functional launch surfaces', () => {
 test('The tool homepage has clear navigation and launch pricing', () => {
   assert.match(pageSource, /aria-label="Main navigation"/);
   assert.match(pageSource, /href="\/#how-it-works"/);
-  assert.match(pageSource, /href="\/#pricing"/);
+  assert.match(pageSource, /href="\/pricing"/);
   assert.match(pageSource, /\$0/);
   assert.match(pageSource, /\$7\.99/);
   assert.match(pageSource, /One plan unlocks every tool/);
