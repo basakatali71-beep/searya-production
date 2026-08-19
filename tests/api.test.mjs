@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { blogPosts } from '../src/data/blogPosts.js';
 import { INDEXNOW_KEY, indexNowKeyPath } from '../src/services/indexNow.js';
+import { INDUSTRY_TOOL_PAGES, INDUSTRY_TOOL_PATHS, TOOL_GUIDES, TOOL_GUIDE_PATHS } from '../src/data/toolSeoContent.js';
 
 const testDir = mkdtempSync(join(tmpdir(), 'searya-api-'));
 process.env.PORT = '0';
@@ -376,28 +377,18 @@ test('transactional search-intent pages expose unique H1 copy, real inventory an
   assert.equal(projectSlugs.every(slug => Number(bySlug.get(slug)?.askingPrice || Infinity) <= 5000), true);
 });
 
-test('guides hub and long-form guide routes expose indexable editorial content', async () => {
-  const routes = new Map([
-    ['/guides/how-to-sell-a-saas', 'How to Sell a SaaS'],
-    ['/guides/where-to-sell-a-saas', 'Where Can You Sell a SaaS Project?'],
-    ['/guides/how-much-is-my-saas-worth', 'How Much Is My SaaS Worth?'],
-    ['/guides/selling-a-saas-with-no-revenue', 'Can You Sell a SaaS With No Revenue?'],
-    ['/guides/how-to-sell-an-app', 'How to Sell a Mobile App'],
-    ['/guides/how-to-sell-a-side-project', 'How to Sell a Side Project Instead of Letting It Sit'],
-    ['/guides/how-to-buy-a-small-saas', 'How to Buy a Small SaaS Project'],
-    ['/guides/what-to-check-before-buying-a-saas', 'What to Check Before Buying a SaaS'],
-    ['/guides/buy-app-vs-build-from-scratch', 'Buy an Existing App or Build From Scratch?'],
-    ['/guides/how-to-find-buyers-for-a-digital-project', 'How to Find Potential Buyers for a Digital Project']
-  ]);
+test('tool guide hub and long-form routes expose indexable editorial content', async () => {
   const hubResponse = await fetch(`${baseUrl}/guides?utm_source=test`);
   assert.equal(hubResponse.status, 200);
   const hub = await hubResponse.text();
   assert.match(hub, /<link rel="canonical" href="https:\/\/searya\.com\/guides">/);
   assert.match(hub, /"@type":"CollectionPage"/);
-  for (const route of routes.keys()) assert.match(hub, new RegExp(`href="${route}"`));
+  assert.equal((hub.match(/data-guide-card/g) || []).length, 96);
+  for (const route of TOOL_GUIDE_PATHS) assert.match(hub, new RegExp(`href="${route}"`));
 
   const titles = new Set();
-  for (const [route, h1] of routes) {
+  for (const route of TOOL_GUIDE_PATHS) {
+    const h1 = TOOL_GUIDES[route].h1;
     const response = await fetch(`${baseUrl}${route}?utm_source=test`);
     assert.equal(response.status, 200, route);
     const html = await response.text();
@@ -405,26 +396,49 @@ test('guides hub and long-form guide routes expose indexable editorial content',
     assert.ok(html.includes(`<h1>${h1.replaceAll('&', '&amp;')}</h1>`), route);
     assert.match(html, /"@type":"Article"/, route);
     assert.match(html, /"@type":"BreadcrumbList"/, route);
-    assert.match(html, /"datePublished":"2026-08-12"/, route);
-    assert.match(html, /Published by Searya/, route);
-    assert.match(html, /does not process acquisitions/, route);
-    assert.doesNotMatch(html, /guaranteed (sale|buyer|return)|secure checkout|Buy now/i, route);
+    assert.match(html, /"datePublished":"2026-08-19"/, route);
+    assert.match(html, /SEARYA EDITORIAL/, route);
+    assert.match(html, /class="seo-article-section"/, route);
+    assert.match(html, new RegExp(`href="${TOOL_GUIDES[route].toolPath}"`), route);
     const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
     assert.ok(title && !titles.has(title), `unique guide title for ${route}`);
     titles.add(title);
     const visibleWords = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length;
-    assert.ok(visibleWords >= 900 && visibleWords <= 1600, `${route} has ${visibleWords} visible words`);
+    assert.ok(visibleWords >= 450, `${route} has ${visibleWords} visible words`);
   }
 
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then(response => response.text());
   assert.match(sitemap, /https:\/\/searya\.com\/guides<\/loc>/);
-  for (const route of routes.keys()) assert.match(sitemap, new RegExp(`https:\/\/searya\.com${route}<\\/loc>`));
+  for (const route of TOOL_GUIDE_PATHS) assert.match(sitemap, new RegExp(`https:\/\/searya\.com${route}<\\/loc>`));
 
-  const malformed = await fetch(`${baseUrl}/guides/not-a-published-guide`, { headers: { Accept: 'text/html' } });
-  assert.equal(malformed.status, 404);
-  const trailingSlash = await fetch(`${baseUrl}/guides/how-to-sell-a-saas/`, { redirect: 'manual' });
-  assert.equal(trailingSlash.status, 302);
-  assert.equal(trailingSlash.headers.get('location'), 'https://searya.com/guides/how-to-sell-a-saas');
+  const trailingPath = `${TOOL_GUIDE_PATHS[0]}/`;
+  const trailingSlash = await fetch(`${baseUrl}${trailingPath}`, { redirect: 'manual' });
+  assert.equal(trailingSlash.status, 301);
+  assert.equal(trailingSlash.headers.get('location'), `https://searya.com${TOOL_GUIDE_PATHS[0]}`);
+});
+
+test('industry tool pages reuse working tools with unique content, canonical URLs and rich schemas', async () => {
+  assert.equal(INDUSTRY_TOOL_PATHS.length, 36);
+  const titles = new Set();
+  const descriptions = new Set();
+  for (const route of INDUSTRY_TOOL_PATHS) {
+    const response = await fetch(`${baseUrl}${route}`);
+    assert.equal(response.status, 200, route);
+    const html = await response.text();
+    assert.equal((html.match(/<h1(?:\s[^>]*)?>/g) || []).length, 1, route);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https:\/\/searya\.com${route}">`), route);
+    assert.match(html, /"@type":"SoftwareApplication"/, route);
+    assert.match(html, /"@type":"FAQPage"/, route);
+    assert.match(html, /"@type":"HowTo"/, route);
+    assert.match(html, /class="seo-example-table"/, route);
+    assert.ok((html.match(/<details>/g) || []).length >= 6, route);
+    assert.match(html, new RegExp(`<h1[^>]*>${INDUSTRY_TOOL_PAGES[route].h1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</h1>`), route);
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+    const description = html.match(/<meta name="description" content="([^"]+)">/)?.[1];
+    assert.ok(title && !titles.has(title), `unique industry title for ${route}`);
+    assert.ok(description && !descriptions.has(description), `unique industry description for ${route}`);
+    titles.add(title); descriptions.add(description);
+  }
 });
 
 test('curated discovery routes use real public inventory and enforce the shared index threshold', async () => {

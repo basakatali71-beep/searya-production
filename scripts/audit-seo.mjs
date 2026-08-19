@@ -1,3 +1,5 @@
+import { INDUSTRY_TOOL_PAGES, INDUSTRY_TOOL_PATHS, TOOL_GUIDE_PATHS } from '../src/data/toolSeoContent.js';
+
 const origin = String(process.env.SEO_AUDIT_ORIGIN || process.argv[2] || 'http://127.0.0.1:4173').replace(/\/$/, '');
 const canonicalOrigin = 'https://searya.com';
 const toolPaths = [
@@ -5,12 +7,12 @@ const toolPaths = [
   '/email-signature-generator', '/expense-tracker', '/profit-margin-calculator', '/sales-tax-calculator',
   '/estimate-generator', '/job-cost-calculator', '/hourly-rate-calculator', '/break-even-calculator'
 ];
-const indexablePaths = ['/', '/tools', '/pricing', ...toolPaths, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html'];
+const indexablePaths = ['/', '/tools', '/pricing', ...toolPaths, ...INDUSTRY_TOOL_PATHS, '/guides', ...TOOL_GUIDE_PATHS, '/legal/privacy.html', '/legal/terms.html', '/legal/cookies.html'];
 const aliases = {
   '/work-hours-calculator': '/time-card-calculator', '/quote-generator': '/invoice-generator', '/receipt-maker': '/invoice-generator',
   '/digital-business-card-maker': '/digital-business-card', '/qr-business-card': '/digital-business-card', '/virtual-business-card': '/digital-business-card'
 };
-const obsoletePaths = ['/projects/example-project', '/discover/saas', '/guides', '/blog'];
+const obsoletePaths = ['/projects/example-project', '/discover/saas', '/blog'];
 const failures = [];
 
 function check(condition, message) {
@@ -51,15 +53,42 @@ for (const path of indexablePaths) {
     check(/<meta property="og:description" content="[^"]+">/i.test(html), `${path} has no Open Graph description`);
     check(/<meta property="og:url" content="[^"]+">/i.test(html), `${path} has no Open Graph URL`);
   }
-  if (toolPaths.includes(path)) {
+  if (toolPaths.includes(path) || INDUSTRY_TOOL_PATHS.includes(path)) {
     check(/class="tool-breadcrumb"/.test(html), `${path} has no visible breadcrumb`);
     check(/"@type":"BreadcrumbList"/.test(html), `${path} has no BreadcrumbList schema`);
     check(/"@type":"SoftwareApplication"/.test(html), `${path} has no SoftwareApplication schema`);
+    check(/"@type":"FAQPage"/.test(html), `${path} has no FAQPage schema`);
+    check(/"@type":"HowTo"/.test(html), `${path} has no HowTo schema`);
     check(/class="tool-guide"/.test(html), `${path} has no supporting tool guide`);
+    check((html.match(/<details>/g) || []).length >= 6, `${path} has fewer than 6 visible FAQ items`);
     check(!seenTitles.has(title), `${path} duplicates the title used by ${seenTitles.get(title)}`);
     check(!seenDescriptions.has(description), `${path} duplicates the description used by ${seenDescriptions.get(description)}`);
     seenTitles.set(title, path);
     seenDescriptions.set(description, path);
+  }
+  if (TOOL_GUIDE_PATHS.includes(path)) {
+    check(/"@type":"Article"/.test(html), `${path} has no Article schema`);
+    check(/class="seo-article-section"/.test(html), `${path} has no guide content sections`);
+  }
+}
+
+const industryWords = page => new Set([
+  page.scenario, page.why, page.records, ...page.rows.flat(), ...page.faqs.flat()
+].join(' ').toLowerCase().match(/[a-z0-9]+/g) || []);
+const industriesByTool = Object.values(INDUSTRY_TOOL_PAGES).reduce((groups, page) => {
+  (groups[page.toolPath] ||= []).push(page);
+  return groups;
+}, {});
+for (const pages of Object.values(industriesByTool)) {
+  for (let left = 0; left < pages.length; left += 1) {
+    for (let right = left + 1; right < pages.length; right += 1) {
+      const leftWords = industryWords(pages[left]);
+      const rightWords = industryWords(pages[right]);
+      const intersection = [...leftWords].filter(word => rightWords.has(word)).length;
+      const union = new Set([...leftWords, ...rightWords]).size;
+      const similarity = union ? intersection / union : 1;
+      check(similarity < 0.6, `${pages[left].path} and ${pages[right].path} have ${(similarity * 100).toFixed(1)}% industry-copy similarity`);
+    }
   }
 }
 
@@ -86,5 +115,5 @@ if (failures.length) {
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exitCode = 1;
 } else {
-  console.log(`SEO audit passed: ${indexablePaths.length} indexable URLs, ${toolPaths.length} canonical tools, ${Object.keys(aliases).length} redirects and ${obsoletePaths.length} removals checked.`);
+  console.log(`SEO audit passed: ${indexablePaths.length} indexable URLs, ${toolPaths.length} canonical tools, ${INDUSTRY_TOOL_PATHS.length} low-duplication industry pages, ${Object.keys(aliases).length} redirects and ${obsoletePaths.length} removals checked.`);
 }
