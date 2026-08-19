@@ -1,6 +1,6 @@
-# Searya Marketplace
+# Searya Business Tools
 
-Searya is a Turkish/English marketplace MVP for transferring unfinished or operating digital projects.
+Searya provides free practical tools for freelancers and small businesses. The production app currently includes 12 generators and calculators for business documents, pricing, time, expenses, QR codes and professional identity.
 
 ## Run locally
 
@@ -20,7 +20,17 @@ The app uses Node's built-in HTTP, crypto and SQLite modules; no third-party ser
 npm run check
 ```
 
-The integration tests cover health checks, secure registration/session cookies, verification-email retries, rate limits behind a proxy, server-side listing credits, unread messages, blocks, package credits and administrator moderation.
+The integration tests cover health checks, secure registration/session cookies, account and Business Profile persistence, image validation, business-tool routes, calculations, QR output, SEO metadata, rate limits and legacy marketplace compatibility.
+
+## Account and Business Profile architecture
+
+- Anonymous visitors can continue using the basic tools without creating an account.
+- Signed-in users can save tool outputs in `tool_items` and manage shared identity data in `business_profiles`.
+- Business Profile stores contact, address, brand, social, booking, currency and optional tax defaults once per user. Images accept only bounded PNG, JPG or WebP data.
+- `GET /api/account/business-profile` returns a safe editable profile and completion percentage.
+- `PUT /api/account/business-profile` validates and upserts the authenticated user's profile.
+- Account export includes the Business Profile, and deleting a user removes it through the database foreign key.
+- Phase 1 intentionally does not autofill every tool yet. The shared API and account editor are the foundation for tool-by-tool autofill in the next phase.
 
 ## Production configuration
 

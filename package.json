@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Searya digital project marketplace MVP",
+  "description": "Free practical business tools for freelancers and small businesses",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
+    "build": "npm run build:css",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.input.css -o public/vendor/tailwind.css --minify",
+    "lint": "node --check server.mjs && node --check src/app.js && node --check src/api.js && node --check src/admin.js && node --check src/tools.js && node --check src/tool-calculations.js",
     "blog:generate": "node scripts/generate-blog.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexnow:submit-sitemap": "node scripts/submit-indexnow.mjs --sitemap",
     "google:submit-sitemap": "node scripts/submit-google-sitemap.mjs",
     "audit:seo": "node scripts/audit-seo.mjs",
     "dev": "NODE_ENV=development PAYMENT_MODE=demo node --env-file-if-exists=.env --watch server.mjs",
-    "check": "npm run build:css && node --check server.mjs && node --check src/app.js && node --check src/admin.js && node --test tests/*.test.mjs"
+    "check": "npm run build && npm run lint && node --test tests/*.test.mjs"
   },
   "engines": {
     "node": ">=24.14.0"

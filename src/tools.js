@@ -32,6 +32,8 @@ let cardLogoData = '';
 let qrLogoData = '';
 let signaturePhotoData = '';
 let signatureLogoData = '';
+let businessProfilePhotoData = '';
+let businessProfileLogoData = '';
 let cardQrTimer = null;
 let lastTimeResult = null;
 let toastTimer = null;
@@ -439,13 +441,46 @@ async function refreshAccount(){
 async function openAccount(){
   if(!currentUser)return openAuth('login');
   track('account_opened');$('#account-drawer').hidden=false;document.body.classList.add('modal-open');$('#account-name').textContent=currentUser.name;
+  setAccountTab('workspace');
   await loadSavedItems();
 }
 function closeAccount(){$('#account-drawer').hidden=true;document.body.classList.remove('modal-open');}
 
 async function loadSavedItems(){
   if(!currentUser)return;
-  try{const [dashboard,itemsPayload]=await Promise.all([SearyaApi.accountDashboard(),SearyaApi.toolItems()]);currentUser=dashboard.account;$('#account-summary').innerHTML=`<div><span>Plan</span><strong>${currentUser.plan==='pro'?'Pro':'Free'}</strong></div><div><span>Saved items</span><strong>${dashboard.savedCount}</strong></div>`;$('#account-upgrade').hidden=currentUser.plan==='pro';const items=itemsPayload.items||[];$('#saved-items').innerHTML=items.length?items.map(item=>`<article><button class="saved-open" type="button" data-saved-id="${item.id}"><i class="ph-bold ph-file"></i><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.itemType.replaceAll('-',' '))} · ${new Date(item.updatedAt).toLocaleDateString('en-US')}</small></span></button><button class="saved-delete" type="button" data-delete-saved="${item.id}" aria-label="Delete"><i class="ph-bold ph-trash"></i></button></article>`).join(''):`<div class="empty-state"><i class="ph-bold ph-folder-open"></i><p>Save a card, document or calculator result to see it here.</p></div>`;window.searyaSavedItems=items;}catch(error){showToast(error.message);}
+  try{const [dashboard,itemsPayload]=await Promise.all([SearyaApi.accountDashboard(),SearyaApi.toolItems()]);currentUser=dashboard.account;$('#account-summary').innerHTML=`<div><span>Plan</span><strong>${currentUser.plan==='pro'?'Pro':'Free'}</strong></div><div><span>Saved items</span><strong>${dashboard.savedCount}</strong></div><div><span>Business Profile</span><strong>${dashboard.businessProfile?.completionPercent||0}%</strong></div>`;$('#account-upgrade').hidden=currentUser.plan==='pro';const items=itemsPayload.items||[];$('#saved-items').innerHTML=items.length?items.map(item=>`<article><button class="saved-open" type="button" data-saved-id="${item.id}"><i class="ph-bold ph-file"></i><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.itemType.replaceAll('-',' '))} · ${new Date(item.updatedAt).toLocaleDateString('en-US')}</small></span></button><button class="saved-delete" type="button" data-delete-saved="${item.id}" aria-label="Delete"><i class="ph-bold ph-trash"></i></button></article>`).join(''):`<div class="empty-state"><i class="ph-bold ph-folder-open"></i><p>Save a card, document or calculator result to see it here.</p></div>`;window.searyaSavedItems=items;}catch(error){showToast(error.message);}
+}
+
+function setAccountTab(tab='workspace'){
+  $$('[data-account-tab]').forEach(button=>{const active=button.dataset.accountTab===tab;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});
+  $$('[data-account-panel]').forEach(panel=>panel.hidden=panel.dataset.accountPanel!==tab);
+  if(tab==='profile')loadBusinessProfile();
+}
+
+function renderBusinessProfileImages(){
+  const status=$('#profile-image-status');
+  status.innerHTML=`${businessProfilePhotoData?`<div><img src="${businessProfilePhotoData}" alt="Saved profile photo"><button type="button" data-clear-profile-image="photo">Remove photo</button></div>`:''}${businessProfileLogoData?`<div><img src="${businessProfileLogoData}" alt="Saved company logo"><button type="button" data-clear-profile-image="logo">Remove logo</button></div>`:''}`;
+}
+
+async function loadBusinessProfile(){
+  const form=$('#business-profile-form');if(!form||!currentUser)return;
+  const message=$('#business-profile-message');message.textContent='Loading profile…';message.classList.remove('success');
+  try{
+    const {profile}=await SearyaApi.businessProfile();
+    const fields=['fullName','companyName','email','phone','website','address','city','country','brandColor','secondaryColor','linkedin','instagram','x','youtube','whatsapp','bookingLink','businessDescription','defaultCurrency','taxInformation'];
+    fields.forEach(name=>{if(form.elements[name])form.elements[name].value=profile[name]??'';});
+    businessProfilePhotoData=profile.profilePhoto||'';businessProfileLogoData=profile.logo||'';renderBusinessProfileImages();message.textContent=profile.exists?`Profile ${profile.completionPercent}% complete.`:'Add your details, then save your shared profile.';
+  }catch(error){message.textContent=error.message;}
+}
+
+async function saveBusinessProfile(event){
+  event.preventDefault();const form=event.currentTarget,button=event.submitter,message=$('#business-profile-message');button.disabled=true;message.classList.remove('success');
+  try{
+    const names=['fullName','companyName','email','phone','website','address','city','country','brandColor','secondaryColor','linkedin','instagram','x','youtube','whatsapp','bookingLink','businessDescription','defaultCurrency','taxInformation'];
+    const data=Object.fromEntries(names.map(name=>[name,form.elements[name].value]));
+    const result=await SearyaApi.saveBusinessProfile({...data,profilePhoto:businessProfilePhotoData,logo:businessProfileLogoData});
+    message.textContent=`Business Profile saved — ${result.profile.completionPercent}% complete.`;message.classList.add('success');showToast('Business Profile saved.');await loadSavedItems();
+  }catch(error){message.textContent=error.message;}finally{button.disabled=false;}
 }
 
 function currentToolKey(){return TOOL_PATHS[location.pathname.replace(/\/$/,'')]||'';}
@@ -472,11 +507,14 @@ async function startCheckout(packageKey){
 function initializeAuth(){
   $$('[data-auth-open]').forEach(button=>button.addEventListener('click',()=>openAuth(button.dataset.authOpen)));
   $$('[data-modal-close]').forEach(button=>button.addEventListener('click',closeAuth));$$('[data-auth-tab]').forEach(button=>button.addEventListener('click',()=>authTab(button.dataset.authTab)));
-  $('#account-button').addEventListener('click',openAccount);$$('[data-account-close]').forEach(button=>button.addEventListener('click',closeAccount));$('#save-current-item').addEventListener('click',saveCurrentTool);$('#save-tool-top')?.addEventListener('click',saveCurrentTool);$('#logout-button').addEventListener('click',async()=>{await SearyaApi.logout();currentUser=null;closeAccount();await refreshAccount();showToast('Signed out.');});
+  $('#account-button').addEventListener('click',openAccount);$$('[data-account-close]').forEach(button=>button.addEventListener('click',closeAccount));$$('[data-account-tab]').forEach(button=>button.addEventListener('click',()=>setAccountTab(button.dataset.accountTab)));$('#save-current-item').addEventListener('click',saveCurrentTool);$('#save-tool-top')?.addEventListener('click',saveCurrentTool);$('#logout-button').addEventListener('click',async()=>{await SearyaApi.logout();currentUser=null;closeAccount();await refreshAccount();showToast('Signed out.');});
+  $('#business-profile-form')?.addEventListener('submit',saveBusinessProfile);
+  $('#business-profile-form [name="profilePhotoFile"]')?.addEventListener('change',async event=>{try{businessProfilePhotoData=await fileToDataUrl(event.target.files?.[0]);renderBusinessProfileImages();}catch(error){showToast(error.message);}});
+  $('#business-profile-form [name="logoFile"]')?.addEventListener('change',async event=>{try{businessProfileLogoData=await fileToDataUrl(event.target.files?.[0]);renderBusinessProfileImages();}catch(error){showToast(error.message);}});
   $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.login(values);currentUser=result.user;closeAuth();await refreshAccount();showToast('Welcome back.');track('auth_completed',{mode:'login'});}catch(error){$('#auth-message').textContent=error.message;track('auth_failed',{mode:'login',code:error.code});}finally{button.disabled=false;}});
   $('#forgot-password')?.addEventListener('click',async()=>{const email=$('#login-form input[name="email"]').value.trim();if(!email){$('#auth-message').textContent='Enter your email above first.';return;}try{await SearyaApi.forgotPassword(email);$('#auth-message').textContent='If an account exists, a secure reset link is on its way.';track('auth_help_requested',{mode:'password_reset'});}catch(error){$('#auth-message').textContent=error.message;}});
   $('#register-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.register({...values,role:'both'});if(result.verificationRequired){$('#auth-message').textContent='Check your inbox and verify your email. Then come back and sign in.';authTab('login');$('#auth-message').textContent='Check your inbox and verify your email. Then sign in.';}else{currentUser=result.user;closeAuth();await refreshAccount();showToast('Your workspace is ready.');}track('auth_completed',{mode:'register'});}catch(error){$('#auth-message').textContent=error.message;track('auth_failed',{mode:'register',code:error.code});}finally{button.disabled=false;}});
-  document.addEventListener('click',async event=>{const checkout=event.target.closest('[data-checkout]');if(checkout){checkout.disabled=true;await startCheckout(checkout.dataset.checkout);checkout.disabled=false;return;}const remove=event.target.closest('[data-delete-saved]');if(remove){await SearyaApi.deleteToolItem(remove.dataset.deleteSaved);await loadSavedItems();return;}const open=event.target.closest('[data-saved-id]');if(open){const item=(window.searyaSavedItems||[]).find(entry=>entry.id===open.dataset.savedId);if(item){sessionStorage.setItem('searya_restore_item',JSON.stringify(item));const routes={'digital-card':'/digital-business-card','qr-code':'/qr-code-generator',invoice:'/invoice-generator',quote:'/quote-generator',receipt:'/receipt-maker',timesheet:'/time-card-calculator','email-signature':'/email-signature-generator','expense-tracker':'/expense-tracker','profit-margin':'/profit-margin-calculator'};location.href=routes[item.itemType]||'/';}}});
+  document.addEventListener('click',async event=>{const clearImage=event.target.closest('[data-clear-profile-image]');if(clearImage){if(clearImage.dataset.clearProfileImage==='photo')businessProfilePhotoData='';else businessProfileLogoData='';renderBusinessProfileImages();return;}const checkout=event.target.closest('[data-checkout]');if(checkout){checkout.disabled=true;await startCheckout(checkout.dataset.checkout);checkout.disabled=false;return;}const remove=event.target.closest('[data-delete-saved]');if(remove){await SearyaApi.deleteToolItem(remove.dataset.deleteSaved);await loadSavedItems();return;}const open=event.target.closest('[data-saved-id]');if(open){const item=(window.searyaSavedItems||[]).find(entry=>entry.id===open.dataset.savedId);if(item){sessionStorage.setItem('searya_restore_item',JSON.stringify(item));const routes={'digital-card':'/digital-business-card','qr-code':'/qr-code-generator',invoice:'/invoice-generator',quote:'/quote-generator',receipt:'/receipt-maker',timesheet:'/time-card-calculator','email-signature':'/email-signature-generator','expense-tracker':'/expense-tracker','profit-margin':'/profit-margin-calculator'};location.href=routes[item.itemType]||'/';}}});
 }
 
 function applyRestoredItem(){

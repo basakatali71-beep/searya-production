@@ -31,7 +31,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/vendor/phosphor/regular/style.css?v=2.1.2">
   <link rel="stylesheet" href="/public/vendor/phosphor/bold/style.css?v=2.1.2">
-  <link rel="stylesheet" href="/src/styles/tools.css?v=20260818-3">
+  <link rel="stylesheet" href="/src/styles/tools.css?v=20260819-1">
   <script id="searya-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Searya","url":"https://searya.com/","logo":"https://searya.com/public/searya-logo.png"},{"@type":"WebSite","name":"Searya Tools","url":"https://searya.com/"},{"@type":"SoftwareApplication","name":"Searya Business Tools","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}]}</script>
 </head>
 <body>
@@ -228,8 +228,35 @@
 
   <footer><div class="shell footer-inner"><a class="brand footer-brand" href="/"><img src="/src/assets/searya-logo.png" alt="Searya" width="1250" height="359"><span>TOOLS</span></a><p>Fast, practical business tools for independent work.</p><div><a href="/legal/privacy.html">Privacy</a><a href="/legal/terms.html">Terms</a><a href="mailto:basakatali71@gmail.com">Feedback</a></div></div></footer>
   <div class="modal" id="auth-modal" hidden><div class="modal-backdrop" data-modal-close></div><section class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button class="modal-close" type="button" data-modal-close aria-label="Close"><i class="ph-bold ph-x"></i></button><div class="auth-brand"><img src="/src/assets/searya-mark.png" alt=""><div><span>SEARYA ACCOUNT</span><h2 id="auth-title">Save your work</h2></div></div><div class="auth-tabs"><button class="active" type="button" data-auth-tab="login">Sign in</button><button type="button" data-auth-tab="register">Create account</button></div><form id="login-form" class="auth-form"><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="button primary full" type="submit">Sign in</button><button class="text-button auth-help" id="forgot-password" type="button">Forgot password?</button></form><form id="register-form" class="auth-form" hidden><label>Full name<input name="name" autocomplete="name" maxlength="80" required></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><small>Use at least 12 characters.</small></label><button class="button primary full" type="submit">Create free account</button></form><p id="auth-message" class="auth-message"></p></section></div>
-  <div class="account-drawer" id="account-drawer" hidden><div class="modal-backdrop" data-account-close></div><aside class="account-panel"><header><div><span>MY WORKSPACE</span><h2 id="account-name">Your Searya account</h2></div><button type="button" data-account-close><i class="ph-bold ph-x"></i></button></header><div id="account-summary" class="account-summary"></div><div class="account-section-head"><strong>Saved work</strong><button id="save-current-item" class="text-button" type="button"><i class="ph-bold ph-floppy-disk"></i> Save current tool</button></div><div id="saved-items" class="saved-items"></div><footer><button id="account-upgrade" class="button primary full" data-checkout="tools_pro_monthly" type="button">Upgrade to Pro</button><button id="logout-button" class="button secondary full" type="button">Sign out</button></footer></aside></div>
+  <div class="account-drawer" id="account-drawer" hidden>
+    <div class="modal-backdrop" data-account-close></div>
+    <aside class="account-panel" aria-label="Searya account workspace">
+      <header><div><span>MY WORKSPACE</span><h2 id="account-name">Your Searya account</h2></div><button type="button" data-account-close aria-label="Close account"><i class="ph-bold ph-x"></i></button></header>
+      <div class="account-tabs" role="tablist" aria-label="Account sections">
+        <button class="active" type="button" role="tab" aria-selected="true" data-account-tab="workspace">Saved work</button>
+        <button type="button" role="tab" aria-selected="false" data-account-tab="profile">Business Profile</button>
+      </div>
+      <section data-account-panel="workspace">
+        <div id="account-summary" class="account-summary"></div>
+        <div class="account-section-head"><strong>Saved work</strong><button id="save-current-item" class="text-button" type="button"><i class="ph-bold ph-floppy-disk"></i> Save current tool</button></div>
+        <div id="saved-items" class="saved-items"></div>
+      </section>
+      <section data-account-panel="profile" hidden>
+        <div class="business-profile-intro"><div><span>SEARYA PRO FOUNDATION</span><h3>Enter once. Use everywhere.</h3></div><p>Keep your business identity in one secure workspace. Tool autofill will be connected in the next implementation phase.</p></div>
+        <form id="business-profile-form" class="business-profile-form">
+          <fieldset><legend>Business identity</legend><div class="profile-form-grid"><label>Full name<input name="fullName" maxlength="100" autocomplete="name" required></label><label>Company or brand<input name="companyName" maxlength="120" autocomplete="organization"></label><label class="profile-wide">Business description<textarea name="businessDescription" maxlength="1000" rows="3"></textarea></label><label>Profile photo<input name="profilePhotoFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPG or WebP under 1 MB</small></label><label>Company logo<input name="logoFile" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPG or WebP under 1 MB</small></label><div class="profile-image-status profile-wide" id="profile-image-status"></div></div></fieldset>
+          <fieldset><legend>Contact details</legend><div class="profile-form-grid"><label>Email<input name="email" type="email" maxlength="254" autocomplete="email"></label><label>Phone<input name="phone" maxlength="40" autocomplete="tel"></label><label class="profile-wide">Website<input name="website" inputmode="url" maxlength="500" placeholder="https://example.com"></label><label class="profile-wide">Address<input name="address" maxlength="200" autocomplete="street-address"></label><label>City<input name="city" maxlength="80" autocomplete="address-level2"></label><label>Country<input name="country" maxlength="80" autocomplete="country-name"></label></div></fieldset>
+          <fieldset><legend>Brand defaults</legend><div class="profile-form-grid color-fields"><label>Brand color<input name="brandColor" type="color" value="#6d5dfc"></label><label>Secondary color<input name="secondaryColor" type="color" value="#14b8a6"></label><label>Default currency<input name="defaultCurrency" maxlength="3" value="USD" autocapitalize="characters"></label><label>Tax information (optional)<input name="taxInformation" maxlength="300" autocomplete="off"></label></div></fieldset>
+          <fieldset><legend>Links</legend><div class="profile-form-grid"><label>LinkedIn<input name="linkedin" inputmode="url" maxlength="500"></label><label>Instagram<input name="instagram" inputmode="url" maxlength="500"></label><label>X / Twitter<input name="x" inputmode="url" maxlength="500"></label><label>YouTube<input name="youtube" inputmode="url" maxlength="500"></label><label>WhatsApp<input name="whatsapp" maxlength="120"></label><label>Booking link<input name="bookingLink" inputmode="url" maxlength="500"></label></div></fieldset>
+          <p class="profile-privacy"><i class="ph-bold ph-shield-check"></i> Profile images and details are uploaded only when you press Save. They are not sent to analytics.</p>
+          <button class="button primary full" type="submit">Save Business Profile</button>
+          <p class="auth-message" id="business-profile-message" aria-live="polite"></p>
+        </form>
+      </section>
+      <footer><button id="account-upgrade" class="button primary full" data-checkout="tools_pro_monthly" type="button">Upgrade to Pro</button><button id="logout-button" class="button secondary full" type="button">Sign out</button></footer>
+    </aside>
+  </div>
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/src/tools.js?v=20260818-3"></script>
+  <script type="module" src="/src/tools.js?v=20260819-1"></script>
 </body>
 </html>

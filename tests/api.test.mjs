@@ -547,12 +547,44 @@ test('registration creates a secure session and listing credits are enforced', a
 test('account settings support password change, export and deletion', async () => {
   const register = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Account Test', email: 'account-test@example.com', password: 'SecurePass123', role: 'buyer' }) });
   const cookie = register.headers.getSetCookie()[0].split(';')[0];
+  const emptyProfile = await fetch(`${baseUrl}/api/account/business-profile`, { headers: { Cookie: cookie } }).then(response => response.json());
+  assert.equal(emptyProfile.profile.exists, false);
+  assert.equal(emptyProfile.profile.fullName, 'Account Test');
+  const profileResponse = await fetch(`${baseUrl}/api/account/business-profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      fullName: 'Alex Rivera', companyName: 'Rivera Studio', email: 'alex@example.com', phone: '+1 555 0100', website: 'rivera.example',
+      address: '100 Market Street', city: 'Austin', country: 'United States', brandColor: '#112233', secondaryColor: '#445566',
+      linkedin: 'https://linkedin.com/in/alex-rivera', whatsapp: '+15550100', bookingLink: 'cal.example/alex',
+      businessDescription: 'Independent design and development services.', defaultCurrency: 'usd', taxInformation: 'Optional tax reference',
+      logo: 'data:image/png;base64,iVBORw0KGgo=', profilePhoto: ''
+    })
+  });
+  assert.equal(profileResponse.status, 200);
+  const savedProfile = (await profileResponse.json()).profile;
+  assert.equal(savedProfile.exists, true);
+  assert.equal(savedProfile.website, 'https://rivera.example/');
+  assert.equal(savedProfile.defaultCurrency, 'USD');
+  assert.ok(savedProfile.completionPercent >= 80);
   const exported = await fetch(`${baseUrl}/api/account/export`, { headers: { Cookie: cookie } }).then(response => response.json());
   assert.equal(exported.account.email, 'account-test@example.com');
+  assert.equal(exported.businessProfile.companyName, 'Rivera Studio');
   const passwordChange = await fetch(`${baseUrl}/api/account/change-password`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ currentPassword: 'SecurePass123', newPassword: 'NewSecurePass456' }) });
   assert.equal(passwordChange.status, 200);
   const deletion = await fetch(`${baseUrl}/api/account`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ password: 'NewSecurePass456', confirmation: 'HESABIMI SİL' }) });
   assert.equal(deletion.status, 200);
+});
+
+test('business profiles require authentication and reject unsafe image data', async () => {
+  assert.equal((await fetch(`${baseUrl}/api/account/business-profile`)).status, 401);
+  const register = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.77' }, body: JSON.stringify({ name: 'Profile Test', email: 'profile-test@example.com', password: 'SecurePass123', role: 'both' }) });
+  const cookie = register.headers.getSetCookie()[0].split(';')[0];
+  const response = await fetch(`${baseUrl}/api/account/business-profile`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ fullName: 'Profile Test', logo: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' })
+  });
+  assert.equal(response.status, 422);
 });
 
 test('demo checkout credits only the authenticated user', async () => {

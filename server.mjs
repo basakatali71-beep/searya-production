@@ -45,6 +45,7 @@ const PRESENCE_ACTIVE_WINDOW_SECONDS = 120;
 const DEFAULT_JSON_BYTES = 128 * 1024;
 const MAX_LISTING_JSON_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGE_DATA_CHARACTERS = 2_900_000;
+const MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS = 1_400_000;
 const MIN_NEW_PASSWORD_LENGTH = 12;
 const MAX_PASSWORD_LENGTH = 128;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
@@ -299,6 +300,33 @@ db.exec(`
   ) STRICT;
 
   CREATE INDEX IF NOT EXISTS tool_items_user_updated ON tool_items(user_id, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS business_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL DEFAULT '',
+    company_name TEXT NOT NULL DEFAULT '',
+    logo_data TEXT NOT NULL DEFAULT '',
+    profile_photo_data TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    website TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT '',
+    brand_color TEXT NOT NULL DEFAULT '#6d5dfc',
+    secondary_color TEXT NOT NULL DEFAULT '#14b8a6',
+    linkedin_url TEXT NOT NULL DEFAULT '',
+    instagram_url TEXT NOT NULL DEFAULT '',
+    x_url TEXT NOT NULL DEFAULT '',
+    youtube_url TEXT NOT NULL DEFAULT '',
+    whatsapp TEXT NOT NULL DEFAULT '',
+    booking_url TEXT NOT NULL DEFAULT '',
+    business_description TEXT NOT NULL DEFAULT '',
+    default_currency TEXT NOT NULL DEFAULT 'USD',
+    tax_information TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  ) STRICT;
 `);
 
 if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'email_verified')) {
@@ -423,7 +451,8 @@ const BEHAVIOR_EVENT_NAMES = new Set([
   'exit_feedback_shown', 'exit_feedback_submitted', 'exit_feedback_dismissed', 'ui_error',
   'discovery_page_view', 'discovery_project_click', 'discovery_seller_cta_click', 'discovery_buyer_cta_click',
   'tool_opened', 'tool_completed', 'tool_exported', 'tool_saved', 'pricing_viewed',
-  'checkout_started', 'checkout_failed', 'account_opened', 'navigation_clicked', 'auth_help_requested'
+  'checkout_started', 'checkout_failed', 'account_opened', 'navigation_clicked', 'auth_help_requested',
+  'business_profile_created', 'business_profile_updated'
 ]);
 
 const BEHAVIOR_METADATA_KEYS = new Set([
@@ -786,6 +815,97 @@ function safeImageData(value) {
   }
   if (/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) && text.length <= MAX_IMAGE_DATA_CHARACTERS) return text;
   return '';
+}
+
+function safeBusinessProfileImage(value, label) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) || text.length > MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS) {
+    throw Object.assign(new Error(`${label} must be a PNG, JPG or WebP image under 1 MB.`), { status: 422 });
+  }
+  return text;
+}
+
+function safeBusinessProfileUrl(value, label) {
+  const text = cleanText(value, 500);
+  if (!text) return '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Unsupported protocol');
+    return url.href.slice(0, 500);
+  } catch {
+    throw Object.assign(new Error(`${label} must be a valid web address.`), { status: 422 });
+  }
+}
+
+function businessProfileFromRow(row, user = null) {
+  const profile = row ? {
+    fullName: row.full_name,
+    companyName: row.company_name,
+    logo: row.logo_data,
+    profilePhoto: row.profile_photo_data,
+    email: row.email,
+    phone: row.phone,
+    website: row.website,
+    address: row.address,
+    city: row.city,
+    country: row.country,
+    brandColor: row.brand_color,
+    secondaryColor: row.secondary_color,
+    linkedin: row.linkedin_url,
+    instagram: row.instagram_url,
+    x: row.x_url,
+    youtube: row.youtube_url,
+    whatsapp: row.whatsapp,
+    bookingLink: row.booking_url,
+    businessDescription: row.business_description,
+    defaultCurrency: row.default_currency,
+    taxInformation: row.tax_information,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  } : {
+    fullName: user?.name || '', companyName: '', logo: '', profilePhoto: '', email: user?.email || '', phone: '', website: '',
+    address: '', city: '', country: '', brandColor: '#6d5dfc', secondaryColor: '#14b8a6', linkedin: '', instagram: '', x: '',
+    youtube: '', whatsapp: '', bookingLink: '', businessDescription: '', defaultCurrency: 'USD', taxInformation: '', createdAt: null, updatedAt: null
+  };
+  const completionFields = ['fullName', 'companyName', 'email', 'phone', 'website', 'address', 'city', 'country', 'businessDescription', 'logo'];
+  const completed = completionFields.filter(key => Boolean(profile[key])).length;
+  return { ...profile, exists: Boolean(row), completionPercent: Math.round(completed / completionFields.length * 100) };
+}
+
+function mapBusinessProfileInput(body, user) {
+  const fullName = cleanText(body.fullName || user.name, 100);
+  const email = cleanText(body.email || user.email, 254).toLowerCase();
+  if (fullName.length < 2) throw Object.assign(new Error('Add your full name.'), { status: 422 });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Add a valid email address.'), { status: 422 });
+  const brandColor = String(body.brandColor || '#6d5dfc').trim().toLowerCase();
+  const secondaryColor = String(body.secondaryColor || '#14b8a6').trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(brandColor) || !/^#[0-9a-f]{6}$/.test(secondaryColor)) throw Object.assign(new Error('Choose valid brand colors.'), { status: 422 });
+  const defaultCurrency = cleanText(body.defaultCurrency || 'USD', 3).toUpperCase();
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) throw Object.assign(new Error('Choose a valid three-letter currency code.'), { status: 422 });
+  return {
+    fullName,
+    companyName: cleanText(body.companyName, 120),
+    logo: safeBusinessProfileImage(body.logo, 'Company logo'),
+    profilePhoto: safeBusinessProfileImage(body.profilePhoto, 'Profile photo'),
+    email,
+    phone: cleanText(body.phone, 40),
+    website: safeBusinessProfileUrl(body.website, 'Website'),
+    address: cleanText(body.address, 200),
+    city: cleanText(body.city, 80),
+    country: cleanText(body.country, 80),
+    brandColor,
+    secondaryColor,
+    linkedin: safeBusinessProfileUrl(body.linkedin, 'LinkedIn link'),
+    instagram: safeBusinessProfileUrl(body.instagram, 'Instagram link'),
+    x: safeBusinessProfileUrl(body.x, 'X link'),
+    youtube: safeBusinessProfileUrl(body.youtube, 'YouTube link'),
+    whatsapp: cleanText(body.whatsapp, 120),
+    bookingLink: safeBusinessProfileUrl(body.bookingLink, 'Booking link'),
+    businessDescription: cleanText(body.businessDescription, 1000),
+    defaultCurrency,
+    taxInformation: cleanText(body.taxInformation, 300)
+  };
 }
 
 function mapListingInput(body, user) {
@@ -1418,12 +1538,46 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true });
   }
 
+  if (method === 'GET' && pathname === '/api/account/business-profile') {
+    const user = requireUser(req, res); if (!user) return;
+    const row = db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id);
+    return json(res, 200, { profile: businessProfileFromRow(row, user), entitlement: { plan: publicUser(user).plan, availableDuringFreeLaunch: LAUNCH_FREE_MODE } });
+  }
+
+  if (method === 'PUT' && pathname === '/api/account/business-profile') {
+    const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `business-profile:${user.id}`, 30, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before updating your business profile again.');
+    const body = await readJson(req, MAX_LISTING_JSON_BYTES);
+    const profile = mapBusinessProfileInput(body, user);
+    const existing = db.prepare('SELECT created_at AS createdAt FROM business_profiles WHERE user_id=?').get(user.id);
+    const updatedAt = nowIso();
+    const createdAt = existing?.createdAt || updatedAt;
+    db.prepare(`INSERT INTO business_profiles(
+      user_id,full_name,company_name,logo_data,profile_photo_data,email,phone,website,address,city,country,brand_color,secondary_color,
+      linkedin_url,instagram_url,x_url,youtube_url,whatsapp,booking_url,business_description,default_currency,tax_information,created_at,updated_at
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      full_name=excluded.full_name,company_name=excluded.company_name,logo_data=excluded.logo_data,profile_photo_data=excluded.profile_photo_data,
+      email=excluded.email,phone=excluded.phone,website=excluded.website,address=excluded.address,city=excluded.city,country=excluded.country,
+      brand_color=excluded.brand_color,secondary_color=excluded.secondary_color,linkedin_url=excluded.linkedin_url,instagram_url=excluded.instagram_url,
+      x_url=excluded.x_url,youtube_url=excluded.youtube_url,whatsapp=excluded.whatsapp,booking_url=excluded.booking_url,
+      business_description=excluded.business_description,default_currency=excluded.default_currency,tax_information=excluded.tax_information,updated_at=excluded.updated_at`).run(
+      user.id, profile.fullName, profile.companyName, profile.logo, profile.profilePhoto, profile.email, profile.phone, profile.website,
+      profile.address, profile.city, profile.country, profile.brandColor, profile.secondaryColor, profile.linkedin, profile.instagram, profile.x,
+      profile.youtube, profile.whatsapp, profile.bookingLink, profile.businessDescription, profile.defaultCurrency, profile.taxInformation, createdAt, updatedAt
+    );
+    recordBehaviorEvent(req, existing ? 'business_profile_updated' : 'business_profile_created', { plan: publicUser(user).plan });
+    const saved = db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id);
+    return json(res, 200, { profile: businessProfileFromRow(saved, user) });
+  }
+
   if (method === 'GET' && pathname === '/api/account/dashboard') {
     const user = requireUser(req, res); if (!user) return;
     const account = publicUser(user);
     const savedByType = db.prepare('SELECT item_type AS itemType,COUNT(*) AS count FROM tool_items WHERE user_id=? GROUP BY item_type ORDER BY count DESC').all(user.id);
     const purchases = db.prepare(`SELECT id,package_key AS packageKey,amount_cents AS amountCents,currency,status,created_at AS createdAt FROM purchases WHERE user_id=? AND package_key LIKE 'tools_%' ORDER BY created_at DESC LIMIT 20`).all(user.id);
-    return json(res, 200, { account, savedCount: savedByType.reduce((sum, row) => sum + row.count, 0), savedByType, purchases });
+    const businessProfile = businessProfileFromRow(db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id), user);
+    return json(res, 200, { account, savedCount: savedByType.reduce((sum, row) => sum + row.count, 0), savedByType, purchases, businessProfile: { exists: businessProfile.exists, completionPercent: businessProfile.completionPercent } });
   }
 
   if (method === 'GET' && pathname === '/api/me/listings') {
@@ -1451,7 +1605,8 @@ async function handleApi(req, res, url) {
     const purchases = db.prepare('SELECT id,package_key AS packageKey,amount_cents AS amountCents,currency,status,created_at AS createdAt FROM purchases WHERE user_id=? ORDER BY created_at DESC').all(user.id);
     const alerts = db.prepare('SELECT id,query,category,min_price AS minPrice,max_price AS maxPrice,frequency,created_at AS createdAt FROM alerts WHERE user_id=? ORDER BY created_at DESC').all(user.id);
     const threads = db.prepare('SELECT id,listing_id AS listingId,created_at AS createdAt,updated_at AS updatedAt FROM threads WHERE user_a=? OR user_b=? ORDER BY updated_at DESC').all(user.id, user.id).map(thread => ({ ...thread, messages: db.prepare('SELECT sender_id AS senderId,body,created_at AS createdAt FROM messages WHERE thread_id=? ORDER BY created_at').all(thread.id) }));
-    return json(res, 200, { exportedAt: nowIso(), account: publicUser(user), listings, purchases, alerts, threads });
+    const businessProfile = businessProfileFromRow(db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id), user);
+    return json(res, 200, { exportedAt: nowIso(), account: publicUser(user), businessProfile, listings, purchases, alerts, threads });
   }
 
   if (method === 'DELETE' && pathname === '/api/account') {
