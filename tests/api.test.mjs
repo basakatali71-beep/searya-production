@@ -162,6 +162,8 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
 });
 
 test('business tools expose dedicated SEO pages and generate real QR SVG output', async () => {
+  const toolsScript = await fetch(`${baseUrl}/src/tools.js`).then(response => response.text());
+  assert.match(toolsScript, /\$\$\('#line-items \.line-item'\)/, 'invoice calculations must not read estimate line items');
   const timePage = await fetch(`${baseUrl}/time-card-calculator`).then(response => response.text());
   assert.match(timePage, /<title>Free Time Card Calculator — Hours &amp; Overtime \| Searya<\/title>/);
   assert.match(timePage, /<link rel="canonical" href="https:\/\/searya\.com\/time-card-calculator">/);
@@ -432,6 +434,7 @@ test('industry tool pages reuse working tools with unique content, canonical URL
     assert.match(html, /"@type":"HowTo"/, route);
     assert.match(html, /class="seo-example-table"/, route);
     assert.ok((html.match(/<details>/g) || []).length >= 6, route);
+    assert.equal((html.match(/id="add-expense"/g) || []).length, 1, `${route} duplicated the expense tool markup`);
     assert.match(html, new RegExp(`<h1[^>]*>${INDUSTRY_TOOL_PAGES[route].h1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</h1>`), route);
     const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
     const description = html.match(/<meta name="description" content="([^"]+)">/)?.[1];

@@ -205,7 +205,7 @@ function downloadTimesheet() {
 function addLineItem(description='',quantity=1,rate=0) {
   const row=document.createElement('div'); row.className='line-item';
   row.innerHTML=`<input class="item-description" aria-label="Item description" placeholder="Service or product" maxlength="120" value="${escapeHtml(description)}"><input class="item-quantity" aria-label="Quantity" type="number" min="0" step="0.01" value="${quantity}"><input class="item-rate" aria-label="Rate" type="number" min="0" step="0.01" value="${rate}"><button class="remove-line" type="button" aria-label="Remove line"><i class="ph-bold ph-trash"></i></button>`;
-  row.querySelector('.remove-line').addEventListener('click',()=>{ if ($$('.line-item').length>1) row.remove(); updateDocumentPreview(); });
+  row.querySelector('.remove-line').addEventListener('click',()=>{ if ($$('#line-items .line-item').length>1) row.remove(); updateDocumentPreview(); });
   row.querySelectorAll('input').forEach(input=>input.addEventListener('input',updateDocumentPreview));
   $('#line-items').append(row); updateDocumentPreview();
 }
@@ -221,7 +221,7 @@ function syncDocumentType() {
 
 function documentValues() {
   const currency=$('#currency').value;
-  const items=$$('.line-item').map(row=>({description:row.querySelector('.item-description').value.trim()||'Item',quantity:Math.max(0,Number(row.querySelector('.item-quantity').value)||0),rate:Math.max(0,Number(row.querySelector('.item-rate').value)||0)}));
+  const items=$$('#line-items .line-item').map(row=>({description:row.querySelector('.item-description').value.trim()||'Item',quantity:Math.max(0,Number(row.querySelector('.item-quantity').value)||0),rate:Math.max(0,Number(row.querySelector('.item-rate').value)||0)}));
   const subtotal=items.reduce((sum,item)=>sum+item.quantity*item.rate,0);
   const discountRate=Math.min(100,Math.max(0,Number($('#discount').value)||0));
   const taxRate=Math.min(100,Math.max(0,Number($('#tax').value)||0));

@@ -2448,18 +2448,18 @@ function renderSeoPage({ title = SEO_TITLE, description = SEO_DESCRIPTION, canon
   }
   if (panelKey && supportingContent) {
     const guidePattern = new RegExp(`(<article class="workspace" data-tool-panel="${panelKey}">[\\s\\S]*?)<section class="tool-guide">[\\s\\S]*?<\\/section>`);
-    html = html.replace(guidePattern, `$1${supportingContent}`);
+    html = html.replace(guidePattern, (_match, panelStart) => `${panelStart}${supportingContent}`);
   }
   if (panelKey && (breadcrumbName || breadcrumbTrail.length)) {
     const trail = breadcrumbTrail.length ? breadcrumbTrail : [{ label: breadcrumbName }];
     const links = trail.map((item, index) => index === trail.length - 1
       ? `<span aria-current="page">${escapeMarkup(item.label)}</span>`
       : `<a href="${escapeMarkup(item.href)}">${escapeMarkup(item.label)}</a>`).join('<span>›</span>');
-    html = html.replace(`<article class="workspace" data-tool-panel="${panelKey}">`, `<article class="workspace" data-tool-panel="${panelKey}"><nav class="tool-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span>›</span><a href="/tools">Tools</a><span>›</span>${links}</nav>`);
+    html = html.replace(`<article class="workspace" data-tool-panel="${panelKey}">`, () => `<article class="workspace" data-tool-panel="${panelKey}"><nav class="tool-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span>›</span><a href="/tools">Tools</a><span>›</span>${links}</nav>`);
   }
   if (panelKey && primaryH1) {
     const headingPattern = new RegExp(`(<article class="workspace" data-tool-panel="${panelKey}">[\\s\\S]*?<header class="workspace-heading">[\\s\\S]*?<h1[^>]*>)[\\s\\S]*?(<\\/h1>)`);
-    html = html.replace(headingPattern, `$1${escapeMarkup(primaryH1)}$2`);
+    html = html.replace(headingPattern, (_match, headingStart, headingEnd) => `${headingStart}${escapeMarkup(primaryH1)}${headingEnd}`);
   }
   return applyPrimaryHeading(html, { panelKey, directory, pricing });
 }
