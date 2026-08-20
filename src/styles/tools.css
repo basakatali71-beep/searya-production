@@ -44,6 +44,7 @@ html{overflow-x:hidden}
 
 /* Shared account workspace and Business Profile */
 .auth-dialog{max-height:86vh;overflow:auto}
+.auth-tabs[hidden],.auth-form[hidden]{display:none!important}
 .account-panel{width:min(96vw,640px)}.account-summary{grid-template-columns:repeat(3,1fr)}
 .account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;margin:0 0 20px;border-radius:13px;background:#f2f3f7}
 .account-tabs button{min-height:40px;border:0;border-radius:9px;background:transparent;color:#737d8e;font:800 12px "DM Sans",sans-serif;cursor:pointer}
