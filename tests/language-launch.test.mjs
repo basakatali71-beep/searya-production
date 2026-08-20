@@ -74,6 +74,7 @@ test('The homepage exposes the core tools as crawlable links', () => {
   assert.match(pageSource, /href="\/qr-code-generator"/);
   assert.match(pageSource, /href="\/time-card-calculator"/);
   assert.match(pageSource, /href="\/invoice-generator"/);
+  assert.match(pageSource, /<h3>Invoice Maker<\/h3>/);
   assert.match(pageSource, /href="\/digital-business-card"/);
 });
 
