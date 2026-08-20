@@ -329,6 +329,33 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS workspace_contacts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    company TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS workspace_contacts_user_updated ON workspace_contacts(user_id, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS workspace_catalog_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    default_rate REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS workspace_catalog_user_updated ON workspace_catalog_items(user_id, updated_at DESC);
 `);
 
 if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'email_verified')) {
@@ -1509,7 +1536,7 @@ async function handleApi(req, res, url) {
 
   if (method === 'GET' && pathname === '/api/tools/items') {
     const user = requireUser(req, res); if (!user) return;
-    const rows = db.prepare(`SELECT id,item_type AS itemType,title,data_json AS dataJson,created_at AS createdAt,updated_at AS updatedAt FROM tool_items WHERE user_id=? ORDER BY updated_at DESC LIMIT 250`).all(user.id);
+    const rows = db.prepare(`SELECT id,item_type AS itemType,title,data_json AS dataJson,created_at AS createdAt,updated_at AS updatedAt FROM tool_items WHERE user_id=? ORDER BY updated_at DESC LIMIT 10000`).all(user.id);
     return json(res, 200, { items: rows.map(row => ({ ...row, data: JSON.parse(row.dataJson || '{}'), dataJson: undefined })) });
   }
 
@@ -1518,14 +1545,14 @@ async function handleApi(req, res, url) {
     if (rateLimited(req, `tool-save:${user.id}`, 120, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before saving more items.');
     const body = await readJson(req, MAX_LISTING_JSON_BYTES);
     const itemType = cleanText(body.itemType, 60);
-    const allowedTypes = new Set(['digital-card', 'qr-code', 'invoice', 'quote', 'receipt', 'timesheet', 'email-signature', 'expense-tracker', 'profit-margin']);
+    const allowedTypes = new Set(['digital-card', 'qr-code', 'invoice', 'quote', 'receipt', 'estimate', 'timesheet', 'email-signature', 'expense-tracker', 'profit-margin']);
     const title = cleanText(body.title, 100);
     const data = body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : null;
     const dataJson = data ? JSON.stringify(data) : '';
     if (!allowedTypes.has(itemType) || title.length < 2 || !dataJson || dataJson.length > MAX_IMAGE_DATA_CHARACTERS) return fail(res, 422, 'INVALID_TOOL_ITEM', 'Choose a valid item and title.');
     const current = db.prepare('SELECT COUNT(*) AS count FROM tool_items WHERE user_id=?').get(user.id).count;
     const plan = publicUser(user).plan;
-    const limit = plan === 'pro' ? 250 : 5;
+    const limit = plan === 'pro' ? 10000 : 5;
     if (current >= limit) return fail(res, 409, 'SAVE_LIMIT', plan === 'pro' ? 'Your saved-item limit has been reached.' : 'Free accounts can save up to five items. Upgrade to Pro for a larger workspace.');
     const id = randomUUID(); const createdAt = nowIso();
     db.prepare('INSERT INTO tool_items(id,user_id,item_type,title,data_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run(id, user.id, itemType, title, dataJson, createdAt, createdAt);
@@ -1573,13 +1600,80 @@ async function handleApi(req, res, url) {
     return json(res, 200, { profile: businessProfileFromRow(saved, user) });
   }
 
+  if (method === 'GET' && pathname === '/api/account/contacts') {
+    const user = requireUser(req, res); if (!user) return;
+    const contacts = db.prepare(`SELECT id,name,company,email,phone,address,created_at AS createdAt,updated_at AS updatedAt FROM workspace_contacts WHERE user_id=? ORDER BY name COLLATE NOCASE LIMIT 1000`).all(user.id);
+    return json(res, 200, { contacts });
+  }
+
+  if (method === 'POST' && pathname === '/api/account/contacts') {
+    const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `workspace-contact:${user.id}`, 120, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before saving more customers.');
+    const body = await readJson(req);
+    const contact = {
+      name: cleanText(body.name, 100), company: cleanText(body.company, 120), email: cleanText(body.email, 254).toLowerCase(),
+      phone: cleanText(body.phone, 40), address: cleanText(body.address, 240)
+    };
+    if (contact.name.length < 2) return fail(res, 422, 'INVALID_CONTACT', 'Add a customer name.');
+    if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) return fail(res, 422, 'INVALID_CONTACT', 'Add a valid customer email.');
+    const limit = publicUser(user).plan === 'pro' ? 1000 : 5;
+    if (db.prepare('SELECT COUNT(*) AS count FROM workspace_contacts WHERE user_id=?').get(user.id).count >= limit) return fail(res, 409, 'CONTACT_LIMIT', 'Free accounts can save up to five customers. Upgrade to Pro for a larger client workspace.');
+    const id = randomUUID(), timestamp = nowIso();
+    db.prepare('INSERT INTO workspace_contacts(id,user_id,name,company,email,phone,address,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run(id,user.id,contact.name,contact.company,contact.email,contact.phone,contact.address,timestamp,timestamp);
+    return json(res, 201, { contact: { id, ...contact, createdAt: timestamp, updatedAt: timestamp } });
+  }
+
+  const contactMatch = pathname.match(/^\/api\/account\/contacts\/([^/]+)$/);
+  if (method === 'DELETE' && contactMatch) {
+    const user = requireUser(req, res); if (!user) return;
+    const result = db.prepare('DELETE FROM workspace_contacts WHERE id=? AND user_id=?').run(decodeURIComponent(contactMatch[1]), user.id);
+    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Customer not found.');
+    return json(res, 200, { ok: true });
+  }
+
+  if (method === 'GET' && pathname === '/api/account/catalog-items') {
+    const user = requireUser(req, res); if (!user) return;
+    const items = db.prepare(`SELECT id,name,description,default_rate AS defaultRate,currency,created_at AS createdAt,updated_at AS updatedAt FROM workspace_catalog_items WHERE user_id=? ORDER BY name COLLATE NOCASE LIMIT 1000`).all(user.id);
+    return json(res, 200, { items });
+  }
+
+  if (method === 'POST' && pathname === '/api/account/catalog-items') {
+    const user = requireUser(req, res); if (!user) return;
+    if (rateLimited(req, `workspace-catalog:${user.id}`, 120, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before saving more services.');
+    const body = await readJson(req);
+    const item = { name: cleanText(body.name, 100), description: cleanText(body.description, 240), defaultRate: Math.max(0, Math.min(10000000, Number(body.defaultRate) || 0)), currency: cleanText(body.currency || 'USD', 3).toUpperCase() };
+    if (item.name.length < 2 || !/^[A-Z]{3}$/.test(item.currency)) return fail(res, 422, 'INVALID_CATALOG_ITEM', 'Add a service name and valid currency.');
+    const limit = publicUser(user).plan === 'pro' ? 1000 : 5;
+    if (db.prepare('SELECT COUNT(*) AS count FROM workspace_catalog_items WHERE user_id=?').get(user.id).count >= limit) return fail(res, 409, 'CATALOG_LIMIT', 'Free accounts can save up to five services. Upgrade to Pro for a larger catalog.');
+    const id = randomUUID(), timestamp = nowIso();
+    db.prepare('INSERT INTO workspace_catalog_items(id,user_id,name,description,default_rate,currency,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(id,user.id,item.name,item.description,item.defaultRate,item.currency,timestamp,timestamp);
+    return json(res, 201, { item: { id, ...item, createdAt: timestamp, updatedAt: timestamp } });
+  }
+
+  const catalogMatch = pathname.match(/^\/api\/account\/catalog-items\/([^/]+)$/);
+  if (method === 'DELETE' && catalogMatch) {
+    const user = requireUser(req, res); if (!user) return;
+    const result = db.prepare('DELETE FROM workspace_catalog_items WHERE id=? AND user_id=?').run(decodeURIComponent(catalogMatch[1]), user.id);
+    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Service not found.');
+    return json(res, 200, { ok: true });
+  }
+
   if (method === 'GET' && pathname === '/api/account/dashboard') {
     const user = requireUser(req, res); if (!user) return;
     const account = publicUser(user);
     const savedByType = db.prepare('SELECT item_type AS itemType,COUNT(*) AS count FROM tool_items WHERE user_id=? GROUP BY item_type ORDER BY count DESC').all(user.id);
     const purchases = db.prepare(`SELECT id,package_key AS packageKey,amount_cents AS amountCents,currency,status,created_at AS createdAt FROM purchases WHERE user_id=? AND package_key LIKE 'tools_%' ORDER BY created_at DESC LIMIT 20`).all(user.id);
     const businessProfile = businessProfileFromRow(db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id), user);
-    return json(res, 200, { account, savedCount: savedByType.reduce((sum, row) => sum + row.count, 0), savedByType, purchases, businessProfile: { exists: businessProfile.exists, completionPercent: businessProfile.completionPercent } });
+    const savedRows = db.prepare(`SELECT item_type AS itemType,data_json AS dataJson FROM tool_items WHERE user_id=? AND item_type IN ('invoice','receipt','expense-tracker')`).all(user.id);
+    let invoiced = 0, expenses = 0; const currentPeriod = nowIso().slice(0, 7);
+    for (const row of savedRows) {
+      let data = {}; try { data = JSON.parse(row.dataJson || '{}'); } catch {}
+      if ((row.itemType === 'invoice' || row.itemType === 'receipt') && (!data.issueDate || String(data.issueDate).startsWith(currentPeriod))) invoiced += Math.max(0, Number(data.total) || 0);
+      if (row.itemType === 'expense-tracker' && Array.isArray(data.items)) expenses += data.items.filter(item => !item.date || String(item.date).startsWith(currentPeriod)).reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
+    }
+    const contactsCount = db.prepare('SELECT COUNT(*) AS count FROM workspace_contacts WHERE user_id=?').get(user.id).count;
+    const catalogCount = db.prepare('SELECT COUNT(*) AS count FROM workspace_catalog_items WHERE user_id=?').get(user.id).count;
+    return json(res, 200, { account, savedCount: savedByType.reduce((sum, row) => sum + row.count, 0), savedByType, purchases, businessProfile: { exists: businessProfile.exists, completionPercent: businessProfile.completionPercent }, workspace: { period: currentPeriod, contactsCount, catalogCount, invoiced, expenses, estimatedProfit: invoiced - expenses } });
   }
 
   if (method === 'GET' && pathname === '/api/me/listings') {
@@ -1608,7 +1702,10 @@ async function handleApi(req, res, url) {
     const alerts = db.prepare('SELECT id,query,category,min_price AS minPrice,max_price AS maxPrice,frequency,created_at AS createdAt FROM alerts WHERE user_id=? ORDER BY created_at DESC').all(user.id);
     const threads = db.prepare('SELECT id,listing_id AS listingId,created_at AS createdAt,updated_at AS updatedAt FROM threads WHERE user_a=? OR user_b=? ORDER BY updated_at DESC').all(user.id, user.id).map(thread => ({ ...thread, messages: db.prepare('SELECT sender_id AS senderId,body,created_at AS createdAt FROM messages WHERE thread_id=? ORDER BY created_at').all(thread.id) }));
     const businessProfile = businessProfileFromRow(db.prepare('SELECT * FROM business_profiles WHERE user_id=?').get(user.id), user);
-    return json(res, 200, { exportedAt: nowIso(), account: publicUser(user), businessProfile, listings, purchases, alerts, threads });
+    const contacts = db.prepare('SELECT id,name,company,email,phone,address,created_at AS createdAt,updated_at AS updatedAt FROM workspace_contacts WHERE user_id=? ORDER BY name').all(user.id);
+    const catalogItems = db.prepare('SELECT id,name,description,default_rate AS defaultRate,currency,created_at AS createdAt,updated_at AS updatedAt FROM workspace_catalog_items WHERE user_id=? ORDER BY name').all(user.id);
+    const toolItems = db.prepare('SELECT id,item_type AS itemType,title,data_json AS dataJson,created_at AS createdAt,updated_at AS updatedAt FROM tool_items WHERE user_id=? ORDER BY updated_at DESC').all(user.id).map(item => ({ ...item, data: JSON.parse(item.dataJson || '{}'), dataJson: undefined }));
+    return json(res, 200, { exportedAt: nowIso(), account: publicUser(user), businessProfile, contacts, catalogItems, toolItems, listings, purchases, alerts, threads });
   }
 
   if (method === 'DELETE' && pathname === '/api/account') {

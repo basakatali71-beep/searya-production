@@ -604,6 +604,29 @@ test('business profiles require authentication and reject unsafe image data', as
   assert.equal(response.status, 422);
 });
 
+test('connected workspace saves customers, services, estimates and finance totals', async () => {
+  const register = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.190' }, body: JSON.stringify({ name: 'Workspace User', email: 'workspace-api@example.com', password: 'SecurePass123', role: 'both' }) });
+  const cookie = register.headers.getSetCookie()[0].split(';')[0];
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie };
+  const contactResponse = await fetch(`${baseUrl}/api/account/contacts`, { method: 'POST', headers, body: JSON.stringify({ name: 'Acme Client', company: 'Acme LLC', email: 'billing@acme.test', phone: '+1 555 0100', address: '20 Market Street' }) });
+  assert.equal(contactResponse.status, 201);
+  const catalogResponse = await fetch(`${baseUrl}/api/account/catalog-items`, { method: 'POST', headers, body: JSON.stringify({ name: 'Design retainer', description: 'Monthly design services', defaultRate: 800, currency: 'USD' }) });
+  assert.equal(catalogResponse.status, 201);
+  assert.equal((await fetch(`${baseUrl}/api/account/contacts`, { headers: { Cookie: cookie } }).then(response => response.json())).contacts.length, 1);
+  assert.equal((await fetch(`${baseUrl}/api/account/catalog-items`, { headers: { Cookie: cookie } }).then(response => response.json())).items[0].defaultRate, 800);
+
+  const invoice = { itemType: 'invoice', title: 'Invoice INV-2001', data: { total: 1200, items: [{ description: 'Design retainer', quantity: 1, rate: 1200 }] } };
+  const expenses = { itemType: 'expense-tracker', title: 'August expenses', data: { items: [{ description: 'Software', amount: 200 }] } };
+  const estimate = { itemType: 'estimate', title: 'Estimate EST-2001', data: { total: 1500, items: [{ description: 'Website', quantity: 1, rate: 1500 }] } };
+  for (const item of [invoice, expenses, estimate]) assert.equal((await fetch(`${baseUrl}/api/tools/items`, { method: 'POST', headers, body: JSON.stringify(item) })).status, 201);
+  const dashboard = await fetch(`${baseUrl}/api/account/dashboard`, { headers: { Cookie: cookie } }).then(response => response.json());
+  assert.equal(dashboard.workspace.contactsCount, 1);
+  assert.equal(dashboard.workspace.catalogCount, 1);
+  assert.equal(dashboard.workspace.invoiced, 1200);
+  assert.equal(dashboard.workspace.expenses, 200);
+  assert.equal(dashboard.workspace.estimatedProfit, 1000);
+});
+
 test('demo checkout credits only the authenticated user', async () => {
   const registerResponse = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
