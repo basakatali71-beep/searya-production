@@ -1751,7 +1751,7 @@ async function handleApi(req, res, url) {
     }
     const row = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
     recordAnalyticsEvent(req, 'listing_created', { type: input.type });
-    if (row.status === 'approved') notifySearchEngines([`/projects/${encodeURIComponent(row.slug)}`, '/sitemap.xml']);
+    if (row.status === 'approved') notifySearchEngines(['/sitemap.xml']);
     if (user.email) sendEmail({ to: user.email, subject: 'We received your Searya listing', text: `Your ${input.title} listing ${status === 'pending' ? 'is under security review' : 'has been published'}.`, idempotencyKey: `listing-${id}` }).catch(console.error);
     return json(res, 201, { listing: listingFromRow(row), moderation: status === 'pending' ? 'pending' : 'approved', user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)) });
   }
@@ -2158,7 +2158,7 @@ async function handleApi(req, res, url) {
     if (action === 'reject') db.prepare(`UPDATE listings SET status='rejected',is_verified=0,priority_review=0,updated_at=? WHERE id=?`).run(nowIso(), id);
     else db.prepare(`UPDATE listings SET status='approved',is_verified=?,priority_review=0,updated_at=? WHERE id=?`).run(action === 'verify' ? 1 : 0, nowIso(), id);
     const updatedListing = db.prepare('SELECT * FROM listings WHERE id=?').get(id);
-    if (updatedListing.status === 'approved') notifySearchEngines([`/projects/${encodeURIComponent(updatedListing.slug)}`, '/sitemap.xml']);
+    if (updatedListing.status === 'approved') notifySearchEngines(['/sitemap.xml']);
     const owner = db.prepare('SELECT email,name FROM users WHERE id=?').get(updatedListing.user_id);
     let notificationSent = false;
     if (owner?.email) {
@@ -2176,7 +2176,7 @@ async function handleApi(req, res, url) {
 }
 
 const mimeTypes = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
 const SEO_TITLE = 'Free Small Business Tools — Calculators & Documents | Searya';
@@ -2397,8 +2397,8 @@ function homepageStructuredData() {
   return {
     '@context': 'https://schema.org',
     '@graph': [
-      { '@type': 'Organization', '@id': `${PUBLIC_ORIGIN}/#organization`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, logo: { '@type': 'ImageObject', url: `${PUBLIC_ORIGIN}/public/searya-logo.png` } },
-      { '@type': 'WebSite', '@id': `${PUBLIC_ORIGIN}/#website`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, publisher: { '@id': `${PUBLIC_ORIGIN}/#organization` }, description: SEO_DESCRIPTION },
+      { '@type': 'Organization', '@id': `${PUBLIC_ORIGIN}/#organization`, name: 'Searya', url: `${PUBLIC_ORIGIN}/`, description: 'Free practical business tools for independent professionals and small businesses.', logo: { '@type': 'ImageObject', url: `${PUBLIC_ORIGIN}/public/searya-logo.png`, width: 351, height: 342 }, image: `${PUBLIC_ORIGIN}/public/icon-512.png` },
+      { '@type': 'WebSite', '@id': `${PUBLIC_ORIGIN}/#website`, name: 'Searya Tools', alternateName: ['Searya', 'Searya Business Tools'], url: `${PUBLIC_ORIGIN}/`, publisher: { '@id': `${PUBLIC_ORIGIN}/#organization` }, description: SEO_DESCRIPTION },
       { '@type': 'ItemList', name: 'Free business tools', itemListElement: TOOL_PATHS.map((path, index) => ({ '@type': 'ListItem', position: index + 1, name: TOOL_PAGES[path].name, url: `${PUBLIC_ORIGIN}${path}` })) }
     ]
   };
@@ -2594,7 +2594,7 @@ function guideFooter() {
 function toolEditorialHead({ title, description, canonical, structuredData, type = 'article' }) {
   const socialImage = `${PUBLIC_ORIGIN}/public/searya-tools-preview.png?v=20260816-2`;
   const json = JSON.stringify(structuredData).replaceAll('<', '\\u003c');
-  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeMarkup(title)}</title><meta name="description" content="${escapeMarkup(description)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${escapeMarkup(canonical)}"><meta property="og:type" content="${escapeMarkup(type)}"><meta property="og:site_name" content="Searya Tools"><meta property="og:locale" content="en_US"><meta property="og:url" content="${escapeMarkup(canonical)}"><meta property="og:title" content="${escapeMarkup(title)}"><meta property="og:description" content="${escapeMarkup(description)}"><meta property="og:image" content="${socialImage}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(title)}"><meta name="twitter:description" content="${escapeMarkup(description)}"><meta name="twitter:image" content="${socialImage}"><link rel="icon" href="/favicon.ico?v=20260816-1" sizes="any"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/src/styles/tools.css?v=20260819-2"><link rel="stylesheet" href="/public/tool-seo.css?v=20260819-1"><script type="application/ld+json">${json}</script>`;
+  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="application-name" content="Searya Tools"><meta name="theme-color" content="#2457f5"><title>${escapeMarkup(title)}</title><meta name="description" content="${escapeMarkup(description)}"><meta name="robots" content="index, follow, max-image-preview:large"><link rel="canonical" href="${escapeMarkup(canonical)}"><meta property="og:type" content="${escapeMarkup(type)}"><meta property="og:site_name" content="Searya Tools"><meta property="og:locale" content="en_US"><meta property="og:url" content="${escapeMarkup(canonical)}"><meta property="og:title" content="${escapeMarkup(title)}"><meta property="og:description" content="${escapeMarkup(description)}"><meta property="og:image" content="${socialImage}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeMarkup(title)}"><meta name="twitter:description" content="${escapeMarkup(description)}"><meta name="twitter:image" content="${socialImage}"><link rel="icon" type="image/png" sizes="48x48" href="/public/favicon-48.png?v=20260820-1"><link rel="icon" type="image/png" sizes="96x96" href="/public/favicon-96.png?v=20260820-1"><link rel="shortcut icon" href="/favicon.ico?v=20260820-1"><link rel="apple-touch-icon" sizes="180x180" href="/public/apple-touch-icon.png?v=20260820-1"><link rel="manifest" href="/public/site.webmanifest?v=20260820-1"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/src/styles/tools.css?v=20260819-2"><link rel="stylesheet" href="/public/tool-seo.css?v=20260819-1"><script type="application/ld+json">${json}</script>`;
 }
 
 function toolEditorialHeader() {

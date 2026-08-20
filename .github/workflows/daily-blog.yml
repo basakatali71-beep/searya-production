@@ -1,24 +1,19 @@
-name: Generate Searya SEO blog article
+name: Refresh Searya Tools search indexing
 
 on:
   schedule:
     - cron: '0 9,18 * * *'
   workflow_dispatch:
-    inputs:
-      keyword:
-        description: Optional exact keyword override
-        required: false
-        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: searya-blog-generator
+  group: searya-tools-indexing
   cancel-in-progress: false
 
 jobs:
-  generate:
+  refresh:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,26 +22,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Generate one reviewed-structure article
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BLOG_MODEL: gpt-5-mini
-          BLOG_KEYWORD: ${{ inputs.keyword }}
-        run: npm run blog:generate
-      - run: npm run check
-      - name: Commit generated article
-        run: |
-          git config user.name "searya-editorial-bot"
-          git config user.email "editorial-bot@users.noreply.github.com"
-          git add src/data/blogPosts.json
-          git diff --cached --quiet || git commit -m "Publish scheduled Searya blog article"
-          git push
-      - name: Notify Bing and Yandex after the article is live
+      - name: Validate the current tools SEO surface
+        run: npm run audit:seo
+      - name: Submit every current sitemap URL to IndexNow
         env:
           PUBLIC_ORIGIN: https://searya.com
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
-        run: node scripts/submit-indexnow.mjs "https://searya.com/$(node -e "const p=require('./src/data/blogPosts.json'); process.stdout.write(p.at(-1).url.replace(/^\\//,''))")" "https://searya.com/sitemap.xml"
-      - name: Refresh the sitemap in Google Search Console
+        run: npm run indexnow:submit-sitemap
+      - name: Refresh the tools sitemap in Google Search Console
         env:
           GOOGLE_SEARCH_CONSOLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SEARCH_CONSOLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SEARCH_CONSOLE_SITE_URL: sc-domain:searya.com

@@ -11,6 +11,7 @@ const serverSource = await readFile(new URL('../server.mjs', import.meta.url), '
 const privacySource = await readFile(new URL('../legal/privacy.html', import.meta.url), 'utf8');
 const termsSource = await readFile(new URL('../legal/terms.html', import.meta.url), 'utf8');
 const campaignSource = await readFile(new URL('../marketing/x-seller-launch-en.md', import.meta.url), 'utf8');
+const indexingWorkflowSource = await readFile(new URL('../.github/workflows/daily-blog.yml', import.meta.url), 'utf8');
 
 test('The public interface is English-only', () => {
   assert.match(pageSource, /<html lang="en"/);
@@ -64,8 +65,11 @@ test('Social sharing metadata uses an absolute English preview card', () => {
 });
 
 test('Searya favicon and English feedback contact are published', () => {
-  assert.match(pageSource, /href="\/favicon\.ico\?v=20260816-1"/);
-  assert.match(pageSource, /href="\/public\/favicon-32\.png\?v=20260816-1"/);
+  assert.match(pageSource, /href="\/favicon\.ico\?v=20260820-1"/);
+  assert.match(pageSource, /href="\/public\/favicon-48\.png\?v=20260820-1"/);
+  assert.match(pageSource, /href="\/public\/favicon-96\.png\?v=20260820-1"/);
+  assert.match(pageSource, /href="\/public\/site\.webmanifest\?v=20260820-1"/);
+  assert.match(pageSource, /"name":"Searya Tools","alternateName":\["Searya","Searya Business Tools"\]/);
   assert.match(pageSource, /href="mailto:basakatali71@gmail\.com"/);
   assert.match(pageSource, />Feedback<\/a>/);
 });
@@ -99,6 +103,14 @@ test('The tool homepage has clear navigation and launch pricing', () => {
 test('The homepage contains no marketplace samples or fake traction claims', () => {
   assert.doesNotMatch(pageSource, /sample|marketplace|commission|buyers|sellers/i);
   assert.doesNotMatch(pageSource, /\d+[,+] users|trusted by|projects sold/i);
+});
+
+test('Scheduled search submissions promote the current tools sitemap only', () => {
+  assert.match(indexingWorkflowSource, /Refresh Searya Tools search indexing/);
+  assert.match(indexingWorkflowSource, /indexnow:submit-sitemap/);
+  assert.match(indexingWorkflowSource, /google:submit-sitemap/);
+  assert.doesNotMatch(indexingWorkflowSource, /blog:generate|OPENAI_API_KEY|Publish scheduled Searya blog article/);
+  assert.match(serverSource, /NODE_ENV !== 'test'[\s\S]*currentPages = \['\/', '\/tools', '\/pricing', \.\.\.TOOL_PATHS/);
 });
 
 test('Listing creation requires a signed-in user before rendering the form', () => {
