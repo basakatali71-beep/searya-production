@@ -376,7 +376,7 @@ const packages = Object.freeze({
   seller_listings_3: { key: 'seller_listings_3', name: '3 Seller Listings', amountCents: 900, sellerListingCredits: 3 },
   seller_vip_10: { key: 'seller_vip_10', name: 'Seller Pro Launch Pack', amountCents: 1999, sellerListingCredits: 10, sellerVipCredits: 1, boostCredits: 1 },
   tools_pro_monthly: { key: 'tools_pro_monthly', name: 'Searya Pro Monthly', amountCents: 799, plan: 'pro', durationDays: 35 },
-  tools_pro_yearly: { key: 'tools_pro_yearly', name: 'Searya Pro Yearly', amountCents: 6900, plan: 'pro', durationDays: 370 }
+  tools_pro_yearly: { key: 'tools_pro_yearly', name: 'Searya Pro Yearly', amountCents: 5900, plan: 'pro', durationDays: 370 }
 });
 
 const polarProductEnvironments = Object.freeze({
@@ -2412,7 +2412,7 @@ function applyPrimaryHeading(html, { panelKey = '', directory = false, pricing =
   } else if (directory) {
     html = html.replace(/(<section class="tools-section" id="tools">[\s\S]*?)<h2>(Pick a job\. Get it done\.)<\/h2>/, '$1<h1>$2</h1>');
   } else if (pricing) {
-    html = html.replace(/(<section class="pricing-section" id="pricing">[\s\S]*?)<h2>(Start free\. Save everything with Pro\.)<\/h2>/, '$1<h1>$2</h1>');
+    html = html.replace(/(<section class="pricing-section" id="pricing">[\s\S]*?)<h2>(Start free\. Upgrade when your work becomes repeatable\.)<\/h2>/, '$1<h1>$2</h1>');
   } else {
     html = html.replace(/(<section class="hero" id="home-hero">[\s\S]*?)<h2>([\s\S]*?)<\/h2>/, '$1<h1>$2</h1>');
   }

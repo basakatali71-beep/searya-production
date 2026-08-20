@@ -53,7 +53,7 @@ test('Launch legal copy does not contain unfinished placeholders', () => {
 test('The homepage explains the free tools and local-first document handling', () => {
   assert.match(pageSource, /No account required/);
   assert.match(pageSource, /Your document data stays in this browser/);
-  assert.match(pageSource, /One plan unlocks every tool/);
+  assert.match(pageSource, /Use every tool for free/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
@@ -95,9 +95,12 @@ test('The tool homepage has clear navigation and launch pricing', () => {
   assert.match(pageSource, /aria-label="Main navigation"/);
   assert.match(pageSource, /href="\/#how-it-works"/);
   assert.match(pageSource, /href="\/pricing"/);
+  assert.match(pageSource, /All 12 calculators and generators/);
+  assert.match(pageSource, /Choose yearly — \$59/);
+  assert.doesNotMatch(pageSource, /All seven generators and calculators/);
   assert.match(pageSource, /\$0/);
   assert.match(pageSource, /\$7\.99/);
-  assert.match(pageSource, /One plan unlocks every tool/);
+  assert.match(pageSource, /Use every tool for free/);
 });
 
 test('The homepage contains no marketplace samples or fake traction claims', () => {
