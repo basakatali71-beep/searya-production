@@ -209,6 +209,20 @@ db.exec(`
     created_at TEXT NOT NULL
   ) STRICT;
 
+  CREATE TABLE IF NOT EXISTS feedback_messages (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    feedback_type TEXT NOT NULL CHECK(feedback_type IN ('suggestion','request','complaint','problem','other')),
+    message TEXT NOT NULL,
+    page_path TEXT NOT NULL DEFAULT '/',
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE INDEX IF NOT EXISTS feedback_messages_created ON feedback_messages(created_at DESC);
+
   CREATE TABLE IF NOT EXISTS page_views (
     id TEXT PRIMARY KEY,
     visitor_id TEXT NOT NULL,
@@ -1379,6 +1393,32 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true, service: 'searya-api', environment: NODE_ENV, paymentMode: PAYMENT_MODE, launchFree: LAUNCH_FREE_MODE, launchLimits: { activeListings: LAUNCH_FREE_LISTING_LIMIT, newConnections: LAUNCH_FREE_CONNECTION_LIMIT, connectionWindowDays: LAUNCH_FREE_CONNECTION_WINDOW_DAYS }, paymentServer: PAYMENT_MODE === 'polar' ? polarServer() : null, paymentConfigured: PAYMENT_MODE === 'polar' ? polarPaymentConfigured() : PAYMENT_MODE === 'demo' && NODE_ENV !== 'production', emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), socialAuth: { google: socialAuthConfigured('google') }, time: nowIso() });
   }
 
+  if (method === 'POST' && pathname === '/api/feedback') {
+    if (rateLimited(req, 'feedback', 6, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before sending another message.');
+    const body = await readJson(req);
+    const user = getUser(req);
+    const name = cleanText(body.name || user?.name, 80);
+    const email = String(body.email || user?.email || '').trim().toLowerCase();
+    const feedbackType = ['suggestion', 'request', 'complaint', 'problem', 'other'].includes(body.type) ? body.type : 'other';
+    const message = cleanText(body.message, 3000);
+    const pagePath = cleanText(body.pagePath || '/', 300);
+    if (name.length < 2 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || message.length < 10) {
+      return fail(res, 422, 'INVALID_FEEDBACK', 'Enter your name, a valid email and a message of at least 10 characters.');
+    }
+    const id = randomUUID();
+    const createdAt = nowIso();
+    db.prepare('INSERT INTO feedback_messages(id,user_id,name,email,feedback_type,message,page_path,status,created_at) VALUES(?,?,?,?,?,?,?,\'new\',?)')
+      .run(id, user?.id || null, name, email, feedbackType, message, pagePath, createdAt);
+    const inbox = String(process.env.FEEDBACK_EMAIL || process.env.SEARYA_ADMIN_EMAIL || 'basakatali71@gmail.com').trim();
+    sendEmail({
+      to: inbox,
+      subject: `Searya feedback: ${feedbackType}`,
+      text: `New Searya feedback\n\nType: ${feedbackType}\nName: ${name}\nEmail: ${email}\nPage: ${pagePath}\nSigned in: ${user ? 'yes' : 'no'}\n\n${message}`,
+      idempotencyKey: `feedback-${id}`
+    }).catch(error => console.error('Feedback email failed:', error?.message || error));
+    return json(res, 201, { ok: true, id });
+  }
+
   if (method === 'GET' && pathname === '/api/tools/qr') {
     if (rateLimited(req, 'qr-tool', 180, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMITED', 'Please wait before creating more QR codes.');
     const text = String(url.searchParams.get('text') || '').trim();
@@ -2278,7 +2318,7 @@ const mimeTypes = {
 };
 
 const SEO_TITLE = 'Free Small Business Tools — Calculators & Documents | Searya';
-const SEO_DESCRIPTION = 'Use 12 free small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity. No account required.';
+const SEO_DESCRIPTION = 'Create a free Searya account to use 12 small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity.';
 const TOOL_PAGES = Object.freeze({
   '/qr-code-generator': { title: 'Free QR Code Generator — Custom SVG Download | Searya', description: 'Create a free permanent QR code for a URL, message, email or phone number. Add brand colors or a logo and download a high-resolution SVG.', h1: 'Free QR Code Generator', name: 'QR Code Generator', feature: 'Create and download static QR codes', faqs: [['Do static QR codes expire?', 'No. The encoded content remains usable as long as the destination itself still works.'], ['Can I use the SVG for print?', 'Yes. SVG is a vector format suitable for signs, menus and business cards.']] },
   '/time-card-calculator': { title: 'Free Time Card Calculator — Hours & Overtime | Searya', description: 'Calculate hours worked, subtract lunch breaks, total weekly overtime and estimate gross pay with a free time card calculator.', h1: 'Free Time Card & Work Hours Calculator', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay', faqs: [['Does the calculator subtract lunch breaks?', 'Yes. Enter each unpaid break in minutes and it is removed from that day\'s total.']] },

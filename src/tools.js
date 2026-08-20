@@ -473,9 +473,50 @@ function authTab(mode='login'){const isRegister=mode==='register';$$('[data-auth
 function openAuth(mode='login'){$('#auth-modal').hidden=false;authTab(mode);document.body.classList.add('modal-open');track('auth_started',{mode});}
 function closeAuth(){$('#auth-modal').hidden=true;document.body.classList.remove('modal-open');}
 
+function renderToolAuthGate({prompt=false}={}){
+  const gate=$('#tool-auth-gate');
+  const toolKey=currentToolKey();
+  const locked=Boolean(toolKey&&!currentUser);
+  document.body.classList.toggle('tool-auth-required',locked);
+  if(gate)gate.hidden=!locked;
+  $$('.workspace').forEach(panel=>{
+    const shouldLock=locked&&panel.classList.contains('active');
+    panel.classList.toggle('requires-auth',shouldLock);
+    panel.querySelectorAll('.workspace-grid,.time-layout,.document-layout,.workspace-actions').forEach(area=>shouldLock?area.setAttribute('inert',''):area.removeAttribute('inert'));
+  });
+  if($('#save-tool-top')){const hideSave=locked||!['qr','time','document','card','signature','expenses','margin','estimate'].includes(toolKey);$('#save-tool-top').hidden=hideSave;$('#save-tool-top').style.display=hideSave?'none':'';}
+  if(locked&&prompt){
+    const promptKey=`searya_auth_prompted:${location.pathname}`;
+    if(!sessionStorage.getItem(promptKey)){sessionStorage.setItem(promptKey,'1');openAuth('register');}
+  }
+}
+
+function startGoogleAuth(){
+  track('auth_started',{mode:'google'});
+  location.assign('/api/auth/oauth/google/start?role=both');
+}
+
+function openFeedback(){
+  const modal=$('#feedback-modal');
+  const form=$('#feedback-form');
+  if(!modal||!form)return;
+  if(currentUser){form.elements.name.value=currentUser.name||'';form.elements.email.value=currentUser.email||'';}
+  $('#feedback-message').textContent='';
+  $('#feedback-message').classList.remove('success');
+  modal.hidden=false;
+  document.body.classList.add('modal-open');
+  setTimeout(()=>form.elements.message.focus(),0);
+}
+
+function closeFeedback(){
+  $('#feedback-modal').hidden=true;
+  document.body.classList.remove('modal-open');
+}
+
 async function refreshAccount(){
   try{currentUser=(await SearyaApi.me()).user;}catch{currentUser=null;}
   const button=$('#account-button');button.querySelector('span').textContent=currentUser?currentUser.name.split(' ')[0]:'Sign in';button.classList.toggle('signed-in',Boolean(currentUser));
+  renderToolAuthGate();
   return currentUser;
 }
 
@@ -597,6 +638,9 @@ function initializeAuth(){
   $$('[data-auth-open]').forEach(button=>button.addEventListener('click',()=>openAuth(button.dataset.authOpen)));
   $$('[data-modal-close]').forEach(button=>button.addEventListener('click',closeAuth));$$('[data-auth-tab]').forEach(button=>button.addEventListener('click',()=>authTab(button.dataset.authTab)));
   $('#auth-back-login')?.addEventListener('click',()=>authTab('login'));
+  $$('[data-google-auth]').forEach(button=>button.addEventListener('click',startGoogleAuth));
+  $$('[data-feedback-open]').forEach(button=>button.addEventListener('click',openFeedback));
+  $$('[data-feedback-close]').forEach(button=>button.addEventListener('click',closeFeedback));
   $('#account-button').addEventListener('click',openAccount);$$('[data-account-close]').forEach(button=>button.addEventListener('click',closeAccount));$$('[data-account-tab]').forEach(button=>button.addEventListener('click',()=>setAccountTab(button.dataset.accountTab)));$('#save-current-item').addEventListener('click',saveCurrentTool);$('#save-tool-top')?.addEventListener('click',saveCurrentTool);$('#logout-button').addEventListener('click',async()=>{await SearyaApi.logout();currentUser=null;closeAccount();await refreshAccount();showToast('Signed out.');});
   $('#business-profile-form')?.addEventListener('submit',saveBusinessProfile);
   $('#business-profile-form [name="profilePhotoFile"]')?.addEventListener('change',async event=>{try{businessProfilePhotoData=await fileToDataUrl(event.target.files?.[0],{maxDimension:1400});renderBusinessProfileImages();}catch(error){event.target.value='';showToast(error.message);}});
@@ -604,6 +648,7 @@ function initializeAuth(){
   $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.login(values);currentUser=result.user;closeAuth();await refreshAccount();showToast(`Signed in successfully. Welcome back${currentUser?.name?`, ${currentUser.name.split(' ')[0]}`:''}!`);track('auth_completed',{mode:'login'});}catch(error){$('#auth-message').textContent=error.message;track('auth_failed',{mode:'login',code:error.code});}finally{button.disabled=false;}});
   $('#forgot-password')?.addEventListener('click',async()=>{const email=$('#login-form input[name="email"]').value.trim();if(!email){$('#auth-message').textContent='Enter your email above first.';return;}try{await SearyaApi.forgotPassword(email);$('#auth-message').textContent='If an account exists, a secure reset link is on its way.';track('auth_help_requested',{mode:'password_reset'});}catch(error){$('#auth-message').textContent=error.message;}});
   $('#register-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const values=Object.fromEntries(new FormData(event.currentTarget));const result=await SearyaApi.register({...values,role:'both'});if(result.verificationRequired){authTab('login');const message=$('#auth-message');message.textContent='Account created successfully. Check your inbox, verify your email, then sign in.';message.classList.add('success');showToast('Account created successfully. Please verify your email.');}else{currentUser=result.user;closeAuth();await refreshAccount();showToast('Account created successfully. Your workspace is ready.');}track('auth_completed',{mode:'register'});}catch(error){$('#auth-message').classList.remove('success');$('#auth-message').textContent=error.message;track('auth_failed',{mode:'register',code:error.code});}finally{button.disabled=false;}});
+  $('#feedback-form')?.addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=event.submitter,message=$('#feedback-message');button.disabled=true;message.textContent='';message.classList.remove('success');try{const values=Object.fromEntries(new FormData(form));await SearyaApi.sendFeedback({...values,pagePath:location.pathname});message.textContent='Thank you — your message was sent to the Searya team.';message.classList.add('success');form.elements.message.value='';showToast('Thank you. Your feedback was sent.');setTimeout(closeFeedback,1400);}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
   document.addEventListener('click',async event=>{const clearImage=event.target.closest('[data-clear-profile-image]');if(clearImage){if(clearImage.dataset.clearProfileImage==='photo')businessProfilePhotoData='';else businessProfileLogoData='';renderBusinessProfileImages();return;}const checkout=event.target.closest('[data-checkout]');if(checkout){checkout.disabled=true;await startCheckout(checkout.dataset.checkout);checkout.disabled=false;return;}const contactDelete=event.target.closest('[data-delete-contact]');if(contactDelete){await SearyaApi.deleteContact(contactDelete.dataset.deleteContact);await loadWorkspaceLibraries();return;}const catalogDelete=event.target.closest('[data-delete-catalog]');if(catalogDelete){await SearyaApi.deleteCatalogItem(catalogDelete.dataset.deleteCatalog);await loadWorkspaceLibraries();return;}const duplicate=event.target.closest('[data-duplicate-saved]');if(duplicate){const item=(window.searyaSavedItems||[]).find(entry=>entry.id===duplicate.dataset.duplicateSaved);if(item){await SearyaApi.saveToolItem({itemType:item.itemType,title:`${item.title} copy`,data:item.data});await loadSavedItems();showToast('Saved item duplicated.');}return;}const remove=event.target.closest('[data-delete-saved]');if(remove){await SearyaApi.deleteToolItem(remove.dataset.deleteSaved);await loadSavedItems();return;}const open=event.target.closest('[data-saved-id]');if(open){const item=(window.searyaSavedItems||[]).find(entry=>entry.id===open.dataset.savedId);if(item){sessionStorage.setItem('searya_restore_item',JSON.stringify(item));const routes={'digital-card':'/digital-business-card','qr-code':'/qr-code-generator',invoice:'/invoice-generator',quote:'/quote-generator',receipt:'/receipt-maker',estimate:'/estimate-generator',timesheet:'/time-card-calculator','email-signature':'/email-signature-generator','expense-tracker':'/expense-tracker','profit-margin':'/profit-margin-calculator'};location.href=routes[item.itemType]||'/';}}});
 }
 
@@ -660,8 +705,13 @@ async function initialize() {
     if(key==='estimate')await applyBusinessProfile('estimate',false).catch(()=>{});
   }
   applyRestoredItem();
-  if(new URLSearchParams(location.search).get('verified')==='1')showToast('Email verified. Your account is ready.');
-  if(new URLSearchParams(location.search).get('payment')==='success'){await refreshAccount();showToast('Payment confirmed. Welcome to Searya Pro.');}
+  const routeParams=new URLSearchParams(location.search);
+  if(routeParams.get('verified')==='1')showToast('Email verified. Your account is ready.');
+  if(routeParams.get('payment')==='success'){await refreshAccount();showToast('Payment confirmed. Welcome to Searya Pro.');}
+  if(routeParams.get('oauth')==='success'){await refreshAccount();showToast('Signed in successfully with Google.');}
+  if(routeParams.get('oauth')==='error'){openAuth('login');$('#auth-message').textContent=routeParams.get('reason')||'Google sign-in could not be completed.';}
+  if(routeParams.has('oauth')){routeParams.delete('oauth');routeParams.delete('provider');routeParams.delete('reason');history.replaceState({},'',`${location.pathname}${routeParams.size?`?${routeParams}`:''}${location.hash}`);}
+  renderToolAuthGate({prompt:true});
   $$('a[href^="/"]').forEach(link=>link.addEventListener('click',()=>track('navigation_clicked',{href:link.getAttribute('href')})));
 }
 

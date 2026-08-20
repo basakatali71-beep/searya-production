@@ -35,6 +35,7 @@ export const SearyaApi = {
   trackEvent: (eventName, metadata = {}) => request('/api/analytics/event', { method: 'POST', body: { eventName, metadata } }),
   trackPresence: (sessionId, action = 'heartbeat', path = '/', device = 'unknown') => request('/api/analytics/presence', { method: 'POST', body: { sessionId, action, path, device } }),
   revokeAnalytics: () => request('/api/analytics/consent', { method: 'DELETE' }),
+  sendFeedback: data => request('/api/feedback', { method: 'POST', body: data }),
   me: () => request('/api/auth/me'),
   register: data => request('/api/auth/register', { method: 'POST', body: data }),
   login: data => request('/api/auth/login', { method: 'POST', body: data }),

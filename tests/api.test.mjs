@@ -118,10 +118,10 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
 
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
   assert.match(homepage, /<title>Free Small Business Tools — Calculators &amp; Documents \| Searya<\/title>/);
-  assert.match(homepage, /<meta name="description" content="Use 12 free small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity\. No account required\.">/);
+  assert.match(homepage, /<meta name="description" content="Create a free Searya account to use 12 small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity\.">/);
   assert.match(homepage, /Free small business tools,/);
   assert.match(homepage, /finished faster\./);
-  assert.match(homepage, /No account required/);
+  assert.match(homepage, /One free account for every tool/);
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
   assert.match(homepage, /"@type":"Organization"/);
   assert.match(homepage, /"@type":"WebSite"/);
@@ -503,6 +503,30 @@ test('anonymous visitors cannot create listings', async () => {
   });
   assert.equal(response.status, 401);
   assert.equal((await response.json()).error.code, 'AUTH_REQUIRED');
+});
+
+test('visitors can submit validated feedback for the Searya team', async () => {
+  const response = await fetch(`${baseUrl}/api/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.91' },
+    body: JSON.stringify({
+      name: 'Feedback Tester',
+      email: 'feedback@example.com',
+      type: 'suggestion',
+      message: 'Please add another useful document template.',
+      pagePath: '/invoice-generator'
+    })
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).ok, true);
+
+  const invalid = await fetch(`${baseUrl}/api/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.92' },
+    body: JSON.stringify({ name: 'A', email: 'not-an-email', message: 'short' })
+  });
+  assert.equal(invalid.status, 422);
+  assert.equal((await invalid.json()).error.code, 'INVALID_FEEDBACK');
 });
 
 test('listing views are counted once per short client window', async () => {

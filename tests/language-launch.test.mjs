@@ -51,9 +51,11 @@ test('Launch legal copy does not contain unfinished placeholders', () => {
 });
 
 test('The homepage explains the free tools and local-first document handling', () => {
-  assert.match(pageSource, /No account required/);
+  assert.match(pageSource, /One free account for every tool/);
+  assert.match(pageSource, /Continue with Google/);
+  assert.match(pageSource, /id="tool-auth-gate"/);
   assert.match(pageSource, /Your document data stays in this browser/);
-  assert.match(pageSource, /Use every tool for free/);
+  assert.match(pageSource, /Create one free account to use every tool/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
@@ -71,7 +73,8 @@ test('Searya favicon and English feedback contact are published', () => {
   assert.match(pageSource, /href="\/public\/site\.webmanifest\?v=20260820-1"/);
   assert.match(pageSource, /"name":"Searya Tools","alternateName":\["Searya","Searya Business Tools"\]/);
   assert.match(pageSource, /href="mailto:basakatali71@gmail\.com"/);
-  assert.match(pageSource, />Feedback<\/a>/);
+  assert.match(pageSource, /id="feedback-form"/);
+  assert.match(pageSource, /data-feedback-open/);
 });
 
 test('The homepage exposes the core tools as crawlable links', () => {
@@ -100,7 +103,7 @@ test('The tool homepage has clear navigation and launch pricing', () => {
   assert.doesNotMatch(pageSource, /All seven generators and calculators/);
   assert.match(pageSource, /\$0/);
   assert.match(pageSource, /\$7\.99/);
-  assert.match(pageSource, /Use every tool for free/);
+  assert.match(pageSource, /Create one free account to use every tool/);
 });
 
 test('The homepage contains no marketplace samples or fake traction claims', () => {
