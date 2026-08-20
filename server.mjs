@@ -20,7 +20,7 @@ import { submitSitemapToGoogle } from './src/services/googleSearchConsole.js';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC_STATIC_FILES = new Set([
   'index.html', 'admin.html', '404.html', 'favicon.ico',
-  'src/app.js', 'src/api.js', 'src/admin.js', 'src/tools.js', 'src/tool-calculations.js',
+  'src/app.js', 'src/api.js', 'src/admin.js', 'src/tools.js', 'src/tool-calculations.js', 'src/tool-utils.js',
   'src/data/seedListings.js', 'src/data/mockData.js', 'src/data/translations.js'
 ].map(path => resolve(ROOT, path)));
 const PUBLIC_STATIC_DIRECTORIES = ['public', 'legal', 'src/assets', 'src/styles'].map(path => resolve(ROOT, path));
@@ -45,8 +45,9 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PRESENCE_ACTIVE_WINDOW_SECONDS = 120;
 const DEFAULT_JSON_BYTES = 128 * 1024;
 const MAX_LISTING_JSON_BYTES = 3 * 1024 * 1024;
+const MAX_BUSINESS_PROFILE_JSON_BYTES = 6 * 1024 * 1024;
 const MAX_IMAGE_DATA_CHARACTERS = 2_900_000;
-const MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS = 1_400_000;
+const MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS = 2_900_000;
 const MIN_NEW_PASSWORD_LENGTH = 12;
 const MAX_PASSWORD_LENGTH = 128;
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
@@ -822,7 +823,7 @@ function safeBusinessProfileImage(value, label) {
   const text = String(value || '').trim();
   if (!text) return '';
   if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) || text.length > MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS) {
-    throw Object.assign(new Error(`${label} must be a PNG, JPG or WebP image under 1 MB.`), { status: 422 });
+    throw Object.assign(new Error(`${label} must be a valid optimized PNG, JPG or WebP image.`), { status: 422 });
   }
   return text;
 }
@@ -1548,7 +1549,7 @@ async function handleApi(req, res, url) {
   if (method === 'PUT' && pathname === '/api/account/business-profile') {
     const user = requireUser(req, res); if (!user) return;
     if (rateLimited(req, `business-profile:${user.id}`, 30, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before updating your business profile again.');
-    const body = await readJson(req, MAX_LISTING_JSON_BYTES);
+    const body = await readJson(req, MAX_BUSINESS_PROFILE_JSON_BYTES);
     const profile = mapBusinessProfileInput(body, user);
     const existing = db.prepare('SELECT created_at AS createdAt FROM business_profiles WHERE user_id=?').get(user.id);
     const updatedAt = nowIso();

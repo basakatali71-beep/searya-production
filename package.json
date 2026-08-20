@@ -8,7 +8,7 @@
     "start": "node --env-file-if-exists=.env server.mjs",
     "build": "npm run build:css",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.input.css -o public/vendor/tailwind.css --minify",
-    "lint": "node --check server.mjs && node --check src/app.js && node --check src/api.js && node --check src/admin.js && node --check src/tools.js && node --check src/tool-calculations.js",
+    "lint": "node --check server.mjs && node --check src/app.js && node --check src/api.js && node --check src/admin.js && node --check src/tools.js && node --check src/tool-calculations.js && node --check src/tool-utils.js",
     "blog:generate": "node scripts/generate-blog.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexnow:submit-sitemap": "node scripts/submit-indexnow.mjs --sitemap",

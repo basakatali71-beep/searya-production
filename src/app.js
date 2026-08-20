@@ -2,6 +2,7 @@ import { initialForSaleListings, initialWtbListings } from './data/seedListings.
 import { initialMessages } from './data/mockData.js?v=20260812-7';
 import { translations } from './data/translations.js?v=20260813-1';
 import { ApiError, SearyaApi } from './api.js?v=20260812-10';
+import { processImageFile } from './tool-utils.js?v=20260820-2';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
 const COOKIE_CONSENT_KEY = 'searya-cookie-consent-v1';
@@ -53,37 +54,10 @@ function safeImageUrl(value, fallback = 'https://images.unsplash.com/photo-16180
 }
 
 async function optimizeListingImage(file) {
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-  if (!allowedTypes.includes(file?.type) || file.size > 5 * 1024 * 1024) {
-    throw new Error(state.lang === 'en' ? 'Use a PNG, JPG or WebP image under 3 MB.' : '3 MB altında PNG, JPG veya WebP görsel kullanın.');
-  }
-  const objectUrl = URL.createObjectURL(file);
   try {
-    const image = await new Promise((resolve, reject) => {
-      const candidate = new Image();
-      candidate.onload = () => resolve(candidate);
-      candidate.onerror = () => reject(new Error(state.lang === 'en' ? 'The image could not be read.' : 'Görsel okunamadı.'));
-      candidate.src = objectUrl;
-    });
-    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
-    let scale = Math.min(1, 1600 / Math.max(1, longestSide));
-    let dataUrl = '';
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const context = canvas.getContext('2d');
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      dataUrl = canvas.toDataURL('image/webp', Math.max(0.62, 0.86 - attempt * 0.08));
-      if (dataUrl.length <= 2_700_000) return dataUrl;
-      scale *= 0.78;
-    }
-    if (dataUrl.length > 2_800_000) throw new Error(state.lang === 'en' ? 'The image is still too large. Choose a smaller image.' : 'Görsel hâlâ çok büyük. Daha küçük bir görsel seçin.');
-    return dataUrl;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
+    return (await processImageFile(file, { maxDimension: 1600 })).dataUrl;
+  } catch (error) {
+    throw new Error(state.lang === 'en' ? error.message : error.message);
   }
 }
 

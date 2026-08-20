@@ -13,13 +13,15 @@ export function calculateSalesTax({ amount, rate, reverse = false }) {
 export function calculateJobCost(values) {
   const keys = ['materials', 'laborHours', 'hourlyRate', 'additional', 'overheadRate', 'markupRate'];
   if (keys.some(key => !valid(values[key])) || number(values.overheadRate) > 1000 || number(values.markupRate) > 1000) return fail('Use non-negative amounts and valid percentage values.');
+  const materials = number(values.materials);
+  const additional = number(values.additional);
   const labor = number(values.laborHours) * number(values.hourlyRate);
-  const directCost = number(values.materials) + labor + number(values.additional);
+  const directCost = materials + labor + additional;
   const overhead = directCost * number(values.overheadRate) / 100;
   const totalCost = directCost + overhead;
   const grossProfit = totalCost * number(values.markupRate) / 100;
   const suggestedPrice = totalCost + grossProfit;
-  return { ok: true, labor, directCost, overhead, totalCost, grossProfit, suggestedPrice, grossMargin: suggestedPrice ? grossProfit / suggestedPrice * 100 : 0 };
+  return { ok: true, materials, additional, labor, directCost, overhead, totalCost, grossProfit, suggestedPrice, grossMargin: suggestedPrice ? grossProfit / suggestedPrice * 100 : 0 };
 }
 
 export function calculateHourlyRate(values) {
@@ -32,10 +34,11 @@ export function calculateHourlyRate(values) {
   return { ok: true, requiredRevenue, billableHours, baseRate, buffer10: baseRate * 1.1, buffer20: baseRate * 1.2 };
 }
 
-export function calculateBreakEven({ fixedCosts, variableCost, sellingPrice }) {
-  if (![fixedCosts, variableCost, sellingPrice].every(valid)) return fail('Enter non-negative cost and price values.');
+export function calculateBreakEven({ fixedCosts, variableCost, sellingPrice, targetProfit = 0 }) {
+  if (![fixedCosts, variableCost, sellingPrice, targetProfit].every(valid)) return fail('Enter non-negative cost, price and target profit values.');
   if (number(sellingPrice) <= number(variableCost)) return fail('Selling price must be greater than variable cost per unit.');
   const contribution = number(sellingPrice) - number(variableCost);
   const exactUnits = number(fixedCosts) / contribution;
-  return { ok: true, contribution, contributionMargin: contribution / number(sellingPrice) * 100, exactUnits, wholeUnits: Math.ceil(exactUnits), breakEvenRevenue: exactUnits * number(sellingPrice) };
+  const targetUnits = (number(fixedCosts) + number(targetProfit)) / contribution;
+  return { ok: true, contribution, contributionMargin: contribution / number(sellingPrice) * 100, exactUnits, wholeUnits: Math.ceil(exactUnits), breakEvenRevenue: exactUnits * number(sellingPrice), targetProfit: number(targetProfit), targetUnits, targetWholeUnits: Math.ceil(targetUnits), targetRevenue: targetUnits * number(sellingPrice) };
 }
