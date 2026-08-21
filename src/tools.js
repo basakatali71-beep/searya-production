@@ -77,15 +77,17 @@ function routeTool() {
   const pathname=location.pathname.replace(/\/$/,'')||'/';
   if(pathname==='/tools'){
     $('#home-hero').hidden=true;$('#how-it-works').hidden=true;$('#pricing').hidden=true;$('#tool-workspace').hidden=true;$('#tools').hidden=false;
+    document.documentElement.classList.remove('route-pending');
     return;
   }
   if(pathname==='/pricing'){
     $('#home-hero').hidden=true;$('#how-it-works').hidden=true;$('#tools').hidden=true;$('#tool-workspace').hidden=true;$('#pricing').hidden=false;
+    document.documentElement.classList.remove('route-pending');
     return;
   }
   const basePath = Object.keys(TOOL_PATHS).find(path => pathname === path || pathname.startsWith(`${path}/`));
   const key = TOOL_PATHS[basePath];
-  if (!key) return;
+  if (!key) { document.documentElement.classList.remove('route-pending'); return; }
   $('#home-hero').hidden = true;
   $('#tools').hidden = true;
   $('#how-it-works').hidden = true;
@@ -99,6 +101,7 @@ function routeTool() {
     if (pathname.startsWith('/invoice-generator/')) updateDocumentPreview();
     else syncDocumentType();
   }
+  document.documentElement.classList.remove('route-pending');
   track('tool_opened', { tool:key, path:location.pathname });
 }
 
@@ -682,8 +685,8 @@ async function initializeTelemetry(){
 }
 
 async function initialize() {
-  await initializeTelemetry();
   routeTool();
+  void initializeTelemetry();
   $('#qr-form')?.addEventListener('submit',generateQr);
   $('#download-qr')?.addEventListener('click',downloadQr);
   $('#copy-qr')?.addEventListener('click',async()=>{ try{await navigator.clipboard.writeText($('#qr-content').value.trim());showToast('QR content copied.');}catch{showToast('Copy is not available in this browser.');} });

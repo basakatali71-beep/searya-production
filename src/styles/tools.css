@@ -87,3 +87,13 @@ html{overflow-x:hidden}
 @media(max-width:900px){.section-heading h1{font-size:35px}}
 @media(max-width:620px){.section-heading h1{font-size:32px}}
 .tool-auth-required #save-tool-top{display:none!important}
+
+/* Route transitions stay quiet and never reveal homepage content first. */
+html.route-pending main{opacity:0}
+main{transition:opacity .12s ease-out}
+.button,.header-cta,.header-account,.feedback-fab{transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease,opacity .14s ease}
+.tool-card{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.tool-card:hover{transform:translateY(-2px)}
+.mini-tool{transition:background-color .14s ease,box-shadow .14s ease}
+.mini-tool:hover,.feedback-fab:hover{transform:none}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}main,.button,.header-cta,.header-account,.feedback-fab,.tool-card,.mini-tool,input,textarea,select,#toast{transition:none!important}.tool-card:hover,.mini-tool:hover,.feedback-fab:hover{transform:none!important}}
