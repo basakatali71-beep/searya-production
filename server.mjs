@@ -742,7 +742,7 @@ function getUser(req) {
 function sessionCookie(token, clear = false) {
   const parts = [`${SESSION_COOKIE}=${clear ? '' : encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   parts.push(`Max-Age=${clear ? 0 : SESSION_TTL_SECONDS}`);
-  if (NODE_ENV === 'production') parts.push('Secure');
+  if (NODE_ENV === 'production') parts.push('Secure', 'Domain=.searya.com');
   return parts.join('; ');
 }
 

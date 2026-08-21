@@ -3594,11 +3594,15 @@ function renderAuthCard() {
         openVerificationPendingModal(email);
         return;
       }
-      applyAuthenticatedUser(payload.user);
-      trackBehavior('auth_completed', { mode: authMode, role: payload.user?.role || authRole, step: 'signed_in' });
+      const confirmedSession = await SearyaApi.me();
+      if (!confirmedSession?.user) throw new ApiError(isEn ? 'Your sign-in could not be saved. Please enable cookies and try again.' : 'Oturum kaydedilemedi. Çerezlere izin verip tekrar deneyin.', 401, 'SESSION_NOT_SAVED');
+      applyAuthenticatedUser(confirmedSession.user);
+      trackBehavior('auth_completed', { mode: authMode, role: confirmedSession.user.role || authRole, step: 'signed_in' });
       completeBehaviorFlow('auth');
       showToast(authMode === 'login' ? (isEn ? 'Welcome back!' : 'Başarıyla giriş yapıldı!') : (isEn ? 'Your account is ready!' : 'Hesabınız başarıyla oluşturuldu!'));
       showMainAppPage();
+      if (confirmedSession.user.isAdmin) window.location.assign('/admin.html');
+      else await openAccountModal();
     } catch (error) {
       trackBehavior('auth_failed', { mode: authMode, role: authMode === 'register' ? authRole : '', code: error?.code || 'request_failed' });
       const message = apiErrorMessage(error);
