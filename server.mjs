@@ -223,6 +223,17 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS feedback_messages_created ON feedback_messages(created_at DESC);
 
+  CREATE TABLE IF NOT EXISTS email_logs (
+    id TEXT PRIMARY KEY,
+    recipient TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('sent','failed','not_configured')),
+    provider_ref TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS email_logs_created ON email_logs(created_at DESC);
+
   CREATE TABLE IF NOT EXISTS page_views (
     id TEXT PRIMARY KEY,
     visitor_id TEXT NOT NULL,
@@ -1009,14 +1020,26 @@ function contactInfoDetected(text) {
 }
 
 async function sendEmail({ to, subject, text, idempotencyKey }) {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return { configured: false };
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey || randomUUID() },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [to], subject, text })
-  });
-  if (!response.ok) throw new Error(`Email provider returned status ${response.status}.`);
-  return { configured: true, data: await response.json() };
+  const logId = randomUUID();
+  const createdAt = nowIso();
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    db.prepare('INSERT INTO email_logs(id,recipient,subject,status,error_message,created_at) VALUES(?,?,?,?,?,?)').run(logId, to, subject, 'not_configured', 'Email provider is not configured.', createdAt);
+    return { configured: false };
+  }
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey || randomUUID() },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [to], subject, text })
+    });
+    if (!response.ok) throw new Error(`Email provider returned status ${response.status}.`);
+    const data = await response.json();
+    db.prepare('INSERT INTO email_logs(id,recipient,subject,status,provider_ref,created_at) VALUES(?,?,?,?,?,?)').run(logId, to, subject, 'sent', data?.id || null, createdAt);
+    return { configured: true, data };
+  } catch (error) {
+    db.prepare('INSERT INTO email_logs(id,recipient,subject,status,error_message,created_at) VALUES(?,?,?,?,?,?)').run(logId, to, subject, 'failed', cleanText(error?.message || 'Unknown email error', 300), createdAt);
+    throw error;
+  }
 }
 
 async function sendVerificationEmail(user) {
@@ -2208,6 +2231,7 @@ async function handleApi(req, res, url) {
       toolMap.set(row.tool, item);
     }
     const recentToolActivity = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.source,ae.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('tool_opened','tool_completed','tool_exported','tool_saved','signup_completed','checkout_started','checkout_failed') ORDER BY ae.created_at DESC LIMIT 80`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
+    const errorEvents = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.created_at AS createdAt,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('ui_error','auth_failed','checkout_failed') ORDER BY ae.created_at DESC LIMIT 100`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
     return json(res, 200, {
       counts: {
         pendingListings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='pending'`).get().count,
@@ -2245,8 +2269,11 @@ async function handleApi(req, res, url) {
         campaigns,
         behavior,
         tools: [...toolMap.values()].sort((a, b) => b.opened - a.opened),
+        errors: errorEvents,
         recentActivity: recentToolActivity
       },
+      feedback: db.prepare(`SELECT f.id,f.name,f.email,f.feedback_type AS feedbackType,f.message,f.page_path AS pagePath,f.status,f.created_at AS createdAt,u.name AS userName FROM feedback_messages f LEFT JOIN users u ON u.id=f.user_id ORDER BY f.created_at DESC LIMIT 200`).all(),
+      emailLogs: db.prepare(`SELECT id,recipient,subject,status,provider_ref AS providerRef,error_message AS errorMessage,created_at AS createdAt FROM email_logs ORDER BY created_at DESC LIMIT 100`).all(),
       pendingListings: db.prepare(`SELECT * FROM listings WHERE status='pending' ORDER BY priority_review DESC,created_at`).all().map(listingFromRow),
       recentListings: db.prepare(`SELECT l.*,u.name AS owner_name,u.email AS owner_email FROM listings l JOIN users u ON u.id=l.user_id WHERE l.user_id NOT LIKE 'seed-%' ORDER BY l.created_at DESC LIMIT 50`).all().map(row => ({ ...listingFromRow(row), ownerName: row.owner_name, ownerEmail: row.owner_email })),
       users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,plan,plan_status AS planStatus,plan_renews_at AS planRenewsAt,created_at AS createdAt,last_seen_at AS lastSeenAt,(SELECT COUNT(*) FROM tool_items ti WHERE ti.user_id=users.id) AS savedItems FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 200`).all(),
@@ -2271,6 +2298,17 @@ async function handleApi(req, res, url) {
     if (!status || target.id === user.id || target.is_admin) return fail(res, 422, 'INVALID_ACTION', 'This user status cannot be changed.');
     db.prepare('UPDATE users SET status=? WHERE id=?').run(status, targetId);
     if (status === 'suspended') db.prepare('DELETE FROM sessions WHERE user_id=?').run(targetId);
+    return json(res, 200, { ok: true, status });
+  }
+
+  const adminFeedbackMatch = pathname.match(/^\/api\/admin\/feedback\/([^/]+)\/status$/);
+  if (method === 'POST' && adminFeedbackMatch) {
+    const user = requireUser(req, res, true); if (!user) return;
+    const body = await readJson(req);
+    const status = ['new', 'read', 'resolved'].includes(body.status) ? body.status : '';
+    if (!status) return fail(res, 422, 'INVALID_ACTION', 'Invalid feedback status.');
+    const result = db.prepare('UPDATE feedback_messages SET status=? WHERE id=?').run(status, decodeURIComponent(adminFeedbackMatch[1]));
+    if (!result.changes) return fail(res, 404, 'NOT_FOUND', 'Feedback not found.');
     return json(res, 200, { ok: true, status });
   }
 

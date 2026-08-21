@@ -80,6 +80,7 @@ export const SearyaApi = {
   block: userId => request('/api/blocks', { method: 'POST', body: { userId } }),
   adminOverview: () => request('/api/admin/overview'),
   updateAdminUserStatus: (id, status) => request(`/api/admin/users/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status } }),
+  updateAdminFeedbackStatus: (id, status) => request(`/api/admin/feedback/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status } }),
   updateAdminReport: (id, status) => request(`/api/admin/reports/${encodeURIComponent(id)}`, { method: 'POST', body: { status } }),
   moderateListing: (id, action) => request(`/api/admin/listings/${encodeURIComponent(id)}/moderate`, { method: 'POST', body: { action } })
 };
