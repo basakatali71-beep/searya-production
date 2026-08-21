@@ -1552,7 +1552,19 @@ async function handleApi(req, res, url) {
     const name = cleanText(body.name, 80);
     const role = ['buyer', 'seller', 'both'].includes(body.role) ? body.role : 'buyer';
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validNewPassword(password) || name.length < 2) return fail(res, 422, 'INVALID_INPUT', `A name, valid email and password of ${MIN_NEW_PASSWORD_LENGTH}–${MAX_PASSWORD_LENGTH} characters are required.`);
-    if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) return fail(res, 409, 'EMAIL_EXISTS', 'An account already exists with this email address.');
+    const existingUser = db.prepare('SELECT * FROM users WHERE email=?').get(email);
+    if (existingUser) {
+      if (!existingUser.email_verified && existingUser.status === 'active' && verifyPassword(password, existingUser.password_hash)) {
+        try {
+          await sendVerificationEmail(existingUser);
+        } catch (error) {
+          console.error('Verification resend during registration failed:', error);
+          return fail(res, 502, 'VERIFICATION_DELIVERY_FAILED', 'Your account was saved, but the verification email could not be sent. Please try again in a moment.');
+        }
+        return json(res, 200, { user: null, verificationRequired: true, verificationResent: true });
+      }
+      return fail(res, 409, 'EMAIL_EXISTS', 'An account already exists with this email address.');
+    }
     const id = randomUUID();
     const now = nowIso();
     const verificationRequired = NODE_ENV === 'production';
@@ -1561,9 +1573,8 @@ async function handleApi(req, res, url) {
       try {
         await sendVerificationEmail({ id, email, name });
       } catch (error) {
-        db.prepare('DELETE FROM email_verifications WHERE user_id=?').run(id);
-        db.prepare('DELETE FROM users WHERE id=?').run(id);
-        throw error;
+        console.error('Registration verification email failed:', error);
+        return fail(res, 502, 'VERIFICATION_DELIVERY_FAILED', 'Your account was saved, but the verification email could not be sent. Please try again in a moment.');
       }
       recordAnalyticsEvent(req, 'signup_completed', { method: 'email', role });
       return json(res, 201, { user: null, verificationRequired: true });
