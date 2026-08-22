@@ -1,4 +1,4 @@
-import { ApiError, SearyaApi } from './api.js';
+import { ApiError, SearyaApi } from './api.js?v=20260822-1';
 import { calculateSalesTax, calculateJobCost, calculateHourlyRate, calculateBreakEven } from './tool-calculations.js';
 import { formatCurrency, normalizeCurrency, processImageFile } from './tool-utils.js?v=20260820-2';
 

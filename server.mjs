@@ -739,11 +739,18 @@ function getUser(req) {
   return row || null;
 }
 
-function sessionCookie(token, clear = false) {
+function sessionCookie(token, clear = false, legacyDomain = false) {
   const parts = [`${SESSION_COOKIE}=${clear ? '' : encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
   parts.push(`Max-Age=${clear ? 0 : SESSION_TTL_SECONDS}`);
-  if (NODE_ENV === 'production') parts.push('Secure', 'Domain=.searya.com');
+  if (NODE_ENV === 'production') parts.push('Secure');
+  if (NODE_ENV === 'production' && legacyDomain) parts.push('Domain=.searya.com');
   return parts.join('; ');
+}
+
+function sessionCookieHeaders(token, clear = false) {
+  const headers = [sessionCookie(token, clear)];
+  if (NODE_ENV === 'production') headers.push(sessionCookie('', true, true));
+  return headers;
 }
 
 function oauthCookie(state, clear = false) {
@@ -1135,7 +1142,7 @@ async function completeOauth(req, res, url, provider) {
     const identity = { email: profile.email, name: profile.name };
     const session = socialUserSession({ ...identity, role: oauthState.role });
     if (session.created) recordAnalyticsEvent(req, 'signup_completed', { method: provider, role: oauthState.role });
-    return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [sessionCookie(session.token), oauthCookie('', true)]);
+    return redirect(res, `${APP_ORIGIN}/?oauth=success&provider=${provider}`, [...sessionCookieHeaders(session.token), oauthCookie('', true)]);
   } catch (error) {
     return redirect(res, oauthErrorRedirect(provider, error.message || 'Sign-in could not be completed.'), [oauthCookie('', true)]);
   }
@@ -1582,7 +1589,7 @@ async function handleApi(req, res, url) {
     const token = createSession(id);
     recordAnalyticsEvent(req, 'signup_completed', { method: 'email', role });
     sendEmail({ to: email, subject: 'Your Searya account is ready', text: `Hi ${name}, your Searya account has been created.`, idempotencyKey: `welcome-${id}` }).catch(console.error);
-    return json(res, 201, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)), verificationRequired: false }, { 'Set-Cookie': sessionCookie(token) });
+    return json(res, 201, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id)), verificationRequired: false }, { 'Set-Cookie': sessionCookieHeaders(token) });
   }
 
   if (method === 'POST' && pathname === '/api/auth/login') {
@@ -1595,13 +1602,13 @@ async function handleApi(req, res, url) {
     if (!user || !verifyPassword(password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
     if (!user.email_verified) return fail(res, 403, 'EMAIL_NOT_VERIFIED', 'Verify your email address before signing in.');
     const token = createSession(user.id);
-    return json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(token) });
+    return json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookieHeaders(token) });
   }
 
   if (method === 'POST' && pathname === '/api/auth/logout') {
     const token = parseCookies(req)[SESSION_COOKIE];
     if (token) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha256(token));
-    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', true) });
+    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookieHeaders('', true) });
   }
 
   if (method === 'GET' && pathname === '/api/auth/me') {
@@ -1794,7 +1801,7 @@ async function handleApi(req, res, url) {
       db.prepare('DELETE FROM users WHERE id=?').run(user.id);
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
-    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', true) });
+    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookieHeaders('', true) });
   }
 
   if (method === 'POST' && pathname === '/api/auth/forgot-password') {
@@ -1859,7 +1866,7 @@ async function handleApi(req, res, url) {
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
     const token = createSession(verification.user_id);
-    return json(res, 200, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(verification.user_id)) }, { 'Set-Cookie': sessionCookie(token) });
+    return json(res, 200, { user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(verification.user_id)) }, { 'Set-Cookie': sessionCookieHeaders(token) });
   }
 
   if (method === 'GET' && pathname === '/api/listings') {

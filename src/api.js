@@ -19,7 +19,7 @@ async function request(path, options = {}) {
     ...options,
     body,
     headers,
-    credentials: 'same-origin'
+    credentials: 'include'
   });
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
