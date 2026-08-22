@@ -476,22 +476,16 @@ function authTab(mode='login'){const isRegister=mode==='register';$$('[data-auth
 function openAuth(mode='login'){$('#auth-modal').hidden=false;authTab(mode);document.body.classList.add('modal-open');track('auth_started',{mode});}
 function closeAuth(){$('#auth-modal').hidden=true;document.body.classList.remove('modal-open');}
 
-function renderToolAuthGate({prompt=false}={}){
+function renderToolAuthGate(){
   const gate=$('#tool-auth-gate');
   const toolKey=currentToolKey();
-  const locked=Boolean(toolKey&&!currentUser);
-  document.body.classList.toggle('tool-auth-required',locked);
-  if(gate)gate.hidden=!locked;
+  document.body.classList.remove('tool-auth-required');
+  if(gate)gate.hidden=true;
   $$('.workspace').forEach(panel=>{
-    const shouldLock=locked&&panel.classList.contains('active');
-    panel.classList.toggle('requires-auth',shouldLock);
-    panel.querySelectorAll('.workspace-grid,.time-layout,.document-layout,.workspace-actions').forEach(area=>shouldLock?area.setAttribute('inert',''):area.removeAttribute('inert'));
+    panel.classList.remove('requires-auth');
+    panel.querySelectorAll('.workspace-grid,.time-layout,.document-layout,.workspace-actions').forEach(area=>area.removeAttribute('inert'));
   });
-  if($('#save-tool-top')){const hideSave=locked||!['qr','time','document','card','signature','expenses','margin','estimate'].includes(toolKey);$('#save-tool-top').hidden=hideSave;$('#save-tool-top').style.display=hideSave?'none':'';}
-  if(locked&&prompt){
-    const promptKey=`searya_auth_prompted:${location.pathname}`;
-    if(!sessionStorage.getItem(promptKey)){sessionStorage.setItem(promptKey,'1');openAuth('register');}
-  }
+  if($('#save-tool-top')){const hideSave=!currentUser||!['qr','time','document','card','signature','expenses','margin','estimate'].includes(toolKey);$('#save-tool-top').hidden=hideSave;$('#save-tool-top').style.display=hideSave?'none':'';}
 }
 
 function startGoogleAuth(){
@@ -714,7 +708,7 @@ async function initialize() {
   if(routeParams.get('oauth')==='success'){await refreshAccount();showToast('Signed in successfully with Google.');}
   if(routeParams.get('oauth')==='error'){openAuth('login');$('#auth-message').textContent=routeParams.get('reason')||'Google sign-in could not be completed.';}
   if(routeParams.has('oauth')){routeParams.delete('oauth');routeParams.delete('provider');routeParams.delete('reason');history.replaceState({},'',`${location.pathname}${routeParams.size?`?${routeParams}`:''}${location.hash}`);}
-  renderToolAuthGate({prompt:true});
+  renderToolAuthGate();
   $$('a[href^="/"]').forEach(link=>link.addEventListener('click',()=>track('navigation_clicked',{href:link.getAttribute('href')})));
 }
 
