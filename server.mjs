@@ -504,7 +504,7 @@ const BEHAVIOR_EVENT_NAMES = new Set([
   'conversation_attempted', 'conversation_started_client', 'conversation_failed',
   'exit_feedback_shown', 'exit_feedback_submitted', 'exit_feedback_dismissed', 'ui_error',
   'discovery_page_view', 'discovery_project_click', 'discovery_seller_cta_click', 'discovery_buyer_cta_click',
-  'tool_opened', 'tool_completed', 'tool_exported', 'tool_saved', 'pricing_viewed',
+  'tool_opened', 'tool_interaction_started', 'tool_completed', 'tool_exported', 'tool_saved', 'tool_abandoned', 'pricing_viewed',
   'checkout_started', 'checkout_failed', 'account_opened', 'navigation_clicked', 'auth_help_requested',
   'business_profile_created', 'business_profile_updated'
 ]);
@@ -646,7 +646,7 @@ function behaviorAnalytics(since, presenceCutoff) {
       errors: count('ui_error') + count('listing_submit_failed') + count('conversation_failed')
     },
     popularActions: [...eventTotals.values()].sort((a, b) => b.count - a.count).slice(0, 12),
-    dropOffs: ['auth_abandoned', 'listing_form_abandoned', 'listing_submit_failed', 'conversation_failed', 'ui_error']
+    dropOffs: ['tool_abandoned', 'auth_abandoned', 'listing_form_abandoned', 'listing_submit_failed', 'conversation_failed', 'ui_error']
       .map(key => ({ key, count: count(key) })).filter(item => item.count > 0),
     topListings: [...listingTotals.values()].sort((a, b) => b.count - a.count).slice(0, 10),
     searches: [...searchTotals.values()].sort((a, b) => b.count - a.count).slice(0, 10),
@@ -2239,16 +2239,18 @@ async function handleApi(req, res, url) {
     const campaigns = [...campaignMap.values()].sort((a, b) => b.visitors - a.visitors || b.signups - a.signups).slice(0, 30);
     const measuredEventCount = eventName => db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM analytics_events WHERE event_name=? AND created_at>=?').get(eventName, thirtyDaysIso.toISOString()).count;
     const behavior = behaviorAnalytics(thirtyDaysIso.toISOString(), presenceCutoff);
-    const toolUsage = db.prepare(`SELECT COALESCE(json_extract(metadata_json,'$.tool'),'unknown') AS tool,event_name AS eventName,COUNT(*) AS total,COUNT(DISTINCT visitor_id) AS users FROM analytics_events WHERE created_at>=? AND event_name IN ('tool_opened','tool_completed','tool_exported','tool_saved') GROUP BY tool,event_name ORDER BY total DESC`).all(thirtyDaysIso.toISOString());
+    const toolUsage = db.prepare(`SELECT COALESCE(json_extract(metadata_json,'$.tool'),'unknown') AS tool,event_name AS eventName,visitor_id AS visitorId FROM analytics_events WHERE created_at>=? AND event_name IN ('tool_opened','tool_interaction_started','tool_completed','tool_exported','tool_saved','tool_abandoned') GROUP BY tool,event_name,visitor_id ORDER BY event_name LIMIT 10000`).all(thirtyDaysIso.toISOString());
+    const canonicalTool = value => ({ qr_code:'qr', 'qr-code':'qr', time:'time_card', document:'invoice', card:'digital_business_card', signature:'email_signature', expenses:'expense_tracker', margin:'profit_margin', salesTax:'sales_tax', jobCost:'job_cost', hourlyRate:'hourly_rate', breakEven:'break_even' }[value] || value || 'unknown');
     const toolMap = new Map();
     for (const row of toolUsage) {
-      const item = toolMap.get(row.tool) || { tool: row.tool, opened: 0, completed: 0, exported: 0, saved: 0, users: 0 };
-      const key = { tool_opened: 'opened', tool_completed: 'completed', tool_exported: 'exported', tool_saved: 'saved' }[row.eventName];
-      if (key) item[key] = row.total;
-      item.users = Math.max(item.users, row.users);
-      toolMap.set(row.tool, item);
+      const tool = canonicalTool(row.tool);
+      const item = toolMap.get(tool) || { tool, visitors: { opened:new Set(), interacted:new Set(), completed:new Set(), exported:new Set(), saved:new Set(), abandoned:new Set() } };
+      const key = { tool_opened:'opened', tool_interaction_started:'interacted', tool_completed:'completed', tool_exported:'exported', tool_saved:'saved', tool_abandoned:'abandoned' }[row.eventName];
+      if (key) item.visitors[key].add(row.visitorId);
+      toolMap.set(tool, item);
     }
-    const recentToolActivity = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.source,ae.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('tool_opened','tool_completed','tool_exported','tool_saved','signup_completed','checkout_started','checkout_failed') ORDER BY ae.created_at DESC LIMIT 80`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
+    const tools = [...toolMap.values()].map(item => ({ tool:item.tool, opened:item.visitors.opened.size, interacted:item.visitors.interacted.size, completed:item.visitors.completed.size, exported:item.visitors.exported.size, saved:item.visitors.saved.size, abandoned:item.visitors.abandoned.size, users:item.visitors.opened.size })).sort((a,b)=>b.opened-a.opened);
+    const recentToolActivity = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.source,ae.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('tool_opened','tool_interaction_started','tool_completed','tool_exported','tool_saved','tool_abandoned','signup_completed','checkout_started','checkout_failed') ORDER BY ae.created_at DESC LIMIT 80`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
     const errorEvents = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.created_at AS createdAt,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('ui_error','auth_failed','checkout_failed') ORDER BY ae.created_at DESC LIMIT 100`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
     return json(res, 200, {
       counts: {
@@ -2286,7 +2288,7 @@ async function handleApi(req, res, url) {
         },
         campaigns,
         behavior,
-        tools: [...toolMap.values()].sort((a, b) => b.opened - a.opened),
+        tools,
         errors: errorEvents,
         recentActivity: recentToolActivity
       },

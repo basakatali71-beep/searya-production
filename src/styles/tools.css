@@ -93,6 +93,8 @@ html{overflow-x:hidden}
 .focus-card{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:20px;padding:30px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,#fff,#fafaff);box-shadow:0 14px 40px rgba(23,32,51,.055)}
 .focus-card h3{margin:7px 0 10px;font-size:24px;line-height:1.25;letter-spacing:-.025em}.focus-card p{margin:0 0 20px;color:var(--muted)}
 .focus-card nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.focus-card nav a{padding:7px 10px;border-radius:999px;background:#f2f3f7;color:#596273;font-size:11px;font-weight:800}.focus-card nav a:hover{background:#ebe8ff;color:var(--purple)}
+.searya-document-credit{display:block;margin-top:28px;padding-top:12px;border-top:1px solid #e5e7eb;color:#667085!important;font-size:10px;font-weight:700;text-align:center;text-decoration:none}.tools-section,.how-section,.pricing-section,.tool-guide{content-visibility:auto;contain-intrinsic-size:1px 800px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .focus-actions .button.secondary{border:1px solid #d8dbe3;background:#fff;color:var(--ink)}
 @media(max-width:900px){.focus-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.focus-section{padding:62px 0}.focus-card{grid-template-columns:1fr;padding:22px}.focus-card .tool-icon{width:48px;height:48px}.focus-card .button{width:100%}.focus-actions{width:100%}.focus-actions .button{width:100%;justify-content:center}}
