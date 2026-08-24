@@ -2373,8 +2373,8 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
-const SEO_TITLE = 'Free Small Business Tools — Calculators & Documents | Searya';
-const SEO_DESCRIPTION = 'Create a free Searya account to use 12 small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity.';
+const SEO_TITLE = 'Free Time Card Calculator & Invoice Generator | Searya';
+const SEO_DESCRIPTION = 'Calculate work hours and overtime or create a professional invoice PDF for free. No sign-up required. Searya also includes estimates, expenses, QR codes and more.';
 const TOOL_PAGES = Object.freeze({
   '/qr-code-generator': { title: 'Free QR Code Generator — Custom SVG Download | Searya', description: 'Create a free permanent QR code for a URL, message, email or phone number. Add brand colors or a logo and download a high-resolution SVG.', h1: 'Free QR Code Generator', name: 'QR Code Generator', feature: 'Create and download static QR codes', faqs: [['Do static QR codes expire?', 'No. The encoded content remains usable as long as the destination itself still works.'], ['Can I use the SVG for print?', 'Yes. SVG is a vector format suitable for signs, menus and business cards.']] },
   '/time-card-calculator': { title: 'Free Time Card Calculator — Hours & Overtime | Searya', description: 'Calculate hours worked, subtract lunch breaks, total weekly overtime and estimate gross pay with a free time card calculator.', h1: 'Free Time Card & Work Hours Calculator', name: 'Time Card Calculator', feature: 'Calculate work hours, breaks, overtime and gross pay', faqs: [['Does the calculator subtract lunch breaks?', 'Yes. Enter each unpaid break in minutes and it is removed from that day\'s total.']] },
@@ -2604,9 +2604,9 @@ function applyPrimaryHeading(html, { panelKey = '', directory = false, pricing =
     const panelPattern = new RegExp(`(<article class="workspace" data-tool-panel="${panelKey}">[\\s\\S]*?<header class="workspace-heading">[\\s\\S]*?)<h2([^>]*)>([\\s\\S]*?)<\\/h2>`);
     html = html.replace(panelPattern, '$1<h1$2>$3</h1>');
   } else if (directory) {
-    html = html.replace(/(<section class="tools-section" id="tools">[\s\S]*?)<h2>(Pick a job\. Get it done\.)<\/h2>/, '$1<h1>$2</h1>');
+    html = html.replace(/(<section class="tools-section" id="tools">[\s\S]*?)<h2>(Continue with the rest of the toolbox\.)<\/h2>/, '$1<h1>$2</h1>');
   } else if (pricing) {
-    html = html.replace(/(<section class="pricing-section" id="pricing">[\s\S]*?)<h2>(Start free\. Upgrade when your work becomes repeatable\.)<\/h2>/, '$1<h1>$2</h1>');
+    html = html.replace(/(<section class="pricing-section" id="pricing">[\s\S]*?)<h2>(Use every core tool free\. Upgrade for a reusable workspace\.)<\/h2>/, '$1<h1>$2</h1>');
   } else {
     html = html.replace(/(<section class="hero" id="home-hero">[\s\S]*?)<h2>([\s\S]*?)<\/h2>/, '$1<h1>$2</h1>');
   }

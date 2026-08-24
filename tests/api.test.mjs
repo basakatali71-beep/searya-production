@@ -117,11 +117,13 @@ test('technical SEO exposes canonical metadata, robots rules and public sitemap 
   assert.equal(await indexNowKey.text(), INDEXNOW_KEY);
 
   const homepage = await fetch(`${baseUrl}/?utm_source=test`).then(response => response.text());
-  assert.match(homepage, /<title>Free Small Business Tools — Calculators &amp; Documents \| Searya<\/title>/);
-  assert.match(homepage, /<meta name="description" content="Create a free Searya account to use 12 small business tools for invoices, estimates, job pricing, time cards, expenses, QR codes and professional business identity\.">/);
-  assert.match(homepage, /Free small business tools,/);
-  assert.match(homepage, /finished faster\./);
-  assert.match(homepage, /One free account for every tool/);
+  assert.match(homepage, /<title>Free Time Card Calculator &amp; Invoice Generator \| Searya<\/title>/);
+  assert.match(homepage, /<meta name="description" content="Calculate work hours and overtime or create a professional invoice PDF for free\. No sign-up required\. Searya also includes estimates, expenses, QR codes and more\.">/);
+  assert.match(homepage, /Calculate work hours\./);
+  assert.match(homepage, /Create invoices\./);
+  assert.match(homepage, /Free · No sign-up required/);
+  assert.match(homepage, /href="\/time-card-calculator\/restaurants"/);
+  assert.match(homepage, /href="\/invoice-generator\/photographers"/);
   assert.match(homepage, /<link rel="canonical" href="https:\/\/searya\.com\/">/);
   assert.match(homepage, /"@type":"Organization"/);
   assert.match(homepage, /"@type":"WebSite"/);

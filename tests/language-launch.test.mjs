@@ -51,15 +51,15 @@ test('Launch legal copy does not contain unfinished placeholders', () => {
 });
 
 test('The homepage explains the free tools and local-first document handling', () => {
-  assert.match(pageSource, /One free account for every tool/);
+  assert.match(pageSource, /Free · No sign-up required/);
   assert.match(pageSource, /Continue with Google/);
   assert.match(pageSource, /id="tool-auth-gate"/);
   assert.match(pageSource, /Your document data stays in this browser/);
-  assert.match(pageSource, /Create one free account to use every tool/);
+  assert.match(pageSource, /No account is required for normal tool use/);
 });
 
 test('Social sharing metadata uses an absolute English preview card', () => {
-  assert.match(pageSource, /<title>Free Small Business Tools — Calculators &amp; Documents \| Searya<\/title>/);
+  assert.match(pageSource, /<title>Free Time Card Calculator &amp; Invoice Generator \| Searya<\/title>/);
   assert.match(pageSource, /property="og:locale" content="en_US"/);
   assert.match(pageSource, /property="og:image" content="https:\/\/searya\.com\/public\/searya-tools-preview\.png\?v=20260816-2"/);
   assert.match(pageSource, /property="og:image:width" content="1200"/);
@@ -81,7 +81,7 @@ test('The homepage exposes the core tools as crawlable links', () => {
   assert.match(pageSource, /href="\/qr-code-generator"/);
   assert.match(pageSource, /href="\/time-card-calculator"/);
   assert.match(pageSource, /href="\/invoice-generator"/);
-  assert.match(pageSource, /<h3>Invoice Maker<\/h3>/);
+  assert.match(pageSource, /<h3>Invoice Generator<\/h3>/);
   assert.match(pageSource, /href="\/digital-business-card"/);
 });
 
@@ -103,7 +103,7 @@ test('The tool homepage has clear navigation and launch pricing', () => {
   assert.doesNotMatch(pageSource, /All seven generators and calculators/);
   assert.match(pageSource, /\$0/);
   assert.match(pageSource, /\$7\.99/);
-  assert.match(pageSource, /Create one free account to use every tool/);
+  assert.match(pageSource, /No account is required for normal tool use/);
 });
 
 test('The homepage contains no marketplace samples or fake traction claims', () => {
