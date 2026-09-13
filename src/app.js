@@ -1,7 +1,7 @@
 import { initialForSaleListings, initialWtbListings } from './data/seedListings.js?v=20260813-1';
 import { initialMessages } from './data/mockData.js?v=20260812-7';
 import { translations } from './data/translations.js?v=20260813-1';
-import { ApiError, SearyaApi } from './api.js?v=20260812-10';
+import { ApiError, SearyaApi } from './api.js?v=20260914-1';
 import { processImageFile } from './tool-utils.js?v=20260820-2';
 
 const CLIENT_STATE_KEY = 'searya-client-state-v1';
@@ -3484,6 +3484,7 @@ function renderAuthCard() {
 
     formContainer.innerHTML = `
       <form id="auth-form" class="space-y-4">
+        <input type="text" id="auth-company-website" tabindex="-1" autocomplete="off" aria-hidden="true" class="hidden">
         <div>
           <label class="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">${isEn ? 'Full Name' : 'Ad Soyad'}</label>
           <div class="relative">
@@ -3584,7 +3585,7 @@ function renderAuthCard() {
     }
     try {
       const payload = authMode === 'register'
-        ? await SearyaApi.register({ name: document.getElementById('auth-fullname')?.value || '', email, password, role: authRole })
+        ? await SearyaApi.register({ name: document.getElementById('auth-fullname')?.value || '', email, password, role: authRole, companyWebsite: document.getElementById('auth-company-website')?.value || '' })
         : await SearyaApi.login({ email, password });
       state.backendReady = true;
       if (payload.verificationRequired) {

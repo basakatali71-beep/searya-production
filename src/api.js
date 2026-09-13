@@ -29,6 +29,32 @@ async function request(path, options = {}) {
   return payload;
 }
 
+let registrationChallengePromise;
+function registrationChallenge() {
+  if (!registrationChallengePromise) registrationChallengePromise = request('/api/auth/register-challenge');
+  return registrationChallengePromise;
+}
+
+// Start the invisible proof while the visitor reads the page. No CAPTCHA or
+// personal data is sent; the server only issues a short-lived signed token.
+registrationChallenge().catch(() => { registrationChallengePromise = null; });
+
+async function register(data) {
+  let challenge = await registrationChallenge();
+  if (Date.now() - Number(challenge.issuedAt || 0) > 55 * 60 * 1000) {
+    registrationChallengePromise = null;
+    challenge = await registrationChallenge();
+  }
+  const waitMs = Math.max(0, 1250 - (Date.now() - Number(challenge.issuedAt || 0)));
+  if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+  try {
+    return await request('/api/auth/register', { method: 'POST', body: { ...data, registrationProof: challenge.proof, companyWebsite: data.companyWebsite || '' } });
+  } finally {
+    registrationChallengePromise = null;
+    registrationChallenge().catch(() => { registrationChallengePromise = null; });
+  }
+}
+
 export const SearyaApi = {
   health: () => request('/api/health'),
   trackPageView: (path, referrer = '') => request('/api/analytics/pageview', { method: 'POST', body: { path, referrer } }),
@@ -37,7 +63,7 @@ export const SearyaApi = {
   revokeAnalytics: () => request('/api/analytics/consent', { method: 'DELETE' }),
   sendFeedback: data => request('/api/feedback', { method: 'POST', body: data }),
   me: () => request('/api/auth/me'),
-  register: data => request('/api/auth/register', { method: 'POST', body: data }),
+  register,
   login: data => request('/api/auth/login', { method: 'POST', body: data }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   forgotPassword: email => request('/api/auth/forgot-password', { method: 'POST', body: { email } }),

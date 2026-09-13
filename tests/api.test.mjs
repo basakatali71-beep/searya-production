@@ -782,6 +782,22 @@ test('administrator can review and approve a pending listing', async () => {
   });
   assert.equal(presenceEnter.status, 201);
 
+  const botPageView = await fetch(`${baseUrl}/api/analytics/pageview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'Googlebot/2.1', 'X-Forwarded-For': '203.0.113.210' },
+    body: JSON.stringify({ path: '/qr-code-generator' })
+  });
+  assert.equal(botPageView.status, 201);
+  for (let index = 0; index < 3; index += 1) {
+    const trackedError = await fetch(`${baseUrl}/api/analytics/event`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: visitorCookie },
+      body: JSON.stringify({ eventName: 'auth_failed', metadata: { mode: 'login', code: 'INVALID_CREDENTIALS' } })
+    });
+    assert.equal(trackedError.status, 201);
+  }
+  const unverifiedId = 'unverified-admin-metric-test';
+  db.prepare(`INSERT OR IGNORE INTO users(id,email,password_hash,name,role,status,is_admin,email_verified,is_verified,created_at,last_seen_at) VALUES(?,?,?,?,?,'active',0,0,0,?,?)`).run(unverifiedId, 'unverified-metric@example.com', 'test:hash', 'Unverified Metric', 'both', new Date().toISOString(), new Date().toISOString());
+
   const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -792,6 +808,11 @@ test('administrator can review and approve a pending listing', async () => {
   const overview = await fetch(`${baseUrl}/api/admin/overview`, { headers: { Cookie: adminCookie } }).then(response => response.json());
   assert.ok(overview.counts.pendingListings >= 1);
   assert.equal(overview.counts.visitorsToday, 1);
+  assert.ok(overview.counts.unverifiedUsers >= 1);
+  assert.ok(overview.analytics.audience.humanLikely >= 1);
+  assert.ok(overview.analytics.audience.suspiciousBots >= 1);
+  assert.equal(overview.analytics.errors.find(item => item.metadata?.code === 'INVALID_CREDENTIALS')?.count, 3);
+  assert.equal(overview.users.find(item => item.id === unverifiedId)?.emailVerified, false);
   assert.equal(overview.analytics.presence.activeNow, 1);
   assert.equal(overview.analytics.presence.enteredToday, 1);
   assert.equal(overview.analytics.presence.exitedToday, 0);

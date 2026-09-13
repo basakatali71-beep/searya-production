@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
@@ -50,6 +50,9 @@ const MAX_IMAGE_DATA_CHARACTERS = 2_900_000;
 const MAX_BUSINESS_PROFILE_IMAGE_CHARACTERS = 2_900_000;
 const MIN_NEW_PASSWORD_LENGTH = 12;
 const MAX_PASSWORD_LENGTH = 128;
+const REGISTRATION_PROOF_MAX_AGE_MS = 60 * 60 * 1000;
+const REGISTRATION_PROOF_MIN_AGE_MS = 1200;
+const REGISTRATION_PROOF_SECRET = String(process.env.REGISTRATION_PROOF_SECRET || process.env.SEARYA_ADMIN_PASSWORD || process.env.RESEND_API_KEY || randomBytes(32).toString('hex'));
 const CONTACT_UNLOCK_MESSAGE_COUNT = 6;
 const LAUNCH_FREE_LISTING_LIMIT = 3;
 const LAUNCH_FREE_CONNECTION_LIMIT = 10;
@@ -244,6 +247,8 @@ db.exec(`
     content TEXT NOT NULL DEFAULT '',
     term TEXT NOT NULL DEFAULT '',
     referrer TEXT NOT NULL DEFAULT '',
+    traffic_class TEXT NOT NULL DEFAULT 'unknown',
+    bot_reason TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   ) STRICT;
 
@@ -281,6 +286,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS analytics_events_created ON analytics_events(created_at DESC);
   CREATE INDEX IF NOT EXISTS analytics_events_name_created ON analytics_events(event_name, created_at DESC);
   CREATE INDEX IF NOT EXISTS analytics_events_visitor_created ON analytics_events(visitor_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS auth_attempts (
+    id TEXT PRIMARY KEY,
+    namespace TEXT NOT NULL,
+    identity_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS auth_attempts_identity_created ON auth_attempts(namespace,identity_hash,created_at DESC);
 
   CREATE TABLE IF NOT EXISTS blocks (
     blocker_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -423,6 +436,14 @@ for (const [column, definition] of [
     db.exec(`ALTER TABLE page_views ADD COLUMN ${column} ${definition};`);
   }
 }
+for (const [column, definition] of [
+  ['traffic_class', "TEXT NOT NULL DEFAULT 'unknown'"],
+  ['bot_reason', "TEXT NOT NULL DEFAULT ''"]
+]) {
+  if (!db.prepare('PRAGMA table_info(page_views)').all().some(item => item.name === column)) {
+    db.exec(`ALTER TABLE page_views ADD COLUMN ${column} ${definition};`);
+  }
+}
 
 const packages = Object.freeze({
   buyer_connections_10: { key: 'buyer_connections_10', name: '10 Buyer Connections', amountCents: 900, buyerConnections: 10 },
@@ -554,12 +575,12 @@ function recordBehaviorEvent(req, eventName, metadata = {}) {
   return true;
 }
 
-function behaviorAnalytics(since, presenceCutoff) {
+function behaviorAnalytics(since, presenceCutoff, includedVisitors = null) {
   const rows = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,
       ae.source,ae.medium,ae.campaign,ae.metadata_json AS metadataJson,ae.created_at AS createdAt
     FROM analytics_events ae
     WHERE ae.created_at>=? AND ae.event_name IN (${[...BEHAVIOR_EVENT_NAMES].map(() => '?').join(',')})
-    ORDER BY ae.created_at DESC LIMIT 5000`).all(since, ...BEHAVIOR_EVENT_NAMES);
+    ORDER BY ae.created_at DESC LIMIT 5000`).all(since, ...BEHAVIOR_EVENT_NAMES).filter(row => !includedVisitors || includedVisitors.has(row.visitorId));
   const events = rows.map(row => {
     let metadata = {};
     try { metadata = cleanBehaviorMetadata(JSON.parse(row.metadataJson || '{}')); } catch { metadata = {}; }
@@ -597,10 +618,9 @@ function behaviorAnalytics(since, presenceCutoff) {
       (SELECT pv.source FROM page_views pv WHERE pv.visitor_id=vs.visitor_id ORDER BY CASE WHEN pv.source='direct' THEN 1 ELSE 0 END,pv.created_at DESC LIMIT 1) AS source,
       (SELECT pv.campaign FROM page_views pv WHERE pv.visitor_id=vs.visitor_id ORDER BY pv.created_at DESC LIMIT 1) AS campaign
     FROM visitor_sessions vs LEFT JOIN users u ON u.id=vs.user_id
-    WHERE vs.started_at>=? ORDER BY vs.started_at DESC LIMIT 100`).all(since);
-  const sessionStats = db.prepare(`SELECT COUNT(*) AS total,
-      COALESCE(AVG(MAX(0,(julianday(COALESCE(ended_at,last_seen_at))-julianday(started_at))*86400)),0) AS avgDuration
-    FROM visitor_sessions WHERE started_at>=?`).get(since);
+    WHERE vs.started_at>=? ORDER BY vs.started_at DESC LIMIT 1000`).all(since).filter(row => !includedVisitors || includedVisitors.has(row.visitorId));
+  const durations = sessions.map(session => Math.max(0, (Date.parse(session.endedAt || session.lastSeenAt) - Date.parse(session.startedAt)) / 1000)).filter(Number.isFinite);
+  const sessionStats = { total: sessions.length, avgDuration: durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : 0 };
   const eventsBySession = new Map();
   for (const event of [...events].reverse()) {
     const sessionId = event.metadata.sessionId;
@@ -633,13 +653,14 @@ function behaviorAnalytics(since, presenceCutoff) {
       events: sessionEvents.slice(-20).map(event => ({ eventName: event.eventName, metadata: event.metadata, createdAt: event.createdAt }))
     };
   });
-  const exitPages = db.prepare(`SELECT path AS key,COUNT(*) AS count FROM visitor_sessions WHERE started_at>=? AND ended_at IS NOT NULL GROUP BY path ORDER BY count DESC LIMIT 8`).all(since);
-  const devices = db.prepare(`SELECT device AS key,COUNT(*) AS count FROM visitor_sessions WHERE started_at>=? GROUP BY device ORDER BY count DESC`).all(since);
+  const summarizeSessions = (values, keyOf) => [...values.reduce((map, item) => { const key = keyOf(item); map.set(key, (map.get(key) || 0) + 1); return map; }, new Map())].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
+  const exitPages = summarizeSessions(sessions.filter(item => item.endedAt), item => item.path).slice(0, 8);
+  const devices = summarizeSessions(sessions, item => item.device || 'unknown');
   const count = name => eventTotals.get(name)?.count || 0;
   return {
     summary: {
       sessions: sessionStats.total,
-      activeNow: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE ended_at IS NULL AND last_seen_at>=?').get(presenceCutoff).count,
+      activeNow: new Set(sessions.filter(item => !item.endedAt && item.lastSeenAt >= presenceCutoff).map(item => item.visitorId)).size,
       avgDurationSeconds: Math.max(0, Math.round(sessionStats.avgDuration || 0)),
       bounceRate: sessions.length ? Math.round((bounceSessions / sessions.length) * 100) : 0,
       feedbackResponses: count('exit_feedback_submitted'),
@@ -654,6 +675,59 @@ function behaviorAnalytics(since, presenceCutoff) {
     exitPages,
     devices,
     journeys: journeys.slice(0, 25)
+  };
+}
+
+// Raw analytics rows remain untouched. This classifier is intentionally applied at
+// query time so historical data can be normalized as detection improves.
+function trafficInsights(since) {
+  const rows = db.prepare(`WITH views AS (
+      SELECT visitor_id AS visitorId,COUNT(*) AS views,
+        MAX(CASE WHEN traffic_class IN ('bot','suspicious') THEN 1 ELSE 0 END) AS knownBot,
+        MAX(CASE WHEN bot_reason<>'' THEN bot_reason ELSE '' END) AS botReason
+      FROM page_views WHERE created_at>=? GROUP BY visitor_id
+    ), events AS (
+      SELECT visitor_id AS visitorId,COUNT(*) AS events,
+        COUNT(DISTINCT CASE WHEN event_name='tool_opened' THEN COALESCE(json_extract(metadata_json,'$.tool'),'unknown') END) AS toolsOpened,
+        SUM(CASE WHEN event_name IN ('tool_interaction_started','tool_completed','tool_exported','tool_saved') THEN 1 ELSE 0 END) AS meaningfulEvents
+      FROM analytics_events WHERE created_at>=? GROUP BY visitor_id
+    ), sessions AS (
+      SELECT visitor_id AS visitorId,MAX(MAX(0,(julianday(COALESCE(ended_at,last_seen_at))-julianday(started_at))*86400)) AS maxDuration
+      FROM visitor_sessions WHERE started_at>=? GROUP BY visitor_id
+    )
+    SELECT v.visitorId,v.views,v.knownBot,v.botReason,COALESCE(e.events,0) AS events,
+      COALESCE(e.toolsOpened,0) AS toolsOpened,COALESCE(e.meaningfulEvents,0) AS meaningfulEvents,
+      COALESCE(s.maxDuration,0) AS maxDuration,
+      MAX(CASE WHEN u.email_verified=1 AND u.is_admin=0 THEN 1 ELSE 0 END) AS verifiedUser
+    FROM views v
+    LEFT JOIN events e ON e.visitorId=v.visitorId
+    LEFT JOIN sessions s ON s.visitorId=v.visitorId
+    LEFT JOIN analytics_events ae ON ae.visitor_id=v.visitorId
+    LEFT JOIN users u ON u.id=ae.user_id
+    GROUP BY v.visitorId`).all(since, since, since);
+  const human = new Set();
+  const suspicious = new Set();
+  const reasons = new Map();
+  for (const row of rows) {
+    let reason = '';
+    if (row.knownBot) reason = row.botReason || 'known_crawler';
+    else if (row.toolsOpened >= 8 && row.meaningfulEvents === 0) reason = 'many_tools_without_interaction';
+    else if (row.views >= 40 && row.meaningfulEvents === 0) reason = 'high_volume_without_interaction';
+    if (reason) {
+      suspicious.add(row.visitorId);
+      reasons.set(reason, (reasons.get(reason) || 0) + 1);
+    } else human.add(row.visitorId);
+  }
+  return {
+    human,
+    suspicious,
+    summary: {
+      humanLikely: human.size,
+      suspiciousBots: suspicious.size,
+      totalObserved: rows.length,
+      verifiedVisitors: rows.filter(row => row.verifiedUser).length,
+      reasons: [...reasons].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count)
+    }
   };
 }
 
@@ -686,6 +760,44 @@ function verifyPassword(password, stored) {
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function hmac(value) {
+  return createHmac('sha256', REGISTRATION_PROOF_SECRET).update(value).digest('base64url');
+}
+
+function createRegistrationProof() {
+  const issuedAt = Date.now();
+  const nonce = randomBytes(18).toString('base64url');
+  const payload = `${issuedAt}.${nonce}`;
+  return { proof: `${payload}.${hmac(payload)}`, issuedAt };
+}
+
+function validRegistrationProof(body) {
+  if (NODE_ENV !== 'production') return true;
+  if (cleanText(body.companyWebsite, 200)) return false;
+  const parts = String(body.registrationProof || '').split('.');
+  if (parts.length !== 3) return false;
+  const [issuedAtText, nonce, signature] = parts;
+  const issuedAt = Number(issuedAtText);
+  const age = Date.now() - issuedAt;
+  if (!Number.isFinite(issuedAt) || !/^[A-Za-z0-9_-]{20,40}$/.test(nonce) || age < REGISTRATION_PROOF_MIN_AGE_MS || age > REGISTRATION_PROOF_MAX_AGE_MS) return false;
+  const expected = Buffer.from(hmac(`${issuedAtText}.${nonce}`));
+  const actual = Buffer.from(signature);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function requestTrafficClass(req) {
+  const userAgent = String(req.headers['user-agent'] || '').slice(0, 500).toLowerCase();
+  if (!userAgent) return { trafficClass: 'suspicious', botReason: 'missing_user_agent' };
+  const botPatterns = [
+    ['search_crawler', /googlebot|bingbot|yandexbot|duckduckbot|baiduspider|petalbot/],
+    ['seo_crawler', /semrushbot|ahrefsbot|mj12bot|dotbot|screaming frog|siteauditbot/],
+    ['automation', /headlesschrome|phantomjs|selenium|playwright|puppeteer|python-requests|curl\/|wget\/|go-http-client/],
+    ['social_preview', /twitterbot|facebookexternalhit|linkedinbot|slackbot|discordbot|whatsapp/]
+  ];
+  const match = botPatterns.find(([, pattern]) => pattern.test(userAgent));
+  return match ? { trafficClass: 'bot', botReason: match[0] } : { trafficClass: 'human_likely', botReason: '' };
 }
 
 function parseCookies(req) {
@@ -1015,6 +1127,17 @@ function rateLimited(req, key, limit, windowMs) {
 function identityRateLimited(namespace, identity, limit, windowMs) {
   const identityHash = sha256(String(identity || '').trim().toLowerCase()).slice(0, 24);
   return rateBucketExceeded(`identity:${namespace}:${identityHash}`, limit, windowMs);
+}
+
+function persistentIdentityRateLimited(namespace, identity, limit, windowMs) {
+  const normalized = String(identity || '').trim().toLowerCase();
+  if (!normalized) return true;
+  const identityHash = sha256(normalized);
+  const cutoff = new Date(Date.now() - windowMs).toISOString();
+  const count = Number(db.prepare('SELECT COUNT(*) AS count FROM auth_attempts WHERE namespace=? AND identity_hash=? AND created_at>=?').get(namespace, identityHash, cutoff)?.count || 0);
+  db.prepare('INSERT INTO auth_attempts(id,namespace,identity_hash,created_at) VALUES(?,?,?,?)').run(randomUUID(), namespace, identityHash, nowIso());
+  if (Math.random() < 0.02) db.prepare('DELETE FROM auth_attempts WHERE created_at<?').run(new Date(Date.now() - 7 * 86400000).toISOString());
+  return count >= limit;
 }
 
 function validNewPassword(password) {
@@ -1482,7 +1605,8 @@ async function handleApi(req, res, url) {
     const visitorId = /^[a-f0-9-]{20,50}$/i.test(existingId) ? existingId : randomUUID();
     const path = cleanText(body.path || '/', 500);
     const attribution = analyticsAttribution(path, body.referrer || req.headers.referer || '');
-    db.prepare('INSERT INTO page_views(id,visitor_id,path,source,medium,campaign,content,term,referrer,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(randomUUID(), visitorId, path, attribution.source, attribution.medium, attribution.campaign, attribution.content, attribution.term, attribution.referrer, nowIso());
+    const traffic = requestTrafficClass(req);
+    db.prepare('INSERT INTO page_views(id,visitor_id,path,source,medium,campaign,content,term,referrer,traffic_class,bot_reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(randomUUID(), visitorId, path, attribution.source, attribution.medium, attribution.campaign, attribution.content, attribution.term, attribution.referrer, traffic.trafficClass, traffic.botReason, nowIso());
     return json(res, 201, { ok: true }, existingId ? {} : { 'Set-Cookie': visitorCookie(visitorId) });
   }
 
@@ -1550,14 +1674,22 @@ async function handleApi(req, res, url) {
     return json(res, 202, { received: true });
   }
 
+  if (method === 'GET' && pathname === '/api/auth/register-challenge') {
+    if (rateLimited(req, 'register-challenge', 30, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Please wait before trying to create an account again.');
+    return json(res, 200, createRegistrationProof());
+  }
+
   if (method === 'POST' && pathname === '/api/auth/register') {
-    if (rateLimited(req, 'register', 8, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many registration attempts. Please try again later.');
+    if (rateLimited(req, 'register-15m', NODE_ENV === 'production' ? 3 : 50, 15 * 60 * 1000) || rateLimited(req, 'register-day', NODE_ENV === 'production' ? 10 : 200, 24 * 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many registration attempts. Please try again later.');
     if (NODE_ENV === 'production' && (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)) return fail(res, 503, 'EMAIL_NOT_CONFIGURED', 'The registration email service is not configured.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     const name = cleanText(body.name, 80);
     const role = ['buyer', 'seller', 'both'].includes(body.role) ? body.role : 'buyer';
+    if (!validRegistrationProof(body)) return fail(res, 422, 'BOT_CHECK_FAILED', 'We could not verify this registration. Refresh the page and try again.');
+    if (NODE_ENV === 'production' && (persistentIdentityRateLimited('register-ip', requestIpAddress(req), 10, 24 * 60 * 60 * 1000) || persistentIdentityRateLimited('register-email', email, 6, 24 * 60 * 60 * 1000))) return fail(res, 429, 'RATE_LIMIT', 'Too many registration attempts. Please try again later.');
+    if (NODE_ENV === 'production' && (identityRateLimited('register-hour', email, 3, 60 * 60 * 1000) || identityRateLimited('register-day', email, 6, 24 * 60 * 60 * 1000))) return fail(res, 429, 'RATE_LIMIT', 'Too many registration attempts for this email. Please try again later.');
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validNewPassword(password) || name.length < 2) return fail(res, 422, 'INVALID_INPUT', `A name, valid email and password of ${MIN_NEW_PASSWORD_LENGTH}–${MAX_PASSWORD_LENGTH} characters are required.`);
     const existingUser = db.prepare('SELECT * FROM users WHERE email=?').get(email);
     if (existingUser) {
@@ -1593,11 +1725,12 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && pathname === '/api/auth/login') {
-    if (rateLimited(req, 'login', 20, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
+    if (rateLimited(req, 'login-15m', NODE_ENV === 'production' ? 12 : 20, 15 * 60 * 1000) || rateLimited(req, 'login-hour', NODE_ENV === 'production' ? 40 : 100, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
     const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
-    if (email.length > 254 || password.length > MAX_PASSWORD_LENGTH || identityRateLimited('login', email, 8, 15 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
+    if (NODE_ENV === 'production' && (persistentIdentityRateLimited('login-ip', requestIpAddress(req), 40, 60 * 60 * 1000) || persistentIdentityRateLimited('login-email', email, 15, 60 * 60 * 1000))) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
+    if (email.length > 254 || password.length > MAX_PASSWORD_LENGTH || identityRateLimited('login-15m', email, NODE_ENV === 'production' ? 5 : 8, 15 * 60 * 1000) || identityRateLimited('login-hour', email, NODE_ENV === 'production' ? 15 : 100, 60 * 60 * 1000)) return fail(res, 429, 'RATE_LIMIT', 'Too many sign-in attempts. Please try again later.');
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
     if (!user || !verifyPassword(password, user.password_hash) || user.status !== 'active') return fail(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
     if (!user.email_verified) return fail(res, 403, 'EMAIL_NOT_VERIFIED', 'Verify your email address before signing in.');
@@ -2209,37 +2342,46 @@ async function handleApi(req, res, url) {
     db.prepare(`UPDATE visitor_sessions SET ended_at=last_seen_at,end_reason='timeout' WHERE ended_at IS NULL AND last_seen_at<?`).run(presenceCutoff);
     db.prepare('DELETE FROM visitor_sessions WHERE started_at<?').run(new Date(Date.now() - 90 * 86400000).toISOString());
     db.prepare('DELETE FROM analytics_events WHERE created_at<?').run(new Date(Date.now() - 180 * 86400000).toISOString());
-    const dailyRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS views,COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE created_at>=? GROUP BY day`).all(sevenDaysIso.toISOString());
-    const signupRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS signups FROM users WHERE created_at>=? AND email IS NOT NULL AND is_admin=0 GROUP BY day`).all(sevenDaysIso.toISOString());
-    const dailyMap = new Map(dailyRows.map(row => [row.day, row]));
+    const traffic30d = trafficInsights(thirtyDaysIso.toISOString());
+    const sevenDayViews = db.prepare(`SELECT substr(created_at,1,10) AS day,visitor_id AS visitorId FROM page_views WHERE created_at>=?`).all(sevenDaysIso.toISOString()).filter(row => traffic30d.human.has(row.visitorId));
+    const dailyMap = new Map();
+    for (const row of sevenDayViews) {
+      const item = dailyMap.get(row.day) || { day: row.day, views: 0, visitorIds: new Set() };
+      item.views += 1; item.visitorIds.add(row.visitorId); dailyMap.set(row.day, item);
+    }
+    const signupRows = db.prepare(`SELECT substr(created_at,1,10) AS day,COUNT(*) AS signups FROM users WHERE created_at>=? AND email IS NOT NULL AND email_verified=1 AND is_admin=0 GROUP BY day`).all(sevenDaysIso.toISOString());
     const signupMap = new Map(signupRows.map(row => [row.day, row.signups]));
     const daily = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(sevenDaysIso.getTime() + index * 86400000);
       const day = date.toISOString().slice(0, 10);
-      return { day, views: dailyMap.get(day)?.views || 0, visitors: dailyMap.get(day)?.visitors || 0, signups: signupMap.get(day) || 0 };
+      return { day, views: dailyMap.get(day)?.views || 0, visitors: dailyMap.get(day)?.visitorIds.size || 0, signups: signupMap.get(day) || 0 };
     });
     const campaignVisits = db.prepare(`WITH ranked AS (
       SELECT visitor_id,source,medium,campaign,ROW_NUMBER() OVER(PARTITION BY visitor_id ORDER BY CASE WHEN source='direct' THEN 1 ELSE 0 END,created_at DESC) AS rank
       FROM page_views WHERE created_at>=?
-    ) SELECT source,medium,campaign,COUNT(*) AS visitors FROM ranked WHERE rank=1 GROUP BY source,medium,campaign`).all(thirtyDaysIso.toISOString());
-    const campaignEvents = db.prepare(`SELECT source,medium,campaign,event_name AS eventName,COUNT(DISTINCT visitor_id) AS total FROM analytics_events WHERE created_at>=? GROUP BY source,medium,campaign,event_name`).all(thirtyDaysIso.toISOString());
+    ) SELECT visitor_id AS visitorId,source,medium,campaign FROM ranked WHERE rank=1`).all(thirtyDaysIso.toISOString()).filter(row => traffic30d.human.has(row.visitorId));
+    const campaignEvents = db.prepare(`SELECT source,medium,campaign,event_name AS eventName,visitor_id AS visitorId FROM analytics_events WHERE created_at>=? GROUP BY source,medium,campaign,event_name,visitor_id`).all(thirtyDaysIso.toISOString()).filter(row => traffic30d.human.has(row.visitorId));
     const campaignMap = new Map();
     const campaignKey = row => `${row.source}\u0000${row.medium}\u0000${row.campaign}`;
-    for (const row of campaignVisits) campaignMap.set(campaignKey(row), { source: row.source, medium: row.medium, campaign: row.campaign, visitors: row.visitors, signups: 0, listings: 0, conversations: 0, toolStarts: 0, checkouts: 0 });
+    for (const row of campaignVisits) {
+      const key = campaignKey(row);
+      const item = campaignMap.get(key) || { source: row.source, medium: row.medium, campaign: row.campaign, visitors: 0, signups: 0, listings: 0, conversations: 0, toolStarts: 0, checkouts: 0 };
+      item.visitors += 1; campaignMap.set(key, item);
+    }
     for (const row of campaignEvents) {
       const key = campaignKey(row);
       const item = campaignMap.get(key) || { source: row.source, medium: row.medium, campaign: row.campaign, visitors: 0, signups: 0, listings: 0, conversations: 0, toolStarts: 0, checkouts: 0 };
-      if (row.eventName === 'signup_completed') item.signups = row.total;
-      if (row.eventName === 'listing_created') item.listings = row.total;
-      if (row.eventName === 'conversation_started') item.conversations = row.total;
-      if (row.eventName === 'tool_opened') item.toolStarts = row.total;
-      if (row.eventName === 'checkout_started') item.checkouts = row.total;
+      if (row.eventName === 'signup_completed') item.signups += 1;
+      if (row.eventName === 'listing_created') item.listings += 1;
+      if (row.eventName === 'conversation_started') item.conversations += 1;
+      if (row.eventName === 'tool_opened') item.toolStarts += 1;
+      if (row.eventName === 'checkout_started') item.checkouts += 1;
       campaignMap.set(key, item);
     }
     const campaigns = [...campaignMap.values()].sort((a, b) => b.visitors - a.visitors || b.signups - a.signups).slice(0, 30);
-    const measuredEventCount = eventName => db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM analytics_events WHERE event_name=? AND created_at>=?').get(eventName, thirtyDaysIso.toISOString()).count;
-    const behavior = behaviorAnalytics(thirtyDaysIso.toISOString(), presenceCutoff);
-    const toolUsage = db.prepare(`SELECT COALESCE(json_extract(metadata_json,'$.tool'),'unknown') AS tool,event_name AS eventName,visitor_id AS visitorId FROM analytics_events WHERE created_at>=? AND event_name IN ('tool_opened','tool_interaction_started','tool_completed','tool_exported','tool_saved','tool_abandoned') GROUP BY tool,event_name,visitor_id ORDER BY event_name LIMIT 10000`).all(thirtyDaysIso.toISOString());
+    const measuredEventCount = eventName => new Set(db.prepare('SELECT DISTINCT visitor_id AS visitorId FROM analytics_events WHERE event_name=? AND created_at>=?').all(eventName, thirtyDaysIso.toISOString()).filter(row => traffic30d.human.has(row.visitorId)).map(row => row.visitorId)).size;
+    const behavior = behaviorAnalytics(thirtyDaysIso.toISOString(), presenceCutoff, traffic30d.human);
+    const toolUsage = db.prepare(`SELECT COALESCE(json_extract(metadata_json,'$.tool'),'unknown') AS tool,event_name AS eventName,visitor_id AS visitorId FROM analytics_events WHERE created_at>=? AND event_name IN ('tool_opened','tool_interaction_started','tool_completed','tool_exported','tool_saved','tool_abandoned') GROUP BY tool,event_name,visitor_id ORDER BY event_name LIMIT 10000`).all(thirtyDaysIso.toISOString()).filter(row => traffic30d.human.has(row.visitorId));
     const canonicalTool = value => ({ qr_code:'qr', 'qr-code':'qr', time:'time_card', document:'invoice', card:'digital_business_card', signature:'email_signature', expenses:'expense_tracker', margin:'profit_margin', salesTax:'sales_tax', jobCost:'job_cost', hourlyRate:'hourly_rate', breakEven:'break_even' }[value] || value || 'unknown');
     const toolMap = new Map();
     for (const row of toolUsage) {
@@ -2251,42 +2393,68 @@ async function handleApi(req, res, url) {
     }
     const tools = [...toolMap.values()].map(item => ({ tool:item.tool, opened:item.visitors.opened.size, interacted:item.visitors.interacted.size, completed:item.visitors.completed.size, exported:item.visitors.exported.size, saved:item.visitors.saved.size, abandoned:item.visitors.abandoned.size, users:item.visitors.opened.size })).sort((a,b)=>b.opened-a.opened);
     const recentToolActivity = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.source,ae.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('tool_opened','tool_interaction_started','tool_completed','tool_exported','tool_saved','tool_abandoned','signup_completed','checkout_started','checkout_failed') ORDER BY ae.created_at DESC LIMIT 80`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
-    const errorEvents = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.created_at AS createdAt,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('ui_error','auth_failed','checkout_failed') ORDER BY ae.created_at DESC LIMIT 100`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
+    const rawErrorEvents = db.prepare(`SELECT ae.event_name AS eventName,ae.visitor_id AS visitorId,ae.user_id AS userId,ae.metadata_json AS metadataJson,ae.created_at AS createdAt,u.email AS userEmail FROM analytics_events ae LEFT JOIN users u ON u.id=ae.user_id WHERE ae.event_name IN ('ui_error','auth_failed','checkout_failed') ORDER BY ae.created_at DESC LIMIT 1000`).all().map(row => ({ ...row, metadata: JSON.parse(row.metadataJson || '{}'), metadataJson: undefined }));
+    const groupedErrors = new Map();
+    for (const row of rawErrorEvents) {
+      const identity = row.userId || row.visitorId || 'unknown';
+      const detail = row.metadata?.code || row.metadata?.reason || 'unknown';
+      const key = `${row.eventName}\u0000${identity}\u0000${detail}`;
+      const item = groupedErrors.get(key) || { ...row, count: 0, firstSeenAt: row.createdAt, lastSeenAt: row.createdAt };
+      item.count += 1;
+      if (row.createdAt < item.firstSeenAt) item.firstSeenAt = row.createdAt;
+      if (row.createdAt > item.lastSeenAt) item.lastSeenAt = row.createdAt;
+      groupedErrors.set(key, item);
+    }
+    const errorEvents = [...groupedErrors.values()].sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt)).slice(0, 100);
+    const humanToday = new Set(db.prepare('SELECT DISTINCT visitor_id AS visitorId FROM page_views WHERE created_at>=?').all(todayIso).filter(row => traffic30d.human.has(row.visitorId)).map(row => row.visitorId));
+    const human7d = new Set(sevenDayViews.map(row => row.visitorId));
+    const pageViews7d = sevenDayViews.length;
+    const countHumanSessions = (where, value) => new Set(db.prepare(`SELECT DISTINCT visitor_id AS visitorId FROM visitor_sessions WHERE ${where}`).all(value).filter(row => traffic30d.human.has(row.visitorId)).map(row => row.visitorId)).size;
+    const humanEventCountSince = (eventName, since) => db.prepare('SELECT visitor_id AS visitorId FROM analytics_events WHERE event_name=? AND created_at>=?').all(eventName, since).filter(row => traffic30d.human.has(row.visitorId)).length;
     return json(res, 200, {
       counts: {
         pendingListings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='pending'`).get().count,
         openReports: db.prepare(`SELECT COUNT(*) AS count FROM reports WHERE status='open'`).get().count,
         seedMessageThreads: db.prepare(`SELECT COUNT(*) AS count FROM threads t JOIN listings l ON l.id=t.listing_id WHERE l.user_id LIKE 'seed-%' AND (t.user_a=? OR t.user_b=?)`).get(user.id, user.id).count,
-        users: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND is_admin=0').get().count,
-        usersToday: db.prepare('SELECT COUNT(*) AS count FROM users WHERE created_at>=? AND email IS NOT NULL AND is_admin=0').get(todayIso).count,
-        visitorsToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(todayIso).count,
-        visitors7d: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(sevenDaysIso.toISOString()).count,
-        pageViews7d: db.prepare('SELECT COUNT(*) AS count FROM page_views WHERE created_at>=?').get(sevenDaysIso.toISOString()).count,
+        users: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND email_verified=1 AND is_admin=0').get().count,
+        unverifiedUsers: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND email_verified=0 AND is_admin=0').get().count,
+        registeredUsers: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND is_admin=0').get().count,
+        usersToday: db.prepare('SELECT COUNT(*) AS count FROM users WHERE created_at>=? AND email IS NOT NULL AND email_verified=1 AND is_admin=0').get(todayIso).count,
+        visitorsToday: humanToday.size,
+        visitors7d: human7d.size,
+        pageViews7d,
         listings: db.prepare(`SELECT COUNT(*) AS count FROM listings WHERE user_id NOT LIKE 'seed-%'`).get().count,
         paidPurchases: db.prepare(`SELECT COUNT(*) AS count FROM purchases WHERE status='paid'`).get().count,
         revenueCents: db.prepare(`SELECT COALESCE(SUM(amount_cents),0) AS total FROM purchases WHERE status='paid' AND package_key LIKE 'tools_%'`).get().total,
         activeSubscribers: db.prepare("SELECT COUNT(*) AS count FROM users WHERE plan='pro' AND plan_status='active' AND (plan_renews_at IS NULL OR plan_renews_at>?)").get(nowIso()).count,
         savedItems: db.prepare('SELECT COUNT(*) AS count FROM tool_items').get().count,
-        toolCompletionsToday: db.prepare("SELECT COUNT(*) AS count FROM analytics_events WHERE event_name='tool_completed' AND created_at>=?").get(todayIso).count
+        toolCompletionsToday: humanEventCountSince('tool_completed', todayIso)
       },
       daily,
       analytics: {
         windowDays: 30,
         presence: {
-          activeNow: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE ended_at IS NULL AND last_seen_at>=?').get(presenceCutoff).count,
-          enteredToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE started_at>=?').get(todayIso).count,
-          exitedToday: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM visitor_sessions WHERE ended_at>=?').get(todayIso).count,
+          activeNow: countHumanSessions('ended_at IS NULL AND last_seen_at>=?', presenceCutoff),
+          enteredToday: countHumanSessions('started_at>=?', todayIso),
+          exitedToday: countHumanSessions('ended_at>=?', todayIso),
           activeWindowSeconds: PRESENCE_ACTIVE_WINDOW_SECONDS,
           updatedAt: nowIso()
         },
         funnel: {
-          visitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS count FROM page_views WHERE created_at>=?').get(thirtyDaysIso.toISOString()).count,
+          visitors: traffic30d.human.size,
           signups: measuredEventCount('signup_completed'),
           toolStarts: measuredEventCount('tool_opened'),
           toolCompletions: measuredEventCount('tool_completed'),
           checkouts: measuredEventCount('checkout_started')
         },
         campaigns,
+        audience: {
+          ...traffic30d.summary,
+          emailVerifiedUsers: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND email_verified=1 AND is_admin=0').get().count,
+          unverifiedUsers: db.prepare('SELECT COUNT(*) AS count FROM users WHERE email IS NOT NULL AND email_verified=0 AND is_admin=0').get().count,
+          toolUsers: measuredEventCount('tool_interaction_started'),
+          resultUsers: measuredEventCount('tool_completed')
+        },
         behavior,
         tools,
         errors: errorEvents,
@@ -2296,7 +2464,11 @@ async function handleApi(req, res, url) {
       emailLogs: db.prepare(`SELECT id,recipient,subject,status,provider_ref AS providerRef,error_message AS errorMessage,created_at AS createdAt FROM email_logs ORDER BY created_at DESC LIMIT 100`).all(),
       pendingListings: db.prepare(`SELECT * FROM listings WHERE status='pending' ORDER BY priority_review DESC,created_at`).all().map(listingFromRow),
       recentListings: db.prepare(`SELECT l.*,u.name AS owner_name,u.email AS owner_email FROM listings l JOIN users u ON u.id=l.user_id WHERE l.user_id NOT LIKE 'seed-%' ORDER BY l.created_at DESC LIMIT 50`).all().map(row => ({ ...listingFromRow(row), ownerName: row.owner_name, ownerEmail: row.owner_email })),
-      users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,plan,plan_status AS planStatus,plan_renews_at AS planRenewsAt,created_at AS createdAt,last_seen_at AS lastSeenAt,(SELECT COUNT(*) FROM tool_items ti WHERE ti.user_id=users.id) AS savedItems FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 200`).all(),
+      users: db.prepare(`SELECT id,email,name,role,status,is_admin AS isAdmin,is_verified AS isVerified,email_verified AS emailVerified,plan,plan_status AS planStatus,plan_renews_at AS planRenewsAt,created_at AS createdAt,last_seen_at AS lastSeenAt,
+        (SELECT COUNT(*) FROM tool_items ti WHERE ti.user_id=users.id) AS savedItems,
+        EXISTS(SELECT 1 FROM analytics_events ae WHERE ae.user_id=users.id AND ae.event_name='tool_interaction_started') AS usedTool,
+        EXISTS(SELECT 1 FROM analytics_events ae WHERE ae.user_id=users.id AND ae.event_name='tool_completed') AS gotResult
+        FROM users WHERE email IS NOT NULL ORDER BY created_at DESC LIMIT 200`).all().map(row => ({ ...row, emailVerified: Boolean(row.emailVerified), usedTool: Boolean(row.usedTool), gotResult: Boolean(row.gotResult) })),
       purchases: db.prepare(`SELECT p.id,p.package_key AS packageKey,p.amount_cents AS amountCents,p.currency,p.status,p.created_at AS createdAt,u.name AS userName,u.email AS userEmail FROM purchases p JOIN users u ON u.id=p.user_id WHERE p.package_key LIKE 'tools_%' ORDER BY p.created_at DESC LIMIT 100`).all(),
       reports: db.prepare(`SELECT r.id,r.target_type AS targetType,r.target_id AS targetId,r.reason,r.status,r.created_at AS createdAt,reporter.name AS reporterName,reporter.email AS reporterEmail,COALESCE(l.title,target.name,r.target_id) AS targetLabel FROM reports r JOIN users reporter ON reporter.id=r.reporter_id LEFT JOIN listings l ON r.target_type='listing' AND l.id=r.target_id LEFT JOIN users target ON r.target_type='user' AND target.id=r.target_id ORDER BY r.created_at DESC LIMIT 100`).all(),
       seedMessageThreads: db.prepare(`SELECT t.id,t.listing_id AS listingId,t.updated_at AS updatedAt,l.title,u.name AS visitorName,u.email AS visitorEmail FROM threads t JOIN listings l ON l.id=t.listing_id JOIN users u ON u.id=CASE WHEN t.user_a=? THEN t.user_b ELSE t.user_a END WHERE l.user_id LIKE 'seed-%' AND (t.user_a=? OR t.user_b=?) ORDER BY t.updated_at DESC LIMIT 100`).all(user.id, user.id, user.id).map(thread => ({
